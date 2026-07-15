@@ -1,3 +1,7 @@
 spring:
   application:
     name: vision
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:.env.${spring.profiles.active}[.properties]
