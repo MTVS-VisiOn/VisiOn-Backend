@@ -32,7 +32,7 @@ public class UserService implements UserDetailsService {
         PreConditions.check(userRepository.existsByPhoneNumber(request.phoneNumber()), ErrorCode.EXIST_PHONENUMBER);
 
         User user;
-        if (request.role() == UserRole.WARD) user = new User(request.email(), request.password(), request.nickname(), request.phoneNumber());
+        if (request.role() == UserRole.WARD) user = new User(request.email(), passwordEncoder.encode(request.password()), request.nickname(), request.phoneNumber());
         else {
             User ward = userRepository.findById(request.wardId()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_WARD));
             user = new User(request.email(), passwordEncoder.encode(request.password()), request.nickname(), request.phoneNumber(),ward);
@@ -43,7 +43,7 @@ public class UserService implements UserDetailsService {
     @Transactional(readOnly = true)
     public KeyPair login(LoginRequest request) {
         User user = userRepository.findByEmail(request.email()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
-        passwordEncoder.matches(request.password(), user.getPassword());
+        PreConditions.check(!passwordEncoder.matches(request.password(), user.getPassword()), ErrorCode.NOT_MATCH_PASSWORD);
         KeyPair keyPair = jwtTokenProvider.issueKeyPair(user.getId(), user.getEmail(), user.getRole());
         refreshTokenRepository.save(user.getId(), keyPair.refreshToken());
         return keyPair;
