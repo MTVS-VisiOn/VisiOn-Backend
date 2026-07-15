@@ -24,7 +24,7 @@ public class RefreshTokenRepository {
         return Optional.ofNullable(redisTemplate.opsForValue().get(KEY_PREFIX+userId));
     }
 
-    public void delete(String userId) {
+    public void delete(Long userId) {
         redisTemplate.delete(KEY_PREFIX+userId);
     }
 }

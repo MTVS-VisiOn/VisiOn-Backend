@@ -2,6 +2,7 @@ package mtvs.onvision.vision.auth.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.auth.dto.RefreshRequest;
 import mtvs.onvision.vision.common.response.ApiResponses;
 import mtvs.onvision.vision.common.response.ApiResult;
@@ -10,10 +11,8 @@ import mtvs.onvision.vision.auth.dto.KeyPair;
 import mtvs.onvision.vision.auth.dto.LoginRequest;
 import mtvs.onvision.vision.user.service.UserService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -30,6 +29,12 @@ public class AuthController {
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponses<KeyPair>> login(@RequestBody @Valid RefreshRequest request) {
         KeyPair response = userService.refreshToken(request);
-        return ApiResult.ok(SuccessCode.REFRESH_SUCCESS,  response);
+        return ApiResult.ok(SuccessCode.REFRESH_SUCCESS, response);
+    }
+
+    @DeleteMapping("/logout")
+    public ResponseEntity<ApiResponses<SuccessCode>> logout(@AuthenticationPrincipal CurrentUser currentUser) {
+        userService.logout(currentUser);
+        return ApiResult.ok(SuccessCode.LOGOUT_SUCCESS);
     }
 }

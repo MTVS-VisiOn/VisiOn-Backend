@@ -66,4 +66,8 @@ public class UserService implements UserDetailsService {
         User user = userRepository.findByEmail(username).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
         return new CurrentUser(user.getId(), user.getEmail(), user.getRole());
     }
+
+    public void logout(CurrentUser currentUser) {
+        refreshTokenRepository.delete(currentUser.getId());
+    }
 }
