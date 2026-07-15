@@ -15,7 +15,7 @@ public record SignupRequest(
 
         @NotBlank(message = "이름은 필수입니다.")
         @Size(max = 50, message = "이름은 최대 50자까지 가능합니다.")
-        String userName,
+        String nickname,
 
         @NotBlank(message = "전화번호는 필수입니다.")
         @Pattern(

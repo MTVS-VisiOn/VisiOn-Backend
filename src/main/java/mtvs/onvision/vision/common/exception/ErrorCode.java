@@ -14,6 +14,8 @@ public enum ErrorCode {
     EXIST_PHONENUMBER(HttpStatus.CONFLICT, "중복된 전화번호입니다."),
     NOT_FOUND_WARD(HttpStatus.NOT_FOUND, "해당하는 아이디의 피보호자를 찾을 수 없습니다."),
     NOT_FOUND_USER(HttpStatus.NOT_FOUND, "해당하는 아이디의 유저를 찾을 수 없습니다."),
+    NOT_FOUND_REFRESH(HttpStatus.NOT_FOUND, "해당하는 refresh 토큰을 찾을 수 없습니다."),
+    INVALID_REFRESH_TOKEN(HttpStatus.BAD_REQUEST, "refresh 토큰이 맞지 않습니다."),
 
     /*common*/
     REQUESTPARAM_REQUIRED(HttpStatus.BAD_REQUEST, "해당 파라미터는 필수값입니다. :::"),

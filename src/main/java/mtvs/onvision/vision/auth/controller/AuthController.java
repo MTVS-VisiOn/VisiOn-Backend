@@ -2,6 +2,7 @@ package mtvs.onvision.vision.auth.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import mtvs.onvision.vision.auth.dto.RefreshRequest;
 import mtvs.onvision.vision.common.response.ApiResponses;
 import mtvs.onvision.vision.common.response.ApiResult;
 import mtvs.onvision.vision.common.response.SuccessCode;
@@ -24,5 +25,11 @@ public class AuthController {
     public ResponseEntity<ApiResponses<KeyPair>> login(@RequestBody @Valid LoginRequest request) {
         KeyPair response = userService.login(request);
         return ApiResult.ok(SuccessCode.LOGIN_SUCCESS,  response);
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponses<KeyPair>> login(@RequestBody @Valid RefreshRequest request) {
+        KeyPair response = userService.refreshToken(request);
+        return ApiResult.ok(SuccessCode.REFRESH_SUCCESS,  response);
     }
 }
