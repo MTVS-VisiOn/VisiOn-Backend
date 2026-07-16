@@ -289,7 +289,7 @@ class AuthControllerTest {
         }
 
         @Nested
-        @DisplayName("Context: 만료되었거나 유효하지 않은 액세스 토큰이 주어지면")
+        @DisplayName("Context: 만료되었거나 유효하지 않은 리프레쉬 토큰이 주어지면")
         class Context_with_expired_token {
             @BeforeEach
             void setUp() {

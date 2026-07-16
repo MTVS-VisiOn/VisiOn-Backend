@@ -14,3 +14,14 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /v3/swagger-ui
+    display-request-duration: true
+    doc-expansion: list
+    persist-authorization: true
