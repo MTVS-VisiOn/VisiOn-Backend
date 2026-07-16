@@ -322,6 +322,54 @@ class AuthControllerTest {
         }
 
         @Nested
+        @DisplayName("Context: 올바르지 않은 request가 주어지면")
+        class Context_with_request_error {
+            @BeforeEach
+            void setUp() {
+            }
+
+            @Test
+            @DisplayName("(refreshToken을 안 보냈을때)It : 400 상태와 검증 실패 이유를 반환한다")
+            void it_return_400_badRequest_and_refreshToken_not_blank() throws Exception {
+                //given
+                request = new RefreshRequest(null);
+
+                //when-then
+                mockMvc.perform(
+                                post("/api/auth/refresh")
+                                        .with(csrf())
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(om.writeValueAsString(request))
+                        )
+                        .andExpect(status().isBadRequest())
+                        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                        .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()))
+                        .andExpect(jsonPath("$.message").value("refreshToken은 필수값입니다."))
+                        .andDo(print());
+            }
+
+            @Test
+            @DisplayName("(refreshToken이 빈 문자열일때)It : 400 상태와 검증 실패 이유를 반환한다")
+            void it_return_400_badRequest_and_refreshToken_blank() throws Exception {
+                //given
+                request = new RefreshRequest("");
+
+                //when-then
+                mockMvc.perform(
+                                post("/api/auth/refresh")
+                                        .with(csrf())
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(om.writeValueAsString(request))
+                        )
+                        .andExpect(status().isBadRequest())
+                        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                        .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()))
+                        .andExpect(jsonPath("$.message").value("refreshToken은 필수값입니다."))
+                        .andDo(print());
+            }
+        }
+
+        @Nested
         @DisplayName("Context: 비즈니스 예외가 발생하면")
         class Context_with_business_error {
             @BeforeEach

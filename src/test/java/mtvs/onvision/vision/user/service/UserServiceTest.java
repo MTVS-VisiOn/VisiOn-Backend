@@ -154,7 +154,7 @@ class UserServiceTest {
                 given(userRepository.existsByEmail(email)).willReturn(false);
                 given(userRepository.existsByPhoneNumber(phoneNumber)).willReturn(false);
                 given(passwordEncoder.encode(password)).willReturn(encodedPassword);
-                given(userRepository.findById(wardId)).willReturn(Optional.of(ward));
+                given(userRepository.findByIdAndRole(wardId, UserRole.WARD)).willReturn(Optional.of(ward));
                 //when
                 userService.signup(signupRequest);
 
@@ -184,7 +184,7 @@ class UserServiceTest {
                 //given
                 given(userRepository.existsByEmail(email)).willReturn(false);
                 given(userRepository.existsByPhoneNumber(phoneNumber)).willReturn(false);
-                given(userRepository.findById(wardId)).willReturn(Optional.empty());
+                given(userRepository.findByIdAndRole(wardId, UserRole.WARD)).willReturn(Optional.empty());
                 //when&then
                 BusinessException exception = assertThrows(BusinessException.class, () -> userService.signup(signupRequest));
                 assertThat(exception.getMessage()).isEqualTo(ErrorCode.NOT_FOUND_WARD.getMessage());
