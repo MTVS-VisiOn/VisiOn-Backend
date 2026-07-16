@@ -29,6 +29,6 @@ public class UserController implements UserControllerSupporter {
             if (request.wardId() == null) throw new BusinessException(ErrorCode.INVALID_WARD);
         }
         userService.signup(request);
-        return ApiResult.ok(SuccessCode.USER_CREATED);
+        return ApiResult.created(SuccessCode.USER_CREATED);
     }
 }
