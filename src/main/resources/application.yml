@@ -5,3 +5,18 @@ spring:
     import:
       - optional:file:.env[.properties]
       - optional:file:.env.${spring.profiles.active}[.properties]
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+
+
+
+jwt:
+  validations:
+    access: 30000
+#    access: 900000
+    refresh: 604800000
+  secrets:
+    app-key: ${JWT_APP_KEY}
+    origin-key: ${JWT_SECRET_KEY}
