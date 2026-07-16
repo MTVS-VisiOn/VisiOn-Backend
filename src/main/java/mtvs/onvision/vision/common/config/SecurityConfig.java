@@ -19,7 +19,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) {
         return http.cors(cors -> cors.disable())
                 .csrf(csrf -> csrf.disable())
                 .httpBasic(basic -> basic.disable())
@@ -27,7 +27,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth ->auth
                         .requestMatchers("/api/users/signup", "/api/auth/login").anonymous()
                         .requestMatchers("/api/users/refresh").permitAll()
-                        .requestMatchers("/api/common").authenticated()
+                        .requestMatchers("/api/common", "/api/auth/logout").authenticated()
                         .anyRequest().permitAll()
                 )
                 .exceptionHandling(exp -> exp
