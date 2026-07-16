@@ -34,7 +34,7 @@ public class UserService implements UserDetailsService {
         User user;
         if (request.role() == UserRole.WARD) user = new User(request.email(), passwordEncoder.encode(request.password()), request.nickname(), request.phoneNumber());
         else {
-            User ward = userRepository.findById(request.wardId()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_WARD));
+            User ward = userRepository.findByIdAndRole(request.wardId(), UserRole.WARD).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_WARD));
             user = new User(request.email(), passwordEncoder.encode(request.password()), request.nickname(), request.phoneNumber(),ward);
         }
         userRepository.save(user);
