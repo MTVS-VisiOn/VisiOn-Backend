@@ -3,6 +3,7 @@ package mtvs.onvision.vision.user.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -17,6 +18,38 @@ public interface UserControllerSupporter {
     @Operation(
             summary = "회원가입",
             description = "회원가입 API"
+    )
+    @RequestBody(
+            content = @Content(
+                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    examples = {
+                            @ExampleObject(
+                                    name = "피보호자(WARD) 회워가입",
+                                    value = """
+                                        {
+                                            "email":"test2@naver.com",
+                                            "password":"test1234",
+                                            "nickname":"test2",
+                                            "phoneNumber":"010-0000-0002",
+                                            "role":"WARD"
+                                        }
+                                        """
+                            ),
+                            @ExampleObject(
+                                    name = "보호자(GUARDIAN) 회원가입",
+                                    value = """
+                                        {
+                                            "email":"test3@naver.com",
+                                            "password":"test1234",
+                                            "nickname":"test3",
+                                            "phoneNumber":"010-0000-0003",
+                                            "role":"GUARDIAN",
+                                            "wardId":3
+                                        }
+                                        """
+                            )
+                    }
+            )
     )
     @ApiResponses(value = {
             @ApiResponse(
