@@ -4,7 +4,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
-import mtvs.onvision.vision.common.response.ApiResponses;
 import mtvs.onvision.vision.common.response.ApiResult;
 import mtvs.onvision.vision.common.response.SuccessCode;
 import mtvs.onvision.vision.user.domain.UserRole;
@@ -19,16 +18,17 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/users")
-public class UserController {
+public class UserController implements UserControllerSupporter {
 
     private final UserService userService;
 
+    @Override
     @PostMapping("/signup")
-    public ResponseEntity<ApiResponses<Void>> signup(@RequestBody @Valid SignupRequest request) {
+    public ResponseEntity<ApiResult<Void>> signup(@RequestBody @Valid SignupRequest request) {
         if (request.role() == UserRole.GUARDIAN) {
             if (request.wardId() == null) throw new BusinessException(ErrorCode.INVALID_WARD);
         }
         userService.signup(request);
-        return ApiResult.ok(SuccessCode.USER_CREATED);
+        return ApiResult.created(SuccessCode.USER_CREATED);
     }
 }

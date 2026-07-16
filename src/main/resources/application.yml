@@ -14,8 +14,7 @@ spring:
 
 jwt:
   validations:
-    access: 30000
-#    access: 900000
+    access: 900000
     refresh: 604800000
   secrets:
     app-key: ${JWT_APP_KEY}
