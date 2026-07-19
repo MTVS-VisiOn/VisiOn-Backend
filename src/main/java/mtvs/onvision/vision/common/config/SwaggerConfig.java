@@ -14,6 +14,7 @@ import org.springdoc.webmvc.ui.SwaggerIndexTransformer;
 import org.springdoc.webmvc.ui.SwaggerWelcomeCommon;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 
 @Configuration
 @OpenAPIDefinition(
@@ -23,6 +24,7 @@ import org.springframework.context.annotation.Configuration;
                 description = "OnVision API 명세"
         )
 )
+@Profile("!prod")
 public class SwaggerConfig {
     @Bean
     public OpenAPI openAPI() {
