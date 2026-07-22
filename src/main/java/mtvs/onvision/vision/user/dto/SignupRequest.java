@@ -50,13 +50,13 @@ public record SignupRequest(
 
         @NotNull(message = "유저의 역할은 필수입니다.")
         @Schema(
-                examples = "GUARDIAN",
+                examples = {"WARD", "GUARDIAN"},
                 description = "유저 역할, WARD 또는 GUARDIAN",
                 requiredMode = Schema.RequiredMode.REQUIRED
         )
         UserRole role,
         @Schema(
-                examples = "3",
+                examples = "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyIiwiZW1haWwiOiJ0ZXN0MUBuYXZlci5jb20iLCJyb2xlIjoiR1VBUkRJQU4iLCJpYXQiOjE3ODQ2OTc2OTgsImV4cCI6MTc4NDY5ODU5OH0.JdRlH8l-sMTe9Z7QQQmxtLbgT9qNWWkuabcFkw8cpEWVgPGihH8u1HqLofCr80ejBYGA5hIfY6Buzu9-r5IyQA",
                 description = "피보호자의 보호자 등록 토큰, 역할이 보호자일 경우 필수값"
         )
         String registerToken

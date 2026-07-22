@@ -7,6 +7,7 @@ import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.common.response.ApiResult;
 import mtvs.onvision.vision.common.response.SuccessCode;
+import mtvs.onvision.vision.common.swagger.ApiUnauthorized;
 import mtvs.onvision.vision.user.domain.UserRole;
 import mtvs.onvision.vision.user.dto.ResisterGuardianResponse;
 import mtvs.onvision.vision.user.dto.SettingRequest;
@@ -33,16 +34,20 @@ public class UserController implements UserControllerSupporter {
         return ApiResult.created(SuccessCode.USER_CREATED);
     }
 
+    @Override
     @GetMapping("/guardian/register-token")
+    @ApiUnauthorized
     public ResponseEntity<ApiResult<ResisterGuardianResponse>> getGuardianRegisterToken(@AuthenticationPrincipal CurrentUser currentUser) {
         ResisterGuardianResponse response = userService.getGuardianRegisterToken(currentUser);
         return ApiResult.ok(SuccessCode.REGISTER_TOKEN_CREATED, response);
     }
 
+    @Override
     @PutMapping("/settings")
+    @ApiUnauthorized
     public ResponseEntity<ApiResult<Void>> updateGuardianSettings(@RequestBody @Valid SettingRequest request,
                                                                   @AuthenticationPrincipal CurrentUser currentUser) {
         userService.updateGuardianSettings(request, currentUser);
-        return ApiResult.ok(SuccessCode.BUSINESS_SUCCESS);
+        return ApiResult.ok(SuccessCode.SETTING_SUCCESS);
     }
 }
