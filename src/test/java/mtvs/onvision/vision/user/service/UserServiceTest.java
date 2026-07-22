@@ -21,6 +21,8 @@ import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.user.domain.Relation;
 import mtvs.onvision.vision.user.domain.User;
 import mtvs.onvision.vision.user.domain.UserRole;
+import mtvs.onvision.vision.user.dto.ResisterGuardianResponse;
+import mtvs.onvision.vision.user.dto.SettingRequest;
 import mtvs.onvision.vision.user.dto.SignupRequest;
 import mtvs.onvision.vision.user.repository.RegisterTokenRepository;
 import mtvs.onvision.vision.user.repository.RelationRepository;
@@ -495,6 +497,84 @@ class UserServiceTest {
 
                 //then
                 verify(refreshTokenRepository).delete(userId);
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Describe: getGuardianRegisterToken 메서드는")
+    class Describe_with_getGuardianRegisterToken {
+
+        CurrentUser currentUser = new CurrentUser(userId, email, UserRole.WARD);
+
+        @Nested
+        @DisplayName("Context: 인증된 피보호자가 주어지면")
+        class Context_with_available_data {
+
+            @Test
+            @DisplayName("It : registerToken을 발급하고 저장한 뒤 응답으로 반환한다")
+            void it_success_issue_register_token() {
+                //given
+                given(jwtTokenProvider.issueRegisterToken(userId, email, UserRole.WARD)).willReturn(registerToken);
+                //when
+                ResisterGuardianResponse response = userService.getGuardianRegisterToken(currentUser);
+
+                //then
+                assertThat(response.token()).isEqualTo(registerToken);
+                verify(registerTokenRepository).save(userId, registerToken);
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Describe: updateGuardianSettings 메서드는")
+    class Describe_with_updateGuardianSettings {
+
+        CurrentUser currentUser = new CurrentUser(userId, email, UserRole.GUARDIAN);
+        SettingRequest settingRequest;
+        Relation relation;
+
+        @Nested
+        @DisplayName("Context: 보호자의 관계가 존재하면")
+        class Context_with_available_relation {
+            @BeforeEach
+            void setup() {
+                settingRequest = new SettingRequest(false, true);
+                User ward = new User("ward@test.com", encodedPassword, "피보호자", "010-9999-8888", UserRole.WARD);
+                User guardian = new User(email, encodedPassword, nickname, phoneNumber, UserRole.GUARDIAN);
+                relation = new Relation(ward, guardian);
+            }
+
+            @Test
+            @DisplayName("It : 관계의 설정을 갱신한다")
+            void it_success_update_settings() {
+                //given
+                given(relationRepository.findByGuardianId(userId)).willReturn(Optional.of(relation));
+                //when
+                userService.updateGuardianSettings(settingRequest, currentUser);
+
+                //then
+                assertThat(relation.getOfflineAlertEnabled()).isEqualTo(settingRequest.offlineAlertEnabled());
+                assertThat(relation.getArrivalAlertEnabled()).isEqualTo(settingRequest.arrivalAlertEnabled());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 보호자의 관계가 존재하지 않으면")
+        class Context_with_no_relation {
+            @BeforeEach
+            void setup() {
+                settingRequest = new SettingRequest(false, true);
+            }
+
+            @Test
+            @DisplayName("It : NOT_FOUND_GUARDIAN 오류 발생")
+            void it_throws_not_found_guardian() {
+                //given
+                given(relationRepository.findByGuardianId(userId)).willReturn(Optional.empty());
+                //when&then
+                BusinessException exception = assertThrows(BusinessException.class, () -> userService.updateGuardianSettings(settingRequest, currentUser));
+                assertThat(exception.getMessage()).isEqualTo(ErrorCode.NOT_FOUND_GUARDIAN.getMessage());
             }
         }
     }

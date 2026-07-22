@@ -1,5 +1,6 @@
 package mtvs.onvision.vision.user.controller;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -9,7 +10,10 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
+import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.entrypoint.JwtAccessDeniedHandler;
 import mtvs.onvision.vision.common.entrypoint.JwtAuthenticationEntryPoint;
 import mtvs.onvision.vision.common.exception.BusinessException;
@@ -17,15 +21,20 @@ import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.common.filter.JwtAuthenticationFilter;
 import mtvs.onvision.vision.common.response.SuccessCode;
 import mtvs.onvision.vision.user.domain.UserRole;
+import mtvs.onvision.vision.user.dto.ResisterGuardianResponse;
+import mtvs.onvision.vision.user.dto.SettingRequest;
 import mtvs.onvision.vision.user.dto.SignupRequest;
 import mtvs.onvision.vision.user.service.UserService;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -51,6 +60,7 @@ class UserControllerTest {
     @MockitoBean
     JwtAuthenticationFilter jwtAuthenticationFilter;
 
+    Long userId = 1L;
     String email = "user@test.com";
     String password = "password1234";
     String nickname = "테스트유저";
@@ -520,6 +530,153 @@ class UserControllerTest {
                         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                         .andExpect(jsonPath("$.code").value(ErrorCode.EXIST_GUARDIAN.name()))
                         .andExpect(jsonPath("$.message").value(ErrorCode.EXIST_GUARDIAN.getMessage()))
+                        .andDo(print());
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Describe: GET /guardian/register-token 엔드포인트는")
+    class getGuardianRegisterToken {
+
+        CurrentUser currentUser = new CurrentUser(userId, email, UserRole.WARD);
+
+        @BeforeEach
+        void setUp() {
+            SecurityContextHolder.getContext().setAuthentication(
+                    new UsernamePasswordAuthenticationToken(currentUser, null, currentUser.getAuthorities()));
+        }
+
+        @AfterEach
+        void tearDown() {
+            SecurityContextHolder.clearContext();
+        }
+
+        @Nested
+        @DisplayName("Context: 인증된 사용자가 요청하면")
+        class Context_with_authenticated_user {
+
+            @Test
+            @DisplayName("It : 200 상태와 생성된 등록 토큰을 반환한다")
+            void it_return_200_ok_and_register_token() throws Exception {
+                //given
+                given(userService.getGuardianRegisterToken(currentUser))
+                        .willReturn(new ResisterGuardianResponse(registerToken));
+
+                //when-then
+                mockMvc.perform(
+                                get("/api/users/guardian/register-token")
+                        )
+                        .andExpect(status().isOk())
+                        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                        .andExpect(jsonPath("$.code").value(SuccessCode.REGISTER_TOKEN_CREATED.name()))
+                        .andExpect(jsonPath("$.message").value(SuccessCode.REGISTER_TOKEN_CREATED.getSuccessMessage()))
+                        .andExpect(jsonPath("$.data.token").value(registerToken))
+                        .andDo(print());
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Describe: PUT /settings 엔드포인트는")
+    class updateGuardianSettings {
+
+        CurrentUser currentUser = new CurrentUser(userId, email, UserRole.GUARDIAN);
+        SettingRequest request;
+
+        @BeforeEach
+        void setUp() {
+            SecurityContextHolder.getContext().setAuthentication(
+                    new UsernamePasswordAuthenticationToken(currentUser, null, currentUser.getAuthorities()));
+        }
+
+        @AfterEach
+        void tearDown() {
+            SecurityContextHolder.clearContext();
+        }
+
+        @Nested
+        @DisplayName("Context: 올바른 설정값이 주어지면")
+        class Context_with_valid_setting {
+            @BeforeEach
+            void setUpRequest() {
+                request = new SettingRequest(true, false);
+            }
+
+            @Test
+            @DisplayName("It : 200 상태와 성공 메시지를 반환한다")
+            void it_return_200_ok_and_success_message() throws Exception {
+                //given
+                doNothing().when(userService).updateGuardianSettings(eq(request), eq(currentUser));
+
+                //when-then
+                mockMvc.perform(
+                                put("/api/users/settings")
+                                        .with(csrf())
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(om.writeValueAsString(request))
+                        )
+                        .andExpect(status().isOk())
+                        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                        .andExpect(jsonPath("$.code").value(SuccessCode.SETTING_SUCCESS.name()))
+                        .andExpect(jsonPath("$.message").value(SuccessCode.SETTING_SUCCESS.getSuccessMessage()))
+                        .andDo(print());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 필수 설정값이 null이면")
+        class Context_with_null_setting {
+            @BeforeEach
+            void setUpRequest() {
+                request = new SettingRequest(null, false);
+            }
+
+            @Test
+            @DisplayName("It : 400 상태와 검증 실패 이유를 반환한다")
+            void it_return_400_badRequest_and_setting_not_null() throws Exception {
+                //when-then
+                mockMvc.perform(
+                                put("/api/users/settings")
+                                        .with(csrf())
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(om.writeValueAsString(request))
+                        )
+                        .andExpect(status().isBadRequest())
+                        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                        .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()))
+                        .andExpect(jsonPath("$.message").value("필수 설정입니다."))
+                        .andDo(print());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 로그인한 보호자의 관계가 존재하지 않으면")
+        class Context_with_relation_not_found {
+            @BeforeEach
+            void setUpRequest() {
+                request = new SettingRequest(true, false);
+            }
+
+            @Test
+            @DisplayName("It : 404 상태와 NOT_FOUND_GUARDIAN을 반환한다")
+            void it_return_404_not_found_and_no_guardian() throws Exception {
+                //given
+                doThrow(new BusinessException(ErrorCode.NOT_FOUND_GUARDIAN))
+                        .when(userService)
+                        .updateGuardianSettings(eq(request), eq(currentUser));
+
+                //when-then
+                mockMvc.perform(
+                                put("/api/users/settings")
+                                        .with(csrf())
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(om.writeValueAsString(request))
+                        )
+                        .andExpect(status().isNotFound())
+                        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                        .andExpect(jsonPath("$.code").value(ErrorCode.NOT_FOUND_GUARDIAN.name()))
+                        .andExpect(jsonPath("$.message").value(ErrorCode.NOT_FOUND_GUARDIAN.getMessage()))
                         .andDo(print());
             }
         }
