@@ -7,9 +7,11 @@ import mtvs.onvision.vision.auth.service.JwtTokenProvider;
 import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.common.util.PreConditions;
+import mtvs.onvision.vision.user.domain.Relation;
 import mtvs.onvision.vision.user.domain.User;
 import mtvs.onvision.vision.user.domain.UserRole;
 import mtvs.onvision.vision.user.dto.SignupRequest;
+import mtvs.onvision.vision.user.repository.RelationRepository;
 import mtvs.onvision.vision.user.repository.UserRepository;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -22,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class UserService implements UserDetailsService {
     private final UserRepository userRepository;
+    private final RelationRepository relationRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenRepository refreshTokenRepository;
@@ -31,13 +34,18 @@ public class UserService implements UserDetailsService {
         PreConditions.check(userRepository.existsByEmail(request.email()), ErrorCode.EXIST_EMAIL);
         PreConditions.check(userRepository.existsByPhoneNumber(request.phoneNumber()), ErrorCode.EXIST_PHONENUMBER);
 
-        User user;
-        if (request.role() == UserRole.WARD) user = new User(request.email(), passwordEncoder.encode(request.password()), request.nickname(), request.phoneNumber());
+        if (request.role() == UserRole.WARD) {
+            User user = new User(request.email(), passwordEncoder.encode(request.password()), request.nickname(), request.phoneNumber(), UserRole.WARD);
+            userRepository.save(user);
+        }
         else {
             User ward = userRepository.findByIdAndRole(request.wardId(), UserRole.WARD).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_WARD));
-            user = new User(request.email(), passwordEncoder.encode(request.password()), request.nickname(), request.phoneNumber(),ward);
+            PreConditions.check(relationRepository.existsByWard(ward), ErrorCode.EXIST_GUARDIAN);
+            User guardian = new User(request.email(), passwordEncoder.encode(request.password()), request.nickname(), request.phoneNumber(),UserRole.GUARDIAN);
+            userRepository.save(guardian);
+            Relation relation = new Relation(ward, guardian);
+            relationRepository.save(relation);
         }
-        userRepository.save(user);
     }
 
     @Transactional(readOnly = true)
