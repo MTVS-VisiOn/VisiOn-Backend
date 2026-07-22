@@ -4,12 +4,13 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import mtvs.onvision.vision.common.domain.BaseEntity;
 
 @Entity
 @Getter
 @Table(name = "users")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class User {
+public class User extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(nullable = false)
@@ -28,25 +29,14 @@ public class User {
     private String phoneNumber;
 
     @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
     private UserRole role;
 
-    @OneToOne
-    private User ward;
-    //피보호자일때
-    public User (String email, String password, String nickname, String phoneNumber) {
+    public User (String email, String password, String nickname, String phoneNumber,  UserRole role) {
         this.email = email;
         this.password = password;
         this.nickname = nickname;
         this.phoneNumber = phoneNumber;
-        this.role = UserRole.WARD;
-    }
-    //보호자일때
-    public User (String email, String password, String nickname, String phoneNumber, User ward) {
-        this.email = email;
-        this.password = password;
-        this.nickname = nickname;
-        this.phoneNumber = phoneNumber;
-        this.role = UserRole.GUARDIAN;
-        this.ward = ward;
+        this.role = role;
     }
 }

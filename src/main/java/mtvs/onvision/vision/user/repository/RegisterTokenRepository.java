@@ -1,4 +1,4 @@
-package mtvs.onvision.vision.auth.repository;
+package mtvs.onvision.vision.user.repository;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,12 +10,13 @@ import java.util.Optional;
 
 @Repository
 @RequiredArgsConstructor
-public class RefreshTokenRepository {
+public class RegisterTokenRepository {
     private final StringRedisTemplate redisTemplate;
 
-    @Value("${jwt.validations.refresh}")
+    @Value("${jwt.validations.register}")
     Long expiredTime;
-    private final String KEY_PREFIX = "refreshToken:";
+
+    private final String KEY_PREFIX = "registerToken:";
 
     public void save(Long userId, String token) {
         redisTemplate.opsForValue().set(KEY_PREFIX+userId, token, Duration.ofMillis(expiredTime));

@@ -7,9 +7,14 @@ import mtvs.onvision.vision.auth.service.JwtTokenProvider;
 import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.common.util.PreConditions;
+import mtvs.onvision.vision.user.domain.Relation;
 import mtvs.onvision.vision.user.domain.User;
 import mtvs.onvision.vision.user.domain.UserRole;
+import mtvs.onvision.vision.user.dto.ResisterGuardianResponse;
+import mtvs.onvision.vision.user.dto.SettingRequest;
 import mtvs.onvision.vision.user.dto.SignupRequest;
+import mtvs.onvision.vision.user.repository.RegisterTokenRepository;
+import mtvs.onvision.vision.user.repository.RelationRepository;
 import mtvs.onvision.vision.user.repository.UserRepository;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -22,25 +27,51 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class UserService implements UserDetailsService {
     private final UserRepository userRepository;
+    private final RelationRepository relationRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final RegisterTokenRepository registerTokenRepository;
 
     @Transactional
     public void signup(SignupRequest request) {
         PreConditions.check(userRepository.existsByEmail(request.email()), ErrorCode.EXIST_EMAIL);
         PreConditions.check(userRepository.existsByPhoneNumber(request.phoneNumber()), ErrorCode.EXIST_PHONENUMBER);
 
-        User user;
-        if (request.role() == UserRole.WARD) user = new User(request.email(), passwordEncoder.encode(request.password()), request.nickname(), request.phoneNumber());
-        else {
-            User ward = userRepository.findByIdAndRole(request.wardId(), UserRole.WARD).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_WARD));
-            user = new User(request.email(), passwordEncoder.encode(request.password()), request.nickname(), request.phoneNumber(),ward);
+        if (request.role() == UserRole.WARD) {
+            User user = new User(request.email(), passwordEncoder.encode(request.password()), request.nickname(), request.phoneNumber(), UserRole.WARD);
+            userRepository.save(user);
         }
-        userRepository.save(user);
+        else {
+            //토큰 확인
+            Long wardId = jwtTokenProvider.parseId(request.registerToken());
+            String repositoryToken = registerTokenRepository.getToken(wardId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_REGISTER));
+            PreConditions.check(!repositoryToken.equals(request.registerToken()), ErrorCode.INVALID_REGISTER_TOKEN);
+
+            //회원 등록
+            User ward = userRepository.findByIdAndRole(wardId, UserRole.WARD).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_WARD));
+            PreConditions.check(relationRepository.existsByWard(ward), ErrorCode.EXIST_GUARDIAN);
+            User guardian = new User(request.email(), passwordEncoder.encode(request.password()), request.nickname(), request.phoneNumber(),UserRole.GUARDIAN);
+            userRepository.save(guardian);
+            Relation relation = new Relation(ward, guardian);
+            relationRepository.save(relation);
+        }
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
+    public ResisterGuardianResponse getGuardianRegisterToken(CurrentUser currentUser) {
+        String registerToken = jwtTokenProvider.issueRegisterToken(currentUser.getId(), currentUser.getEmail(), UserRole.WARD);
+        registerTokenRepository.save(currentUser.getId(), registerToken);
+        return new ResisterGuardianResponse(registerToken);
+    }
+
+    @Transactional
+    public void updateGuardianSettings(SettingRequest request, CurrentUser currentUser) {
+        Relation relation = relationRepository.findByGuardianId(currentUser.getId()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_GUARDIAN));
+        relation.updateSettings(request);
+    }
+
+    @Transactional
     public KeyPair login(LoginRequest request) {
         User user = userRepository.findByEmail(request.email()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
         PreConditions.check(!passwordEncoder.matches(request.password(), user.getPassword()), ErrorCode.NOT_MATCH_PASSWORD);
@@ -70,4 +101,11 @@ public class UserService implements UserDetailsService {
     public void logout(CurrentUser currentUser) {
         refreshTokenRepository.delete(currentUser.getId());
     }
+
+    @Transactional(readOnly = true)
+    public User currentUserToUser(CurrentUser currentUser) {
+        return userRepository.findById(currentUser.getId()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
+    }
+
+
 }
