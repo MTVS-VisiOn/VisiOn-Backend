@@ -51,11 +51,11 @@ class UserControllerTest {
     @MockitoBean
     JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    Long wardId = 2L;
     String email = "user@test.com";
     String password = "password1234";
     String nickname = "테스트유저";
     String phoneNumber = "010-1234-5678";
+    String registerToken = "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyIiwiZW1haWwiOiJ0ZXN0MUBuYXZlci5jb20iLCJyb2xlIjoiR1VBUkRJQU4iLCJpYXQiOjE3ODQ2OTc2OTgsImV4cCI6MTc4NDY5ODU5OH0.JdRlH8l-sMTe9Z7QQQmxtLbgT9qNWWkuabcFkw8cpEWVgPGihH8u1HqLofCr80ejBYGA5hIfY6Buzu9-r5IyQA";
 
     @Nested
     @DisplayName("Describe: POST /signup 엔드포인트는")
@@ -92,11 +92,11 @@ class UserControllerTest {
         }
 
         @Nested
-        @DisplayName("Context: role이 GUARDIAN이고 올바른 wardId가 주어지면")
+        @DisplayName("Context: role이 GUARDIAN이고 올바른 registerToken이 주어지면")
         class Context_with_guardian_role {
             @BeforeEach
             void setUp() {
-                request = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, wardId);
+                request = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, registerToken);
             }
 
             @Test
@@ -154,8 +154,8 @@ class UserControllerTest {
         }
 
         @Nested
-        @DisplayName("Context: role이 GUARDIAN이고 wardId가 없으면")
-        class Context_with_guardian_role_and_no_ward_id {
+        @DisplayName("Context: role이 GUARDIAN이고 registerToken이 없으면")
+        class Context_with_guardian_role_and_no_register_token {
             @BeforeEach
             void setUp() {
                 request = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, null);
@@ -401,11 +401,11 @@ class UserControllerTest {
         }
 
         @Nested
-        @DisplayName("Context: role이 GUARDIAN이고 wardId에 해당하는 피보호자가 없으면")
+        @DisplayName("Context: role이 GUARDIAN이고 registerToken으로 찾은 피보호자가 없으면")
         class Context_with_ward_not_found {
             @BeforeEach
             void setUp() {
-                request = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, wardId);
+                request = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, registerToken);
             }
 
             @Test
@@ -427,6 +427,99 @@ class UserControllerTest {
                         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                         .andExpect(jsonPath("$.code").value(ErrorCode.NOT_FOUND_WARD.name()))
                         .andExpect(jsonPath("$.message").value(ErrorCode.NOT_FOUND_WARD.getMessage()))
+                        .andDo(print());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: role이 GUARDIAN이고 저장소에 registerToken이 존재하지 않으면")
+        class Context_with_register_token_not_found {
+            @BeforeEach
+            void setUp() {
+                request = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, registerToken);
+            }
+
+            @Test
+            @DisplayName("It : 404 상태와 NOT_FOUND_REGISTER를 반환한다")
+            void it_return_404_not_found_and_no_register() throws Exception {
+                //given
+                doThrow(new BusinessException(ErrorCode.NOT_FOUND_REGISTER))
+                        .when(userService)
+                        .signup(eq(request));
+
+                //when-then
+                mockMvc.perform(
+                                post("/api/users/signup")
+                                        .with(csrf())
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(om.writeValueAsString(request))
+                        )
+                        .andExpect(status().isNotFound())
+                        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                        .andExpect(jsonPath("$.code").value(ErrorCode.NOT_FOUND_REGISTER.name()))
+                        .andExpect(jsonPath("$.message").value(ErrorCode.NOT_FOUND_REGISTER.getMessage()))
+                        .andDo(print());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: role이 GUARDIAN이고 registerToken이 저장된 토큰과 일치하지 않으면")
+        class Context_with_invalid_register_token {
+            @BeforeEach
+            void setUp() {
+                request = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, registerToken);
+            }
+
+            @Test
+            @DisplayName("It : 400 상태와 INVALID_REGISTER_TOKEN을 반환한다")
+            void it_return_400_badRequest_and_invalid_register_token() throws Exception {
+                //given
+                doThrow(new BusinessException(ErrorCode.INVALID_REGISTER_TOKEN))
+                        .when(userService)
+                        .signup(eq(request));
+
+                //when-then
+                mockMvc.perform(
+                                post("/api/users/signup")
+                                        .with(csrf())
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(om.writeValueAsString(request))
+                        )
+                        .andExpect(status().isBadRequest())
+                        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                        .andExpect(jsonPath("$.code").value(ErrorCode.INVALID_REGISTER_TOKEN.name()))
+                        .andExpect(jsonPath("$.message").value(ErrorCode.INVALID_REGISTER_TOKEN.getMessage()))
+                        .andDo(print());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: role이 GUARDIAN이고 해당 피보호자에게 이미 보호자가 등록되어 있으면")
+        class Context_with_existing_guardian {
+            @BeforeEach
+            void setUp() {
+                request = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, registerToken);
+            }
+
+            @Test
+            @DisplayName("It : 409 상태와 EXIST_GUARDIAN을 반환한다")
+            void it_return_409_conflict_and_exist_guardian() throws Exception {
+                //given
+                doThrow(new BusinessException(ErrorCode.EXIST_GUARDIAN))
+                        .when(userService)
+                        .signup(eq(request));
+
+                //when-then
+                mockMvc.perform(
+                                post("/api/users/signup")
+                                        .with(csrf())
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(om.writeValueAsString(request))
+                        )
+                        .andExpect(status().isConflict())
+                        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                        .andExpect(jsonPath("$.code").value(ErrorCode.EXIST_GUARDIAN.name()))
+                        .andExpect(jsonPath("$.message").value(ErrorCode.EXIST_GUARDIAN.getMessage()))
                         .andDo(print());
             }
         }

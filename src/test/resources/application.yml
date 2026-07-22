@@ -19,3 +19,4 @@ jwt:
   validations:
     access: 900000
     refresh: 604800000
+    register: 900000
