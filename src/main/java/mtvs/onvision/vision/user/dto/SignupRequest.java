@@ -57,9 +57,9 @@ public record SignupRequest(
         UserRole role,
         @Schema(
                 examples = "3",
-                description = "피보호자의 아이디, 역할이 보호자일 경우 필수값"
+                description = "피보호자의 보호자 등록 토큰, 역할이 보호자일 경우 필수값"
         )
-        Long wardId
+        String registerToken
 
         ) {
         public interface FormatCheck {}

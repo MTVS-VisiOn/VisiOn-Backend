@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 public enum SuccessCode {
     /*User*/
     USER_CREATED("계정이 정상적으로 생성되었습니다."),
+    REGISTER_TOKEN_CREATED("보호자 등록 토큰이 정상적으로 생성되었습니다."),
 
 
     /*Auth*/
