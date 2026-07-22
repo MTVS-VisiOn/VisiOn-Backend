@@ -9,6 +9,7 @@ import mtvs.onvision.vision.common.response.ApiResult;
 import mtvs.onvision.vision.common.response.SuccessCode;
 import mtvs.onvision.vision.user.domain.UserRole;
 import mtvs.onvision.vision.user.dto.ResisterGuardianResponse;
+import mtvs.onvision.vision.user.dto.SettingRequest;
 import mtvs.onvision.vision.user.dto.SignupRequest;
 import mtvs.onvision.vision.user.service.UserService;
 import org.springframework.http.ResponseEntity;
@@ -32,9 +33,16 @@ public class UserController implements UserControllerSupporter {
         return ApiResult.created(SuccessCode.USER_CREATED);
     }
 
-    @GetMapping("/guadian/register-token")
+    @GetMapping("/guardian/register-token")
     public ResponseEntity<ApiResult<ResisterGuardianResponse>> getGuardianRegisterToken(@AuthenticationPrincipal CurrentUser currentUser) {
         ResisterGuardianResponse response = userService.getGuardianRegisterToken(currentUser);
         return ApiResult.ok(SuccessCode.REGISTER_TOKEN_CREATED, response);
+    }
+
+    @PutMapping("/settings")
+    public ResponseEntity<ApiResult<Void>> updateGuardianSettings(@RequestBody @Valid SettingRequest request,
+                                                                  @AuthenticationPrincipal CurrentUser currentUser) {
+        userService.updateGuardianSettings(request, currentUser);
+        return ApiResult.ok(SuccessCode.BUSINESS_SUCCESS);
     }
 }

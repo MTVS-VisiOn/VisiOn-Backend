@@ -5,6 +5,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import mtvs.onvision.vision.common.domain.BaseEntity;
+import mtvs.onvision.vision.user.dto.SettingRequest;
 
 @Entity
 @Getter
@@ -24,13 +25,18 @@ public class Relation extends BaseEntity {
     @OneToOne(fetch = FetchType.LAZY)
     User guardian;
 
-    private boolean offlineAlertEnabled;  // 피보호자 장시간 미접속 알림
-    private boolean arrivalAlertEnabled;  // 피보호자 목적지 도착 알림
+    private Boolean offlineAlertEnabled;  // 피보호자 장시간 미접속 알림
+    private Boolean arrivalAlertEnabled;  // 피보호자 목적지 도착 알림
 
     public Relation(User ward, User guardian) {
         this.ward = ward;
         this.guardian = guardian;
         this.offlineAlertEnabled = true;
         this.arrivalAlertEnabled = true;
+    }
+
+    public void updateSettings(SettingRequest request) {
+        this.offlineAlertEnabled = request.offlineAlertEnabled();
+        this.arrivalAlertEnabled = request.arrivalAlertEnabled();
     }
 }

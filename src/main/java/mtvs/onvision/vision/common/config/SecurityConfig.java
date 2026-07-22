@@ -27,6 +27,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth ->auth
                         .requestMatchers("/api/users/signup", "/api/auth/login").anonymous()
                         .requestMatchers("/api/users/refresh").permitAll()
+                        .requestMatchers("/api/users/guardian/register-token").hasAuthority("WARD")
+                        .requestMatchers("/api/users/settings").hasAuthority("GUARDIAN")
                         .requestMatchers("/api/common", "/api/auth/logout").authenticated()
                         .anyRequest().permitAll()
                 )

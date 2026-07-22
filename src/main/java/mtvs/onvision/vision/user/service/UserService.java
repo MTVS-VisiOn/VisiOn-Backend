@@ -11,6 +11,7 @@ import mtvs.onvision.vision.user.domain.Relation;
 import mtvs.onvision.vision.user.domain.User;
 import mtvs.onvision.vision.user.domain.UserRole;
 import mtvs.onvision.vision.user.dto.ResisterGuardianResponse;
+import mtvs.onvision.vision.user.dto.SettingRequest;
 import mtvs.onvision.vision.user.dto.SignupRequest;
 import mtvs.onvision.vision.user.repository.RegisterTokenRepository;
 import mtvs.onvision.vision.user.repository.RelationRepository;
@@ -65,6 +66,12 @@ public class UserService implements UserDetailsService {
     }
 
     @Transactional
+    public void updateGuardianSettings(SettingRequest request, CurrentUser currentUser) {
+        Relation relation = relationRepository.findByGuardianId(currentUser.getId()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_GUARDIAN));
+        relation.updateSettings(request);
+    }
+
+    @Transactional
     public KeyPair login(LoginRequest request) {
         User user = userRepository.findByEmail(request.email()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
         PreConditions.check(!passwordEncoder.matches(request.password(), user.getPassword()), ErrorCode.NOT_MATCH_PASSWORD);
@@ -93,6 +100,11 @@ public class UserService implements UserDetailsService {
 
     public void logout(CurrentUser currentUser) {
         refreshTokenRepository.delete(currentUser.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public User currentUserToUser(CurrentUser currentUser) {
+        return userRepository.findById(currentUser.getId()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
     }
 
 

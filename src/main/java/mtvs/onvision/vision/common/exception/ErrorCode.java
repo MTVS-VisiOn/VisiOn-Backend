@@ -14,6 +14,7 @@ public enum ErrorCode {
     EXIST_PHONENUMBER(HttpStatus.CONFLICT, "중복된 전화번호입니다."),
     EXIST_GUARDIAN(HttpStatus.CONFLICT, "해당 피보호자에게는 이미 등록된 보호자가 있습니다."),
     NOT_FOUND_WARD(HttpStatus.NOT_FOUND, "해당하는 아이디의 피보호자를 찾을 수 없습니다."),
+    NOT_FOUND_GUARDIAN(HttpStatus.NOT_FOUND, "해당하는 아이디의 보호자를 찾을 수 없습니다."),
     NOT_FOUND_USER(HttpStatus.NOT_FOUND, "해당하는 아이디의 유저를 찾을 수 없습니다."),
     NOT_FOUND_REFRESH(HttpStatus.NOT_FOUND, "해당하는 refresh 토큰을 찾을 수 없습니다."),
     NOT_FOUND_REGISTER(HttpStatus.NOT_FOUND, "해당하는 register 토큰을 찾을 수 없습니다."),
