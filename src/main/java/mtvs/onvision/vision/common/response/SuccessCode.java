@@ -16,6 +16,9 @@ public enum SuccessCode {
     LOGIN_SUCCESS("로그인에 성공했습니다."),
     REFRESH_SUCCESS("토큰 갱신에 성공했습니다."),
     LOGOUT_SUCCESS("로그아웃에 성공했습니다."),
+
+    /*Presence*/
+    HEARTBEAT_CREATED("생존신호가 정상적으로 저장되었습니다."),
     BUSINESS_SUCCESS("정상적으로 작성되었습니다.");
 
     private final String successMessage;

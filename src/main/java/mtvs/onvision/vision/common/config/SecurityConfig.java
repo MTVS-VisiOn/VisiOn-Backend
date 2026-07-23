@@ -6,6 +6,7 @@ import mtvs.onvision.vision.common.entrypoint.JwtAuthenticationEntryPoint;
 import mtvs.onvision.vision.common.filter.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -30,6 +31,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/users/guardian/register-token").hasAuthority("WARD")
                         .requestMatchers("/api/users/settings").hasAuthority("GUARDIAN")
                         .requestMatchers("/api/common", "/api/auth/logout").authenticated()
+                        .requestMatchers(HttpMethod.POST,"/api/presence").hasAuthority("WARD")
                         .anyRequest().permitAll()
                 )
                 .exceptionHandling(exp -> exp
