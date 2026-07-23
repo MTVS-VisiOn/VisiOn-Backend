@@ -23,3 +23,4 @@ jwt:
 redis:
   expired:
     presence: 180  #초단위
+    location: 30  #분단위
