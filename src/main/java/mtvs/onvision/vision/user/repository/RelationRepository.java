@@ -9,4 +9,5 @@ import java.util.Optional;
 public interface RelationRepository extends JpaRepository<Relation, Long> {
     Boolean existsByWard(User ward);
     Optional<Relation> findByGuardianId(Long guardianId);
+    Optional<Relation> findByWardId(Long wardId);
 }
