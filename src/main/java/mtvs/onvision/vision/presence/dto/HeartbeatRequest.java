@@ -3,6 +3,7 @@ package mtvs.onvision.vision.presence.dto;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import mtvs.onvision.vision.presence.domain.NetworkType;
 
 import java.time.Instant;
 
@@ -24,7 +25,7 @@ public record HeartbeatRequest(
 ) {
     public record NetworkRequest(
         @NotNull(message = "네트워크 타입값은 필수값입니다.")
-       String type,
+        NetworkType type,
        @NotNull(message = "네트워크 연결 여부는 필수값입니다.")
        Boolean connected
     ){}
