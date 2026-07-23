@@ -20,7 +20,7 @@ public class PresenceRepository {
     public void saveHeartbeat(Long userId, String json) {
         redisTemplate.opsForValue().set(KEY_PREFIX+userId, json, Duration.ofSeconds(expiredTime));
     }
-    public Optional<String> getHeartbeat(Long userId) {
+    public Optional<String> getLastHeartbeat(Long userId) {
         return Optional.ofNullable(redisTemplate.opsForValue().get(KEY_PREFIX+userId));
     }
 

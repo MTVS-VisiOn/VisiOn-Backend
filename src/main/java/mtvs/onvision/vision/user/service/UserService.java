@@ -107,5 +107,11 @@ public class UserService implements UserDetailsService {
         return userRepository.findById(currentUser.getId()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
     }
 
+    @Transactional(readOnly = true)
+    public Long getWardIdFromGuardianId(Long guardianId) {
+        Relation relation = relationRepository.findByGuardianId(guardianId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_RELATION));
+        return relation.getWard().getId();
+    }
+
 
 }

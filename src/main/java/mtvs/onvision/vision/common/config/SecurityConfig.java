@@ -32,6 +32,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/users/settings").hasAuthority("GUARDIAN")
                         .requestMatchers("/api/common", "/api/auth/logout").authenticated()
                         .requestMatchers(HttpMethod.POST,"/api/presence").hasAuthority("WARD")
+                        .requestMatchers(HttpMethod.GET,"/api/presence").hasAuthority("GUARDIAN")
                         .anyRequest().permitAll()
                 )
                 .exceptionHandling(exp -> exp

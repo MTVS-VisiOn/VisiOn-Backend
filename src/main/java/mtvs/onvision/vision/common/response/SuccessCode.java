@@ -19,6 +19,9 @@ public enum SuccessCode {
 
     /*Presence*/
     HEARTBEAT_CREATED("생존신호가 정상적으로 저장되었습니다."),
+    PRESENCE_READ("기기 상태 확인이 정상적으로 조회되었습니다."),
+
+    /*common*/
     BUSINESS_SUCCESS("정상적으로 작성되었습니다.");
 
     private final String successMessage;
