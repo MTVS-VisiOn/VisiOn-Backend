@@ -30,6 +30,12 @@ public enum ErrorCode {
     FORBIDDEN_WARD(HttpStatus.FORBIDDEN, "피보호자는 권한이 없는 기능입니다."),
     NOT_DELETE_ROOM(HttpStatus.INTERNAL_SERVER_ERROR, "방이 지워지지 않았습니다."),
 
+    /*Presence*/
+    NOT_FOUND_CONNECT(HttpStatus.NOT_FOUND, "기기의 연결상태를 찾을 수 없습니다."),
+    /*Location*/
+    NOT_FOUND_LAST_LOCATION(HttpStatus.NOT_FOUND, "마지막 위치를 찾을 수 없습니다."),
+
+
     /*common*/
     REQUESTPARAM_REQUIRED(HttpStatus.BAD_REQUEST, "해당 파라미터는 필수값입니다. :::"),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "검증에 실패했습니다."),

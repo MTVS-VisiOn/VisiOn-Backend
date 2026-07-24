@@ -24,3 +24,6 @@ redis:
   expired:
     presence: 180  #초단위
     location: 30  #분단위
+tmap:
+  base-url: https://apis.openapi.sk.com
+  app-key: ${TMAP_APP_KEY}

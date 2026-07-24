@@ -27,7 +27,7 @@ public class RealtimeLocationRepository {
     }
 
     public Optional<String> getLastLocation(Long userId) {
-        return Optional.ofNullable(redisTemplate.opsForValue().get(KEY_PREFIX+userId));
+        return Optional.ofNullable(redisTemplate.opsForValue().get(KEY_PREFIX+LASTEST_PREFIX+userId));
     }
 
     public void delete(Long userId) {

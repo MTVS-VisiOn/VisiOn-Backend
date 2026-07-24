@@ -38,7 +38,7 @@ public class PresenceService {
         //있으면 연결상태 판별
         //마지막 동기화 시간이 2분 이내 인지와 네트워크가 연결된 상태인지 확인
         HeartbeatRequest heartbeat = objectMapper.readValue(json.get(), HeartbeatRequest.class);
-        boolean isRecent = heartbeat.lastSync().isAfter(Instant.now().minusSeconds(120));
+        boolean isRecent = getIsRecent(heartbeat.lastSync());
         boolean networkConnected = heartbeat.network().connected();
         PresenceType status;
         if (isRecent) {
@@ -49,5 +49,18 @@ public class PresenceService {
             else status = PresenceType.NOT_FOUND;
         }
         return new PresenceResponse(heartbeat.battery(),  heartbeat.deviceConnected(), status.getDescription());
+    }
+
+    public boolean getIsConnected(Long wardId) {
+        Optional<String> json = presenceRepository.getLastHeartbeat(wardId);
+        if (json.isEmpty()) return false;
+        HeartbeatRequest heartbeat = objectMapper.readValue(json.get(), HeartbeatRequest.class);
+        boolean isRecent = getIsRecent(heartbeat.lastSync());
+        boolean networkConnected = heartbeat.network().connected();
+        return isRecent && networkConnected;
+    }
+
+    private static boolean getIsRecent(Instant lastSync) {
+        return lastSync.isAfter(Instant.now().minusSeconds(120));
     }
 }
