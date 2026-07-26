@@ -27,4 +27,4 @@ redis:
 
 tmap:
   base-url: https://apis.openapi.sk.com
-  app-key: ${TMAP_APP_KEY}
+  app-key: test
