@@ -1,0 +1,377 @@
+package mtvs.onvision.vision.location.service;
+
+import mtvs.onvision.vision.auth.dto.CurrentUser;
+import mtvs.onvision.vision.common.exception.BusinessException;
+import mtvs.onvision.vision.common.exception.ErrorCode;
+import mtvs.onvision.vision.location.domain.MovementStatus;
+import mtvs.onvision.vision.location.dto.LastLocationResponse;
+import mtvs.onvision.vision.location.dto.LocationReport;
+import mtvs.onvision.vision.location.dto.LocationRequest;
+import mtvs.onvision.vision.location.repository.LocationHistoryRepository;
+import mtvs.onvision.vision.location.repository.RealtimeLocationRepository;
+import mtvs.onvision.vision.presence.service.PresenceService;
+import mtvs.onvision.vision.user.domain.UserRole;
+import mtvs.onvision.vision.user.service.UserService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.RestClient;
+import tools.jackson.databind.ObjectMapper;
+
+import java.time.Instant;
+import java.util.Optional;
+
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.hamcrest.Matchers.startsWith;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.queryParam;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+
+@ExtendWith(MockitoExtension.class)
+@DisplayName("LocationService의")
+class LocationServiceTest {
+
+    @Mock
+    private LocationHistoryRepository locationHistoryRepository;
+
+    @Mock
+    private RealtimeLocationRepository realtimeLocationRepository;
+
+    @Mock
+    private PresenceService presenceService;
+
+    @Mock
+    private UserService userService;
+
+    @Mock
+    private ObjectMapper objectMapper;
+
+    private LocationService locationService;
+    private MockRestServiceServer tmapServer;
+
+    static final String BASE_URL = "https://apis.openapi.sk.com";
+
+    Long guardianId = 1L;
+    Long wardId = 2L;
+
+    CurrentUser guardian = new CurrentUser(guardianId, "guardian@test.com", UserRole.GUARDIAN);
+    CurrentUser ward = new CurrentUser(wardId, "ward@test.com", UserRole.WARD);
+
+    /** 티맵 역지오코딩 응답. fullAddress는 마지막 콤마 뒤가 도로명 주소 */
+    static final String TMAP_RESPONSE = """
+            {
+              "addressInfo": {
+                "fullAddress": "경기도 부천시 원미구 심곡동 354-2,경기도 부천시 원미구 부일로 123",
+                "addressType": "A10",
+                "city_do": "경기도",
+                "gu_gun": "부천시 원미구",
+                "legalDong": "심곡동",
+                "bunji": "354-2"
+              }
+            }
+            """;
+
+    @BeforeEach
+    void setUp() {
+        // RestClient는 fluent 체인이라 mock 대신 MockRestServiceServer로 실제 요청/응답을 검증한다
+        RestClient.Builder builder = RestClient.builder().baseUrl(BASE_URL);
+        tmapServer = MockRestServiceServer.bindTo(builder).build();
+        RestClient tmapRestClient = builder.build();
+
+        locationService = new LocationService(
+                locationHistoryRepository,
+                realtimeLocationRepository,
+                presenceService,
+                userService,
+                objectMapper,
+                tmapRestClient
+        );
+    }
+
+    private LocationRequest request(Double lat, Double lon, Float accuracy, Float speed, Instant recordedAt) {
+        return new LocationRequest(lat, lon, accuracy, speed, recordedAt);
+    }
+
+    private LocationReport report(Double lat, Double lon, Float accuracy, MovementStatus status, Instant recordedAt) {
+        return new LocationReport(wardId, lat, lon, accuracy, null, status, recordedAt);
+    }
+
+    /** receiveLocation이 저장하려고 만든 LocationReport를 꺼낸다 */
+    private LocationReport captureSavedReport() {
+        ArgumentCaptor<LocationReport> captor = ArgumentCaptor.forClass(LocationReport.class);
+        verify(objectMapper).writeValueAsString(captor.capture());
+        return captor.getValue();
+    }
+
+    @Nested
+    @DisplayName("Describe: receiveLocation 메서드는")
+    class Describe_with_receiveLocation {
+
+        @Nested
+        @DisplayName("Context: speed가 함께 주어지면")
+        class Context_with_speed {
+
+            @Test
+            @DisplayName("(0.5 m/s 미만)It : STATIONARY로 판별해 저장한다")
+            void it_classify_stationary() {
+                //given
+                LocationRequest request = request(37.5, 127.0, 10f, 0.2f, Instant.now());
+
+                //when
+                locationService.receiveLocation(request, ward);
+
+                //then
+                assertThat(captureSavedReport().status()).isEqualTo(MovementStatus.STATIONARY);
+            }
+
+            @Test
+            @DisplayName("(0.5~2.8 m/s)It : ON_FOOT으로 판별해 저장한다")
+            void it_classify_on_foot() {
+                //given
+                LocationRequest request = request(37.5, 127.0, 10f, 1.4f, Instant.now());
+
+                //when
+                locationService.receiveLocation(request, ward);
+
+                //then
+                assertThat(captureSavedReport().status()).isEqualTo(MovementStatus.ON_FOOT);
+            }
+
+            @Test
+            @DisplayName("(2.8 m/s 이상)It : IN_VEHICLE로 판별해 저장한다")
+            void it_classify_in_vehicle() {
+                //given
+                LocationRequest request = request(37.5, 127.0, 10f, 12.0f, Instant.now());
+
+                //when
+                locationService.receiveLocation(request, ward);
+
+                //then
+                assertThat(captureSavedReport().status()).isEqualTo(MovementStatus.IN_VEHICLE);
+            }
+
+            @Test
+            @DisplayName("It : 이전 위치를 조회하지 않는다")
+            void it_does_not_read_previous_location() {
+                //given
+                LocationRequest request = request(37.5, 127.0, 10f, 1.4f, Instant.now());
+
+                //when
+                locationService.receiveLocation(request, ward);
+
+                //then
+                verify(realtimeLocationRepository, org.mockito.Mockito.never()).getLastLocation(wardId);
+                verify(realtimeLocationRepository).saveLocation(org.mockito.ArgumentMatchers.eq(wardId),
+                        org.mockito.ArgumentMatchers.any());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: speed가 없고 이전 위치도 없으면")
+        class Context_with_no_speed_and_no_previous {
+
+            @Test
+            @DisplayName("It : UNKNOWN으로 판별해 저장한다")
+            void it_classify_unknown() {
+                //given
+                LocationRequest request = request(37.5, 127.0, 10f, null, Instant.now());
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.empty());
+
+                //when
+                locationService.receiveLocation(request, ward);
+
+                //then
+                assertThat(captureSavedReport().status()).isEqualTo(MovementStatus.UNKNOWN);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: speed가 없고 이동 거리가 오차 반경 안이면")
+        class Context_with_no_speed_and_jitter {
+
+            @Test
+            @DisplayName("It : 지터로 보고 STATIONARY로 판별한다")
+            void it_classify_stationary() {
+                //given
+                Instant now = Instant.now();
+                String previousJson = "{\"previous\":true}";
+                // 위도 0.0001도 ≈ 11m 이동, 오차 반경 합은 40m
+                LocationReport previous = report(37.5, 127.0, 20f, MovementStatus.STATIONARY, now.minusSeconds(30));
+                LocationRequest request = request(37.5001, 127.0, 20f, null, now);
+
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.of(previousJson));
+                given(objectMapper.readValue(previousJson, LocationReport.class)).willReturn(previous);
+
+                //when
+                locationService.receiveLocation(request, ward);
+
+                //then
+                assertThat(captureSavedReport().status()).isEqualTo(MovementStatus.STATIONARY);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: speed가 없고 오차 반경 밖으로 걷는 속도만큼 이동했으면")
+        class Context_with_no_speed_and_walking_distance {
+
+            @Test
+            @DisplayName("It : ON_FOOT으로 판별한다")
+            void it_classify_on_foot() {
+                //given
+                Instant now = Instant.now();
+                String previousJson = "{\"previous\":true}";
+                // 위도 0.0004도 ≈ 44m, 30초 → 약 1.48 m/s. 오차 반경 합은 10m
+                LocationReport previous = report(37.5, 127.0, 5f, MovementStatus.STATIONARY, now.minusSeconds(30));
+                LocationRequest request = request(37.5004, 127.0, 5f, null, now);
+
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.of(previousJson));
+                given(objectMapper.readValue(previousJson, LocationReport.class)).willReturn(previous);
+
+                //when
+                locationService.receiveLocation(request, ward);
+
+                //then
+                assertThat(captureSavedReport().status()).isEqualTo(MovementStatus.ON_FOOT);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: speed가 없고 차량 속도만큼 이동했으면")
+        class Context_with_no_speed_and_vehicle_distance {
+
+            @Test
+            @DisplayName("It : IN_VEHICLE로 판별한다")
+            void it_classify_in_vehicle() {
+                //given
+                Instant now = Instant.now();
+                String previousJson = "{\"previous\":true}";
+                // 위도 0.01도 ≈ 1111m, 30초 → 약 37 m/s
+                LocationReport previous = report(37.5, 127.0, 5f, MovementStatus.STATIONARY, now.minusSeconds(30));
+                LocationRequest request = request(37.51, 127.0, 5f, null, now);
+
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.of(previousJson));
+                given(objectMapper.readValue(previousJson, LocationReport.class)).willReturn(previous);
+
+                //when
+                locationService.receiveLocation(request, ward);
+
+                //then
+                assertThat(captureSavedReport().status()).isEqualTo(MovementStatus.IN_VEHICLE);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: speed가 없고 이전 위치와의 간격이 5분을 넘으면")
+        class Context_with_no_speed_and_stale_previous {
+
+            @Test
+            @DisplayName("It : UNKNOWN으로 판별한다")
+            void it_classify_unknown() {
+                //given
+                Instant now = Instant.now();
+                String previousJson = "{\"previous\":true}";
+                LocationReport previous = report(37.5, 127.0, 5f, MovementStatus.STATIONARY, now.minusSeconds(400));
+                LocationRequest request = request(37.51, 127.0, 5f, null, now);
+
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.of(previousJson));
+                given(objectMapper.readValue(previousJson, LocationReport.class)).willReturn(previous);
+
+                //when
+                locationService.receiveLocation(request, ward);
+
+                //then
+                assertThat(captureSavedReport().status()).isEqualTo(MovementStatus.UNKNOWN);
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Describe: getLastLocation 메서드는")
+    class Describe_with_getLastLocation {
+
+        @Nested
+        @DisplayName("Context: 피보호자 기기가 연결 상태가 아니면")
+        class Context_with_disconnected_ward {
+
+            @Test
+            @DisplayName("It : 미연결 응답을 반환하고 티맵을 호출하지 않는다")
+            void it_return_disconnected_response() {
+                //given
+                given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
+                given(presenceService.getIsConnected(wardId)).willReturn(false);
+
+                //when
+                LastLocationResponse response = locationService.getLastLocation(guardian);
+
+                //then
+                assertThat(response.isCponnected()).isFalse();
+                assertThat(response.lastAddress()).isNull();
+                assertThat(response.status()).isEqualTo(MovementStatus.UNKNOWN.getMessage());
+                tmapServer.verify();  // 호출된 요청 없음
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 연결 상태이지만 저장된 최근 위치가 없으면")
+        class Context_with_no_last_location {
+
+            @Test
+            @DisplayName("It : NOT_FOUND_LAST_LOCATION 오류 발생")
+            void it_throws_not_found_last_location() {
+                //given
+                given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
+                given(presenceService.getIsConnected(wardId)).willReturn(true);
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.empty());
+
+                //when&then
+                BusinessException exception = assertThrows(BusinessException.class,
+                        () -> locationService.getLastLocation(guardian));
+                assertThat(exception.getMessage()).isEqualTo(ErrorCode.NOT_FOUND_LAST_LOCATION.getMessage());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 연결 상태이고 최근 위치가 존재하면")
+        class Context_with_available_last_location {
+
+            @Test
+            @DisplayName("It : 좌표로 티맵을 호출해 도로명 주소와 이동 상태를 반환한다")
+            void it_return_address_and_status() {
+                //given
+                String latestJson = "{\"latest\":true}";
+                LocationReport latest = new LocationReport(
+                        wardId, 37.5, 127.0, 10f, 1.4f, MovementStatus.ON_FOOT, Instant.now());
+
+                given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
+                given(presenceService.getIsConnected(wardId)).willReturn(true);
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.of(latestJson));
+                given(objectMapper.readValue(latestJson, LocationReport.class)).willReturn(latest);
+
+                tmapServer.expect(requestTo(startsWith(BASE_URL + "/tmap/geo/reversegeocoding")))
+                        .andExpect(queryParam("lat", "37.5"))
+                        .andExpect(queryParam("lon", "127.0"))
+                        .andExpect(queryParam("addressType", "A10"))
+                        .andRespond(withSuccess(TMAP_RESPONSE, MediaType.APPLICATION_JSON));
+
+                //when
+                LastLocationResponse response = locationService.getLastLocation(guardian);
+
+                //then
+                assertThat(response.isCponnected()).isTrue();
+                assertThat(response.lastAddress()).isEqualTo("경기도 부천시 원미구 부일로 123");
+                assertThat(response.status()).isEqualTo(MovementStatus.ON_FOOT.getMessage());
+                tmapServer.verify();
+            }
+        }
+    }
+}
