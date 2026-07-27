@@ -3,8 +3,10 @@ package mtvs.onvision.vision.favorite.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
+import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.common.response.ApiResult;
 import mtvs.onvision.vision.common.response.SuccessCode;
+import mtvs.onvision.vision.common.util.PreConditions;
 import mtvs.onvision.vision.favorite.dto.FavoriteRequest;
 import mtvs.onvision.vision.favorite.dto.FavoriteResponse;
 import mtvs.onvision.vision.favorite.dto.FavoriteUpdateRequest;
@@ -32,6 +34,8 @@ public class FavoriteController {
     public ResponseEntity<ApiResult<Page<FavoriteResponse>>> searchFavorite(@AuthenticationPrincipal CurrentUser currentUser,
                                                                             @RequestParam(required = false) String keyword,
                                                                             @RequestParam(required = false, defaultValue = "1") int page) {
+        PreConditions.check(page<1, ErrorCode.VALIDATION_FAILED, "page는 1 이상의 정수값입니다.");
+        PreConditions.check(keyword != null && keyword.length() > 30, ErrorCode.VALIDATION_FAILED, "keyword는 30자 이하여야 합니다.");
         Page<FavoriteResponse> response = favoriteService.searchFavorite(currentUser, keyword, page);
 
         return ApiResult.ok(SuccessCode.FAVORITE_READ, response);

@@ -55,7 +55,7 @@ public class FavoriteService {
     @Transactional
     public void updateFavorite(Long favoriteId, CurrentUser currentUser, FavoriteUpdateRequest request) {
         Favorite favorite = favoriteRepository.findByIdAndUserIdAndDeletedAtIsNull(favoriteId, currentUser.getId()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_FAVORITE));
-        favorite.update(request.nickname());
+        favorite.update(request.nickname() == null || request.nickname().isBlank() ? null : request.nickname());
     }
 
     @Transactional

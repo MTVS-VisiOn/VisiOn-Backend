@@ -415,6 +415,41 @@ class FavoriteServiceTest {
         }
 
         @Nested
+        @DisplayName("Context: nickname이 null이거나 공백이면")
+        class Context_with_blank_nickname {
+
+            @Test
+            @DisplayName("(null)It : 별칭을 지운다")
+            void it_clears_nickname_with_null() {
+                //given
+                Favorite favorite = favorite("화목순대국", "맛집");
+                given(favoriteRepository.findByIdAndUserIdAndDeletedAtIsNull(10L, wardId))
+                        .willReturn(Optional.of(favorite));
+
+                //when
+                favoriteService.updateFavorite(10L, ward, new FavoriteUpdateRequest(null));
+
+                //then
+                assertThat(favorite.getNickname()).isNull();
+            }
+
+            @Test
+            @DisplayName("(빈 문자열)It : 그대로 저장하지 않고 null로 바꾼다")
+            void it_normalizes_blank_to_null() {
+                //given : 빈 문자열은 NULL이 아니라 정렬에서 맨 앞으로 온다
+                Favorite favorite = favorite("화목순대국", "맛집");
+                given(favoriteRepository.findByIdAndUserIdAndDeletedAtIsNull(10L, wardId))
+                        .willReturn(Optional.of(favorite));
+
+                //when
+                favoriteService.updateFavorite(10L, ward, new FavoriteUpdateRequest("   "));
+
+                //then
+                assertThat(favorite.getNickname()).isNull();
+            }
+        }
+
+        @Nested
         @DisplayName("Context: 없는 id이거나 남의 즐겨찾기면")
         class Context_with_others_favorite {
 

@@ -287,18 +287,41 @@ class FavoriteControllerTest {
         }
 
         @Nested
-        @DisplayName("Context: nickname이 없으면")
+        @DisplayName("Context: nickname을 생략하면")
         class Context_without_nickname {
 
             @Test
-            @DisplayName("It : 400 상태를 반환한다")
-            void it_return_400_bad_request() throws Exception {
-                //when-then
+            @DisplayName("It : 별칭 삭제 요청으로 보고 200 상태를 반환한다")
+            void it_return_200_ok() throws Exception {
+                //when-then : @NotNull을 빼서 null이 유효한 값이 되었다
                 mockMvc.perform(
                                 patch("/api/favorites/10")
                                         .with(csrf())
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content("{}")
+                        )
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.code").value(SuccessCode.FAVORITE_UPDATED.name()))
+                        .andDo(print());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: nickname이 50자를 넘으면")
+        class Context_with_too_long_nickname {
+
+            @Test
+            @DisplayName("It : 400 상태와 VALIDATION_FAILED를 반환한다")
+            void it_return_400_bad_request() throws Exception {
+                //given : 엔티티가 length = 50이라 DTO에서 걸러야 500이 아닌 400이 된다
+                FavoriteUpdateRequest request = new FavoriteUpdateRequest("가".repeat(51));
+
+                //when-then
+                mockMvc.perform(
+                                patch("/api/favorites/10")
+                                        .with(csrf())
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(om.writeValueAsString(request))
                         )
                         .andExpect(status().isBadRequest())
                         .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()))
