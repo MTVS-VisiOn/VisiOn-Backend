@@ -4,9 +4,7 @@ import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.location.domain.MovementStatus;
-import mtvs.onvision.vision.location.dto.LastLocationResponse;
-import mtvs.onvision.vision.location.dto.LocationReport;
-import mtvs.onvision.vision.location.dto.LocationRequest;
+import mtvs.onvision.vision.location.dto.*;
 import mtvs.onvision.vision.location.repository.LocationHistoryRepository;
 import mtvs.onvision.vision.location.repository.RealtimeLocationRepository;
 import mtvs.onvision.vision.presence.service.PresenceService;
@@ -20,11 +18,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Optional;
 
@@ -35,6 +36,8 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.queryParam;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 @ExtendWith(MockitoExtension.class)
@@ -371,6 +374,201 @@ class LocationServiceTest {
                 assertThat(response.lastAddress()).isEqualTo("경기도 부천시 원미구 부일로 123");
                 assertThat(response.status()).isEqualTo(MovementStatus.ON_FOOT.getMessage());
                 tmapServer.verify();
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Describe: searchLocation 메서드는")
+    class Describe_with_searchLocation {
+
+        /** 부번이 "0"인 POI와 "14"인 POI를 함께 담았다 */
+        static final String POI_SEARCH_RESPONSE = """
+                {
+                  "searchPoiInfo": {
+                    "totalCount": "2",
+                    "count": "2",
+                    "page": "1",
+                    "pois": {
+                      "poi": [
+                        {
+                          "id": "2874793",
+                          "pkey": "287479301",
+                          "name": "화목순대국 광화문1호점",
+                          "telNo": "02-723-8313",
+                          "noorLat": "37.57120358",
+                          "noorLon": "126.97471568",
+                          "upperAddrName": "서울",
+                          "middleAddrName": "종로구",
+                          "lowerAddrName": "당주동",
+                          "detailAddrName": "",
+                          "firstNo": "40",
+                          "secondNo": "0",
+                          "newAddressList": {
+                            "newAddress": [
+                              { "fullAddressRoad": "서울 종로구 새문안로5길 11" }
+                            ]
+                          }
+                        },
+                        {
+                          "id": "1561691",
+                          "pkey": "156169101",
+                          "name": "화목순대국",
+                          "telNo": "02-780-8191",
+                          "noorLat": "37.51934772",
+                          "noorLon": "126.93149886",
+                          "upperAddrName": "서울",
+                          "middleAddrName": "영등포구",
+                          "lowerAddrName": "여의도동",
+                          "detailAddrName": "",
+                          "firstNo": "44",
+                          "secondNo": "14",
+                          "newAddressList": {
+                            "newAddress": [
+                              { "fullAddressRoad": "서울 영등포구 여의대방로 383" }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+                """;
+
+        private void expectPoiSearch() {
+            tmapServer.expect(requestTo(startsWith(BASE_URL + "/tmap/pois")))
+                    .andExpect(queryParam("version", "1"))
+                    .andExpect(queryParam("count", "10"))
+                    .andRespond(withSuccess(POI_SEARCH_RESPONSE, MediaType.APPLICATION_JSON));
+        }
+
+        @Nested
+        @DisplayName("Context: 검색 결과가 존재하면")
+        class Context_with_results {
+
+            @Test
+            @DisplayName("It : 페이지 정보와 장소 목록을 반환한다")
+            void it_returns_places() {
+                //given
+                expectPoiSearch();
+
+                //when
+                LocationSearchResponse response = locationService.searchLocation("화목순대국");
+
+                //then
+                assertThat(response.totalCount()).isEqualTo(2);
+                assertThat(response.count()).isEqualTo(2);
+                assertThat(response.page()).isEqualTo(1);
+                assertThat(response.infos().size()).isEqualTo(2);
+                tmapServer.verify();
+            }
+
+            @Test
+            @DisplayName("It : 중심점 좌표(noorLat/noorLon)와 도로명 주소를 매핑한다")
+            void it_maps_center_coordinate_and_road_address() {
+                //given
+                expectPoiSearch();
+
+                //when
+                LocationSearchInfo first = locationService.searchLocation("화목순대국").infos().getFirst();
+
+                //then
+                assertThat(first.id()).isEqualTo("2874793");
+                assertThat(first.pkey()).isEqualTo("287479301");
+                assertThat(first.name()).isEqualTo("화목순대국 광화문1호점");
+                assertThat(first.noorLat()).isEqualTo(37.57120358);
+                assertThat(first.noorLon()).isEqualTo(126.97471568);
+                assertThat(first.roadAddress()).isEqualTo("서울 종로구 새문안로5길 11");
+            }
+
+            @Test
+            @DisplayName("(부번이 0)It : 지번 주소에 부번을 붙이지 않는다")
+            void it_omits_zero_second_no() {
+                //given
+                expectPoiSearch();
+
+                //when
+                LocationSearchInfo first = locationService.searchLocation("화목순대국").infos().getFirst();
+
+                //then : detailAddrName이 빈 값이라 뒤에 공백도 남지 않는다
+                assertThat(first.landAddress()).isEqualTo("서울 종로구 당주동 40");
+            }
+
+            @Test
+            @DisplayName("(부번이 있음)It : 지번 주소를 본번-부번으로 조합한다")
+            void it_joins_first_and_second_no() {
+                //given
+                expectPoiSearch();
+
+                //when
+                LocationSearchInfo second = locationService.searchLocation("화목순대국").infos().get(1);
+
+                //then
+                assertThat(second.landAddress()).isEqualTo("서울 영등포구 여의도동 44-14");
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 키워드에 한글과 공백이 섞여 있으면")
+        class Context_with_korean_keyword {
+
+            @Test
+            @DisplayName("It : 이중 인코딩 없이 한 번만 인코딩해 요청한다")
+            void it_encodes_keyword_once() {
+                //given : 이중 인코딩되면 한 번 디코딩해도 %ED%99%94... 형태로 남는다
+                tmapServer.expect(request -> {
+                            String decoded = URLDecoder.decode(
+                                    request.getURI().toString(), StandardCharsets.UTF_8);
+                            assertThat(decoded.contains("searchKeyword=강남 스타벅스")).isTrue();
+                        })
+                        .andRespond(withSuccess(POI_SEARCH_RESPONSE, MediaType.APPLICATION_JSON));
+
+                //when
+                locationService.searchLocation("강남 스타벅스");
+
+                //then
+                tmapServer.verify();
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 검색 결과가 없어 티맵이 204를 응답하면")
+        class Context_with_no_content {
+
+            @Test
+            @DisplayName("It : 예외 없이 빈 결과를 반환한다")
+            void it_returns_empty_result() {
+                //given : 티맵은 0건일 때 200이 아니라 204 No Content를 준다
+                tmapServer.expect(requestTo(startsWith(BASE_URL + "/tmap/pois")))
+                        .andRespond(withStatus(HttpStatus.NO_CONTENT));
+
+                //when
+                LocationSearchResponse response = locationService.searchLocation("asdfqwerzxcv");
+
+                //then
+                assertThat(response.totalCount()).isEqualTo(0);
+                assertThat(response.count()).isEqualTo(0);
+                assertThat(response.page()).isEqualTo(0);
+                assertThat(response.infos().isEmpty()).isTrue();
+                tmapServer.verify();
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 티맵이 서버 오류를 응답하면")
+        class Context_with_tmap_server_error {
+
+            @Test
+            @DisplayName("It : TMAP_API_ERROR 오류 발생")
+            void it_throws_tmap_api_error() {
+                //given
+                tmapServer.expect(requestTo(startsWith(BASE_URL + "/tmap/pois")))
+                        .andRespond(withServerError());
+
+                //when&then
+                BusinessException exception = assertThrows(BusinessException.class,
+                        () -> locationService.searchLocation("화목순대국"));
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.TMAP_API_ERROR);
             }
         }
     }

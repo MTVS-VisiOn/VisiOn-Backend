@@ -10,6 +10,8 @@ import mtvs.onvision.vision.common.response.SuccessCode;
 import mtvs.onvision.vision.location.domain.MovementStatus;
 import mtvs.onvision.vision.location.dto.LastLocationResponse;
 import mtvs.onvision.vision.location.dto.LocationRequest;
+import mtvs.onvision.vision.location.dto.LocationSearchInfo;
+import mtvs.onvision.vision.location.dto.LocationSearchResponse;
 import mtvs.onvision.vision.location.service.LocationService;
 import mtvs.onvision.vision.user.domain.UserRole;
 import org.junit.jupiter.api.AfterEach;
@@ -28,6 +30,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
@@ -285,6 +288,114 @@ class LocationControllerTest {
                         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                         .andExpect(jsonPath("$.code").value(ErrorCode.NOT_FOUND_LAST_LOCATION.name()))
                         .andExpect(jsonPath("$.message").value(ErrorCode.NOT_FOUND_LAST_LOCATION.getMessage()))
+                        .andDo(print());
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Describe: GET /api/locations/search 엔드포인트는")
+    class searchLocation {
+
+        private LocationSearchInfo info() {
+            return new LocationSearchInfo(
+                    "2874793", "287479301", "화목순대국 광화문1호점",
+                    37.57120358, 126.97471568,
+                    "서울 종로구 당주동 40", "서울 종로구 새문안로5길 11");
+        }
+
+        @Nested
+        @DisplayName("Context: 검색 결과가 존재하면")
+        class Context_with_results {
+
+            @Test
+            @DisplayName("It : 200 상태와 장소 목록을 반환한다")
+            void it_return_200_ok_and_places() throws Exception {
+                //given
+                LocationSearchResponse response =
+                        new LocationSearchResponse(1, 1, 1, List.of(info()));
+                given(locationService.searchLocation("화목순대국")).willReturn(response);
+
+                //when-then
+                mockMvc.perform(
+                                get("/api/locations/search")
+                                        .param("keyword", "화목순대국")
+                        )
+                        .andExpect(status().isOk())
+                        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                        .andExpect(jsonPath("$.code").value(SuccessCode.LOCATION_SEARCH_READ.name()))
+                        .andExpect(jsonPath("$.message").value(SuccessCode.LOCATION_SEARCH_READ.getSuccessMessage()))
+                        .andExpect(jsonPath("$.data.totalCount").value(1))
+                        .andExpect(jsonPath("$.data.infos[0].name").value("화목순대국 광화문1호점"))
+                        .andExpect(jsonPath("$.data.infos[0].landAddress").value("서울 종로구 당주동 40"))
+                        .andExpect(jsonPath("$.data.infos[0].roadAddress").value("서울 종로구 새문안로5길 11"))
+                        .andExpect(jsonPath("$.data.infos[0].noorLat").value(37.57120358))
+                        .andDo(print());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 검색 결과가 없으면")
+        class Context_with_no_result {
+
+            @Test
+            @DisplayName("It : 200 상태와 빈 목록을 반환한다")
+            void it_return_200_ok_and_empty_list() throws Exception {
+                //given : 결과 없음은 오류가 아니다
+                given(locationService.searchLocation("asdfqwerzxcv"))
+                        .willReturn(new LocationSearchResponse(0, 0, 0, List.of()));
+
+                //when-then
+                mockMvc.perform(
+                                get("/api/locations/search")
+                                        .param("keyword", "asdfqwerzxcv")
+                        )
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.code").value(SuccessCode.LOCATION_SEARCH_READ.name()))
+                        .andExpect(jsonPath("$.data.totalCount").value(0))
+                        .andExpect(jsonPath("$.data.infos").isEmpty())
+                        .andDo(print());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: keyword 파라미터가 없으면")
+        class Context_with_no_keyword {
+
+            @Test
+            @DisplayName("It : 400 상태와 REQUESTPARAM_REQUIRED를 반환한다")
+            void it_return_400_bad_request() throws Exception {
+                //when-then
+                mockMvc.perform(
+                                get("/api/locations/search")
+                        )
+                        .andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.code").value(ErrorCode.REQUESTPARAM_REQUIRED.name()))
+                        .andDo(print());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 티맵 호출이 실패하면")
+        class Context_with_tmap_error {
+
+            @Test
+            @DisplayName("It : 502 상태와 TMAP_API_ERROR를 반환한다")
+            void it_return_502_bad_gateway() throws Exception {
+                //given
+                doThrow(new BusinessException(ErrorCode.TMAP_API_ERROR))
+                        .when(locationService)
+                        .searchLocation("화목순대국");
+
+                //when-then
+                mockMvc.perform(
+                                get("/api/locations/search")
+                                        .param("keyword", "화목순대국")
+                        )
+                        .andExpect(status().isBadGateway())
+                        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                        .andExpect(jsonPath("$.code").value(ErrorCode.TMAP_API_ERROR.name()))
+                        .andExpect(jsonPath("$.message").value(ErrorCode.TMAP_API_ERROR.getMessage()))
                         .andDo(print());
             }
         }
