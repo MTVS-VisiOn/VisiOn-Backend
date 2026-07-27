@@ -8,15 +8,12 @@ import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.response.ApiResult;
 import mtvs.onvision.vision.presence.dto.HeartbeatRequest;
 import mtvs.onvision.vision.presence.dto.PresenceResponse;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.RequestBody;
 
 @Tag(name="Presence API", description = "기기 연결상태 API")
 public interface PresenceControllerSupporter {
@@ -85,8 +82,8 @@ public interface PresenceControllerSupporter {
                     }
             )
     })
-    ResponseEntity<ApiResult<Void>> receiveHeartBeat(@Valid @RequestBody HeartbeatRequest request,
-                                                     @AuthenticationPrincipal CurrentUser currentUser);
+    ResponseEntity<ApiResult<Void>> receiveHeartBeat(HeartbeatRequest request,
+                                                     CurrentUser currentUser);
 
 
     @Operation(
@@ -138,6 +135,6 @@ public interface PresenceControllerSupporter {
                     }
             )
     })
-    ResponseEntity<ApiResult<PresenceResponse>> getWardPresence(@AuthenticationPrincipal CurrentUser currentUser);
+    ResponseEntity<ApiResult<PresenceResponse>> getWardPresence(CurrentUser currentUser);
 
 }

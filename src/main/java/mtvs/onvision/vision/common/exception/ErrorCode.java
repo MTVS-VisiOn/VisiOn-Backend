@@ -34,14 +34,18 @@ public enum ErrorCode {
     NOT_FOUND_CONNECT(HttpStatus.NOT_FOUND, "기기의 연결상태를 찾을 수 없습니다."),
     /*Location*/
     NOT_FOUND_LAST_LOCATION(HttpStatus.NOT_FOUND, "마지막 위치를 찾을 수 없습니다."),
+    TMAP_API_ERROR(HttpStatus.BAD_GATEWAY, "지도 서비스 호출에 실패했습니다."),
 
+    /*Favorite*/
+    EXIST_FAVORITE(HttpStatus.CONFLICT, "이미 저장된 장소입니다."),
+    NOT_FOUND_FAVORITE(HttpStatus.NOT_FOUND, "해당 아이디의 즐겨찾기를 찾을 수 없습니다."),
 
     /*common*/
     REQUESTPARAM_REQUIRED(HttpStatus.BAD_REQUEST, "해당 파라미터는 필수값입니다. :::"),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "검증에 실패했습니다."),
     ALREADY_DELETED(HttpStatus.CONFLICT, "이미 삭제된 상태입니다."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류입니다."),
-    BUSINESS_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "알 수 없는 오류입니다.");
+    BUSINESS_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "알 수 없는 오류입니다. ::: ");
 
     private final HttpStatus status;
     private final String message;

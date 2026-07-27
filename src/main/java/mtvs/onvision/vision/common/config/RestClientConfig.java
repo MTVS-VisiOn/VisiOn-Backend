@@ -16,7 +16,6 @@ public class RestClientConfig {
 
     @Bean
     public RestClient tmapRestClient() {
-        System.out.println(appKey);
         return RestClient.builder()
                 .baseUrl(baseUrl)
                 .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
