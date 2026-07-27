@@ -7,6 +7,7 @@ import mtvs.onvision.vision.common.response.ApiResult;
 import mtvs.onvision.vision.common.response.SuccessCode;
 import mtvs.onvision.vision.favorite.dto.FavoriteRequest;
 import mtvs.onvision.vision.favorite.dto.FavoriteResponse;
+import mtvs.onvision.vision.favorite.dto.FavoriteUpdateRequest;
 import mtvs.onvision.vision.favorite.service.FavoriteService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -34,6 +35,15 @@ public class FavoriteController {
         List<FavoriteResponse> response = favoriteService.searchFavorite(currentUser, keyword);
 
         return ApiResult.ok(SuccessCode.FAVORITE_READ, response);
+    }
+
+    //즐겨찾기 수정
+    @PatchMapping("/{favoriteId}")
+    public ResponseEntity<ApiResult<Void>> updateFavorite(@PathVariable Long favoriteId,
+                                                          @RequestBody @Valid FavoriteUpdateRequest request,
+                                                          @AuthenticationPrincipal CurrentUser currentUser) {
+        favoriteService.updateFavorite(favoriteId, currentUser, request);
+        return ApiResult.ok(SuccessCode.FAVORITE_UPDATED);
     }
 
 

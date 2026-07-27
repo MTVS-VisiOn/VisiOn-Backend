@@ -52,4 +52,8 @@ public class Favorite extends BaseEntity {
         this.longitude = request.noorLon();
         this.user = user;
     }
+
+    public void update(String nickname) {
+        this.nickname = nickname;
+    }
 }
