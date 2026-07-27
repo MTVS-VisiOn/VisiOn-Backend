@@ -376,6 +376,61 @@ class LocationControllerTest {
         }
 
         @Nested
+        @DisplayName("Context: keyword가 빈 값이면")
+        class Context_with_blank_keyword {
+
+            @Test
+            @DisplayName("(빈 문자열)It : 400 상태와 필수값 메시지를 반환한다")
+            void it_return_400_bad_request_with_empty_string() throws Exception {
+                //when-then : 파라미터 자체는 존재하므로 REQUESTPARAM_REQUIRED가 아니라 VALIDATION_FAILED
+                mockMvc.perform(
+                                get("/api/locations/search")
+                                        .param("keyword", "")
+                        )
+                        .andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()))
+                        .andExpect(jsonPath("$.message").value("keyword는 필수값입니다."))
+                        .andDo(print());
+            }
+
+            @Test
+            @DisplayName("(공백만)It : 400 상태와 필수값 메시지를 반환한다")
+            void it_return_400_bad_request_with_whitespace() throws Exception {
+                //when-then
+                mockMvc.perform(
+                                get("/api/locations/search")
+                                        .param("keyword", "   ")
+                        )
+                        .andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()))
+                        .andExpect(jsonPath("$.message").value("keyword는 필수값입니다."))
+                        .andDo(print());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: keyword가 100자를 넘으면")
+        class Context_with_too_long_keyword {
+
+            @Test
+            @DisplayName("It : 400 상태와 길이 제한 메시지를 반환한다")
+            void it_return_400_bad_request() throws Exception {
+                //given
+                String keyword = "가".repeat(101);
+
+                //when-then
+                mockMvc.perform(
+                                get("/api/locations/search")
+                                        .param("keyword", keyword)
+                        )
+                        .andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()))
+                        .andExpect(jsonPath("$.message").value("keyword는 100자 이하여야 합니다."))
+                        .andDo(print());
+            }
+        }
+
+        @Nested
         @DisplayName("Context: 티맵 호출이 실패하면")
         class Context_with_tmap_error {
 

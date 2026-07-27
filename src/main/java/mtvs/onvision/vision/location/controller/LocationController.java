@@ -3,9 +3,11 @@ package mtvs.onvision.vision.location.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
+import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.common.response.ApiResult;
 import mtvs.onvision.vision.common.response.SuccessCode;
 import mtvs.onvision.vision.common.swagger.ApiUnauthorized;
+import mtvs.onvision.vision.common.util.PreConditions;
 import mtvs.onvision.vision.location.dto.LastLocationResponse;
 import mtvs.onvision.vision.location.dto.LocationRequest;
 import mtvs.onvision.vision.location.dto.LocationSearchResponse;
@@ -39,6 +41,8 @@ public class LocationController implements LocationControllerSupporter{
 
     @GetMapping("/search")
     public ResponseEntity<ApiResult<LocationSearchResponse>> searchLocation(@RequestParam String keyword) {
+        PreConditions.check(keyword == null || keyword.isBlank(), ErrorCode.VALIDATION_FAILED, "keyword는 필수값입니다.");
+        PreConditions.check(keyword.length()>100, ErrorCode.VALIDATION_FAILED, "keyword는 100자 이하여야 합니다.");
         LocationSearchResponse response = locationService.searchLocation(keyword);
         return ApiResult.ok(SuccessCode.LOCATION_SEARCH_READ, response);
     }
