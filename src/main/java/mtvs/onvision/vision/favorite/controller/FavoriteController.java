@@ -6,6 +6,7 @@ import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.common.response.ApiResult;
 import mtvs.onvision.vision.common.response.SuccessCode;
+import mtvs.onvision.vision.common.swagger.ApiUnauthorized;
 import mtvs.onvision.vision.common.util.PreConditions;
 import mtvs.onvision.vision.favorite.dto.FavoriteRequest;
 import mtvs.onvision.vision.favorite.dto.FavoriteResponse;
@@ -19,10 +20,12 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/favorites")
 @RequiredArgsConstructor
-public class FavoriteController {
+public class FavoriteController implements FavoriteControllerSupporter{
     private final FavoriteService favoriteService;
 
+    @Override
     @PostMapping
+    @ApiUnauthorized
     public ResponseEntity<ApiResult<Void>> saveFavorite(@RequestBody @Valid FavoriteRequest request,
                                                         @AuthenticationPrincipal CurrentUser currentUser) {
         favoriteService.saveFavorite(request, currentUser);
@@ -30,7 +33,9 @@ public class FavoriteController {
     }
 
     //즐겨찾기 검색
+    @Override
     @GetMapping("/search")
+    @ApiUnauthorized
     public ResponseEntity<ApiResult<Page<FavoriteResponse>>> searchFavorite(@AuthenticationPrincipal CurrentUser currentUser,
                                                                             @RequestParam(required = false) String keyword,
                                                                             @RequestParam(required = false, defaultValue = "1") int page) {
@@ -42,7 +47,9 @@ public class FavoriteController {
     }
 
     //즐겨찾기 수정
+    @Override
     @PatchMapping("/{favoriteId}")
+    @ApiUnauthorized
     public ResponseEntity<ApiResult<Void>> updateFavorite(@PathVariable Long favoriteId,
                                                           @RequestBody @Valid FavoriteUpdateRequest request,
                                                           @AuthenticationPrincipal CurrentUser currentUser) {
@@ -51,7 +58,9 @@ public class FavoriteController {
     }
 
     //즐겨찾기 삭제
+    @Override
     @DeleteMapping("/{favoriteId}")
+    @ApiUnauthorized
     public ResponseEntity<ApiResult<Void>> deleteFavorite(@PathVariable Long favoriteId,
                                                           @AuthenticationPrincipal CurrentUser currentUser) {
         favoriteService.deleteFavorite(favoriteId, currentUser);
