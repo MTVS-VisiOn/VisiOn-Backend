@@ -48,4 +48,11 @@ public class FavoriteService {
         PreConditions.check(!favorite.getUser().getId().equals(currentUser.getId()), ErrorCode.FORBIDDEN_USER);
         favorite.update(request.nickname());
     }
+
+    @Transactional
+    public void deleteFavorite(Long favoriteId, CurrentUser currentUser) {
+        Favorite favorite = favoriteRepository.findById(favoriteId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_FAVORITE));
+        PreConditions.check(!favorite.getUser().getId().equals(currentUser.getId()), ErrorCode.FORBIDDEN_USER);
+        favorite.delete();
+    }
 }

@@ -46,5 +46,13 @@ public class FavoriteController {
         return ApiResult.ok(SuccessCode.FAVORITE_UPDATED);
     }
 
+    //즐겨찾기 삭제
+    @DeleteMapping("/{favoriteId}")
+    public ResponseEntity<ApiResult<Void>> deleteFavorite(@PathVariable Long favoriteId,
+                                                          @AuthenticationPrincipal CurrentUser currentUser) {
+        favoriteService.deleteFavorite(favoriteId, currentUser);
+        return ApiResult.ok(SuccessCode.FAVORITE_DELETED);
+    }
+
 
 }

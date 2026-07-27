@@ -39,6 +39,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST,"/api/favorites").hasAuthority("WARD")
                         .requestMatchers(HttpMethod.GET,"/api/favorites/search").hasAnyAuthority("WARD","GUARDIAN")
                         .requestMatchers(HttpMethod.PATCH,"/api/favorites/**").hasAuthority("WARD")
+                        .requestMatchers(HttpMethod.DELETE,"/api/favorites/**").hasAuthority("WARD")
                         .anyRequest().permitAll()
                 )
                 .exceptionHandling(exp -> exp
