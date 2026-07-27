@@ -45,13 +45,13 @@ public class FavoriteService {
     //즐겨찾기 닉네임 바꾸기
     @Transactional
     public void updateFavorite(Long favoriteId, CurrentUser currentUser, FavoriteUpdateRequest request) {
-        Favorite favorite = favoriteRepository.findByIdAndUserIdAndDeletedAtIsNull(currentUser.getId(), favoriteId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_FAVORITE));
+        Favorite favorite = favoriteRepository.findByIdAndUserIdAndDeletedAtIsNull(favoriteId, currentUser.getId()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_FAVORITE));
         favorite.update(request.nickname());
     }
 
     @Transactional
     public void deleteFavorite(Long favoriteId, CurrentUser currentUser) {
-        Favorite favorite = favoriteRepository.findByIdAndUserIdAndDeletedAtIsNull(currentUser.getId(), favoriteId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_FAVORITE));
+        Favorite favorite = favoriteRepository.findByIdAndUserIdAndDeletedAtIsNull(favoriteId, currentUser.getId()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_FAVORITE));
         favorite.delete();
     }
 }
