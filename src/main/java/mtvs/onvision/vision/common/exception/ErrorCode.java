@@ -39,7 +39,6 @@ public enum ErrorCode {
     /*Favorite*/
     EXIST_FAVORITE(HttpStatus.CONFLICT, "이미 저장된 장소입니다."),
     NOT_FOUND_FAVORITE(HttpStatus.NOT_FOUND, "해당 아이디의 즐겨찾기를 찾을 수 없습니다."),
-    FORBIDDEN_USER(HttpStatus.FORBIDDEN, "해당 사용자의 즐겨찾기 목록이 아닙니다."),
 
     /*common*/
     REQUESTPARAM_REQUIRED(HttpStatus.BAD_REQUEST, "해당 파라미터는 필수값입니다. :::"),

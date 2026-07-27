@@ -39,7 +39,7 @@ public class Favorite extends BaseEntity {
     @Column(nullable = false)
     private Double longitude;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(nullable = false)
     private User user;
 
