@@ -1,6 +1,8 @@
 package mtvs.onvision.vision.favorite.dto;
 
+import jakarta.validation.constraints.NotNull;
+
 public record FavoriteUpdateRequest(
-        String nickname
+        @NotNull String nickname
 ) {
 }
