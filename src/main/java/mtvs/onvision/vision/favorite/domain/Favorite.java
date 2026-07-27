@@ -18,18 +18,19 @@ public class Favorite extends BaseEntity {
     @Column(nullable = false)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 50)
     private String name;   //지도상의 장소
 
+    @Column(length = 50)
     private String nickname;   //장소의 별칭
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 50)
     private String pkey;  //티맵 아이디
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 100)
     private String landAddress;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 100)
     private String roadAddress;
 
     @Column(nullable = false)
