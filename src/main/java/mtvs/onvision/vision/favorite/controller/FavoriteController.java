@@ -9,11 +9,10 @@ import mtvs.onvision.vision.favorite.dto.FavoriteRequest;
 import mtvs.onvision.vision.favorite.dto.FavoriteResponse;
 import mtvs.onvision.vision.favorite.dto.FavoriteUpdateRequest;
 import mtvs.onvision.vision.favorite.service.FavoriteService;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/favorites")
@@ -30,9 +29,10 @@ public class FavoriteController {
 
     //즐겨찾기 검색
     @GetMapping("/search")
-    public ResponseEntity<ApiResult<List<FavoriteResponse>>> searchFavorite(@AuthenticationPrincipal CurrentUser currentUser,
-                                                                         @RequestParam(required = false) String keyword) {
-        List<FavoriteResponse> response = favoriteService.searchFavorite(currentUser, keyword);
+    public ResponseEntity<ApiResult<Page<FavoriteResponse>>> searchFavorite(@AuthenticationPrincipal CurrentUser currentUser,
+                                                                            @RequestParam(required = false) String keyword,
+                                                                            @RequestParam(required = false, defaultValue = "1") int page) {
+        Page<FavoriteResponse> response = favoriteService.searchFavorite(currentUser, keyword, page);
 
         return ApiResult.ok(SuccessCode.FAVORITE_READ, response);
     }

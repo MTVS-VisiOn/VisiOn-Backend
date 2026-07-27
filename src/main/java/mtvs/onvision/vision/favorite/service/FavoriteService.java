@@ -13,10 +13,11 @@ import mtvs.onvision.vision.favorite.repository.FavoriteRepository;
 import mtvs.onvision.vision.user.domain.User;
 import mtvs.onvision.vision.user.domain.UserRole;
 import mtvs.onvision.vision.user.service.UserService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -33,13 +34,21 @@ public class FavoriteService {
     }
 
     @Transactional(readOnly = true)
-    public List<FavoriteResponse> searchFavorite(CurrentUser currentUser, String keyword) {
+    public Page<FavoriteResponse> searchFavorite(CurrentUser currentUser, String keyword, int page) {
         UserRole role = currentUser.getRole();
         Long userId = role == UserRole.GUARDIAN? userService.getWardIdFromGuardianId(currentUser.getId()) : currentUser.getId();
-        List<Favorite> favorites;
-        if (keyword == null || keyword.isBlank()) favorites = favoriteRepository.findTop5ByUserIdAndDeletedAtIsNullOrderByNicknameAscNameAsc(userId);
-        else favorites = favoriteRepository.searchFavorite(userId, keyword);
-        return favorites.stream().map(FavoriteResponse::from).toList();
+        Page<Favorite> favorites;
+        Pageable pageable;
+
+        if (keyword == null || keyword.isBlank()) {
+            pageable = PageRequest.of(page-1, 10);
+            favorites = favoriteRepository.findByUserIdAndDeletedAtIsNullOrderByNicknameAscNameAsc(userId, pageable);
+        }
+        else  {
+            pageable = PageRequest.of(page-1, 5);
+            favorites = favoriteRepository.searchFavorite(userId, keyword, pageable);
+        }
+        return favorites.map(FavoriteResponse::from);
     }
 
     //즐겨찾기 닉네임 바꾸기
