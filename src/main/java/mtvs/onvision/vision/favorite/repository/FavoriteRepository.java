@@ -15,10 +15,10 @@ public interface FavoriteRepository extends JpaRepository<Favorite, Long> {
         select f from Favorite f
         where f.user.id = :userId
             and f.deletedAt is null
-            and (f.nickname like %:keyword% or f.name like %:keyword%)
-            order by case when f.nickname like %:keyword% then 0 else 1 end, f.name
+            and (f.nickname like :pattern escape '!' or f.name like :pattern escape '!')
+            order by case when f.nickname like :pattern escape '!' then 0 else 1 end, f.name
     """)
-    Page<Favorite> searchFavorite(Long userId, String keyword,Pageable pageable);
+    Page<Favorite> searchFavorite(Long userId, String pattern, Pageable pageable);
 
     Optional<Favorite> findByIdAndUserIdAndDeletedAtIsNull(Long favoriteId, Long userId);
 }

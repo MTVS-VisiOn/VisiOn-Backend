@@ -46,7 +46,7 @@ public class FavoriteService {
         }
         else  {
             pageable = PageRequest.of(page-1, 5);
-            favorites = favoriteRepository.searchFavorite(userId, keyword, pageable);
+            favorites = favoriteRepository.searchFavorite(userId, toLikePattern(keyword), pageable);
         }
         return favorites.map(FavoriteResponse::from);
     }
@@ -62,5 +62,13 @@ public class FavoriteService {
     public void deleteFavorite(Long favoriteId, CurrentUser currentUser) {
         Favorite favorite = favoriteRepository.findByIdAndUserIdAndDeletedAtIsNull(favoriteId, currentUser.getId()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_FAVORITE));
         favorite.delete();
+    }
+
+    private String toLikePattern(String keyword) {
+        String escaped = keyword
+                .replace("!", "!!")
+                .replace("%", "!%")
+                .replace("_", "!_");
+        return "%" + escaped + "%";
     }
 }
