@@ -34,6 +34,7 @@ public enum ErrorCode {
     NOT_FOUND_CONNECT(HttpStatus.NOT_FOUND, "기기의 연결상태를 찾을 수 없습니다."),
     /*Location*/
     NOT_FOUND_LAST_LOCATION(HttpStatus.NOT_FOUND, "마지막 위치를 찾을 수 없습니다."),
+    TMAP_API_ERROR(HttpStatus.BAD_GATEWAY, "지도 서비스 호출에 실패했습니다."),
 
 
     /*common*/
@@ -41,7 +42,7 @@ public enum ErrorCode {
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "검증에 실패했습니다."),
     ALREADY_DELETED(HttpStatus.CONFLICT, "이미 삭제된 상태입니다."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류입니다."),
-    BUSINESS_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "알 수 없는 오류입니다.");
+    BUSINESS_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "알 수 없는 오류입니다. ::: ");
 
     private final HttpStatus status;
     private final String message;

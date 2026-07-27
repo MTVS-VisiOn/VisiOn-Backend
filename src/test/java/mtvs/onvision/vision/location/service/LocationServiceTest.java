@@ -314,7 +314,7 @@ class LocationServiceTest {
                 LastLocationResponse response = locationService.getLastLocation(guardian);
 
                 //then
-                assertThat(response.isCponnected()).isFalse();
+                assertThat(response.isConnected()).isFalse();
                 assertThat(response.lastAddress()).isNull();
                 assertThat(response.status()).isEqualTo(MovementStatus.UNKNOWN.getMessage());
                 tmapServer.verify();  // 호출된 요청 없음
@@ -367,7 +367,7 @@ class LocationServiceTest {
                 LastLocationResponse response = locationService.getLastLocation(guardian);
 
                 //then
-                assertThat(response.isCponnected()).isTrue();
+                assertThat(response.isConnected()).isTrue();
                 assertThat(response.lastAddress()).isEqualTo("경기도 부천시 원미구 부일로 123");
                 assertThat(response.status()).isEqualTo(MovementStatus.ON_FOOT.getMessage());
                 tmapServer.verify();

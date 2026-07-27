@@ -29,4 +29,13 @@ public class GlobalExceptionHandler {
         String errorMessage = ErrorCode.REQUESTPARAM_REQUIRED.getMessage() + e.getParameterName();
         return ApiResult.error(ErrorCode.REQUESTPARAM_REQUIRED, errorMessage);
     }
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiResult<Void>> handleMissingRequestParam(
+            Exception e
+    ) {
+        String errorMessage = ErrorCode.BUSINESS_ERROR.getMessage() + e.getMessage();
+        return ApiResult.error(ErrorCode.BUSINESS_ERROR, errorMessage);
+    }
+
+
 }
