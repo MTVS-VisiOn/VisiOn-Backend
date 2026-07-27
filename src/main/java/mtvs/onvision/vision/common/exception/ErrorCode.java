@@ -36,6 +36,8 @@ public enum ErrorCode {
     NOT_FOUND_LAST_LOCATION(HttpStatus.NOT_FOUND, "마지막 위치를 찾을 수 없습니다."),
     TMAP_API_ERROR(HttpStatus.BAD_GATEWAY, "지도 서비스 호출에 실패했습니다."),
 
+    /*Favorite*/
+    EXIST_FAVORITE(HttpStatus.CONFLICT, "이미 저장된 장소입니다."),
 
     /*common*/
     REQUESTPARAM_REQUIRED(HttpStatus.BAD_REQUEST, "해당 파라미터는 필수값입니다. :::"),

@@ -26,6 +26,13 @@ public enum SuccessCode {
     LOCATION_READ("실시간 위치가 정상적으로 조회되었습니다."),
     LOCATION_SEARCH_READ("장소 검색이 정상적으로 조회되었습니다."),
 
+    /*Favorite*/
+    FAVORITE_CREATED("즐겨찾기가 정상적으로 저장되었습니다."),
+    FAVORITE_READ("즐겨찾기가 정상적으로 조회되었습니다."),
+    FAVORITE_UPDATED("즐겨찾기가 정상적으로 수정되었습니다."),
+    FAVORITE_DELETED("즐겨찾기가 정상적으로 삭제되었습니다."),
+
+
     /*common*/
     BUSINESS_SUCCESS("정상적으로 작성되었습니다.");
 

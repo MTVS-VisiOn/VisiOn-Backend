@@ -103,8 +103,9 @@ public class UserService implements UserDetailsService {
     }
 
     @Transactional(readOnly = true)
-    public User currentUserToUser(CurrentUser currentUser) {
-        return userRepository.findById(currentUser.getId()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
+    public User currentUserToUser(Long userId) {
+        return userRepository.getReferenceById(userId);
+//        return userRepository.findById(currentUser.getId()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
     }
 
     @Transactional(readOnly = true)

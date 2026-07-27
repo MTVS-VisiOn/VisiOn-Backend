@@ -36,6 +36,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST,"/api/locations").hasAuthority("WARD")
                         .requestMatchers(HttpMethod.GET,"/api/locations").hasAuthority("GUARDIAN")
                         .requestMatchers("/api/locations/search").hasAuthority("WARD")
+                        .requestMatchers(HttpMethod.POST,"/api/favorites").hasAuthority("WARD")
                         .anyRequest().permitAll()
                 )
                 .exceptionHandling(exp -> exp
