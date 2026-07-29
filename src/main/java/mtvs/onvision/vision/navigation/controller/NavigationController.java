@@ -15,17 +15,27 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/navigations")
 @RequiredArgsConstructor
 public class NavigationController {
     private final NavigationService navigationService;
 
-    //출발지,도착지 받고 경로 찾기
+    //출발지,도착지 받고 경로 찾기(보행자, 자동차)
     @PostMapping
     public ResponseEntity<ApiResult<NavigationSummary>> searchNavigation(@RequestBody @Valid NavigationPreRequest request,
                                                                            @AuthenticationPrincipal CurrentUser currentUser) {
         NavigationSummary response = navigationService.searchNavigation(request, currentUser);
-        return ApiResult.ok(SuccessCode.BUSINESS_SUCCESS, response);
+        return ApiResult.ok(SuccessCode.NAVIGATION_SEARCH, response);
+    }
+
+    //출발지,도착지 받고 경로 찾기(대중교통)
+    @PostMapping("/transit")
+    public ResponseEntity<ApiResult<List<NavigationSummary>>> searchNavigationTransit(@RequestBody @Valid NavigationPreRequest request,
+                                                                                      @AuthenticationPrincipal CurrentUser currentUser) {
+        List<NavigationSummary> response = navigationService.searchNavigationTransit(request, currentUser);
+        return ApiResult.ok(SuccessCode.NAVIGATION_SEARCH, response);
     }
 }

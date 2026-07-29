@@ -5,6 +5,7 @@ import mtvs.onvision.vision.navigation.domain.TransportMode;
 import java.util.List;
 
 public record CarSummaryResponse(
+        Integer index,
         TransportMode mode,
         Integer totalDistance,
         Integer totalTime,           //초

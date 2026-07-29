@@ -5,6 +5,7 @@ import mtvs.onvision.vision.navigation.domain.TransportMode;
 import java.util.List;
 
 public record WalkSummaryResponse(
+    Integer index,
     TransportMode mode,
     Integer totalDistance,  //총걸리는 시간
     Integer totalTime,   //초

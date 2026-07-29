@@ -8,6 +8,7 @@ import mtvs.onvision.vision.navigation.domain.TransportMode;
 import mtvs.onvision.vision.navigation.dto.*;
 import mtvs.onvision.vision.navigation.repository.NavigationRepository;
 import org.jspecify.annotations.NonNull;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
@@ -17,7 +18,9 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -34,6 +37,7 @@ public class NavigationService {
         TransportMode mode = request.mode();
         MultiValueMap<String, String> form = getStringStringMultiValueMap(request, mode);
         try {
+            if (!(mode == TransportMode.WALK) && !(mode == TransportMode.CAR)) throw new BusinessException(ErrorCode.INVALID_TRANSFER);
             if (mode == TransportMode.WALK) {
                 //티맵에서 경로찾기
                 TmapPedestrianResponse res = tmapRestClient.post()
@@ -72,6 +76,7 @@ public class NavigationService {
                 LocationInfo start = request.start();
                 LocationInfo end = request.end();
                 WalkSummaryResponse summary = new WalkSummaryResponse(
+                        0,
                         request.mode(),
                         totalDistance, totalTime, crosswalkCount,
                         stairCount, overpassCount, underpassCount,
@@ -87,12 +92,12 @@ public class NavigationService {
                 //경로 redis 저장
                 NavigationRouteReport report = new NavigationRouteReport(summary, steps);
                 String json = objectMapper.writeValueAsString(report);
-                navigationRepository.saveRoute(currentUser.getId(), json);
+                navigationRepository.saveRoute(currentUser.getId(), mode.getPrefix(), json);
 
                 // 출력은 요약만
                 return summary;
             }
-            if (mode == TransportMode.CAR) {
+            else if (mode == TransportMode.CAR) {
                 //티맵에서 경로찾기
                 TmapCarResponse res = tmapRestClient.post()
                         .uri(
@@ -122,6 +127,7 @@ public class NavigationService {
                 LocationInfo start = request.start();
                 LocationInfo end = request.end();
                 CarSummaryResponse summary = new CarSummaryResponse(
+                        0,
                         request.mode(),
                         fStart.totalDistance(), fStart.totalTime(),
                         fStart.totalFare(), fStart.taxiFare(),
@@ -137,7 +143,7 @@ public class NavigationService {
                 //경로 redis 저장
                 NavigationRouteReport report = new NavigationRouteReport(summary, steps);
                 String json = objectMapper.writeValueAsString(report);
-                navigationRepository.saveRoute(currentUser.getId(), json);
+                navigationRepository.saveRoute(currentUser.getId(), mode.getPrefix(), json);
 
                 // 출력은 요약만
                 return summary;
@@ -150,6 +156,49 @@ public class NavigationService {
         }
     }
 
+    //대중교통 경로 검색
+    public List<NavigationSummary> searchNavigationTransit(NavigationPreRequest request, CurrentUser currentUser) {
+        TransportMode mode = request.mode();
+        TmapTransitRequest req = TmapTransitRequest.from(request);
+        try {
+            if (mode != TransportMode.TRANSIT) throw new BusinessException(ErrorCode.INVALID_TRANSFER);
+
+            TmapTransitResponse res = tmapRestClient.post()
+                    .uri(uriBuilder -> uriBuilder.path(mode.getPath()).build())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(req)
+                    .retrieve()
+                    // 오류 23은 400, 한도 초과는 429로 온다. 원인은 본문에만 있으므로
+                    // 기본 예외 처리를 끄고 아래 toTransitException에서 가른다
+                    .onStatus(HttpStatusCode::isError, (rq, rs) -> { })
+                    .body(TmapTransitResponse.class);
+
+            // 정렬·필터까지 끝난 후보. index는 이 순서로 매긴다
+            List<TmapTransitResponse.Itinerary> itineraries = usableItineraries(res);
+
+            List<NavigationSummary> summaries = new ArrayList<>();
+            List<TransitRoute> candidates = new ArrayList<>();
+            for (TmapTransitResponse.Itinerary itinerary : itineraries) {
+                List<TmapTransitResponse.Leg> legs = usableLegs(itinerary);
+                TransitSummaryResponse summary =
+                        toTransitSummary(request, itinerary, legs, summaries.size());
+                summaries.add(summary);
+                candidates.add(new TransitRoute(summary, toTransitLegs(legs)));
+            }
+
+            // 후보 전체를 배열로 저장한다. 선택 API는 2단계(안내 세션)에서 붙는다
+            navigationRepository.saveRoute(currentUser.getId(), mode.getPrefix(),
+                    objectMapper.writeValueAsString(candidates));
+
+            return summaries;
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.TMAP_API_ERROR, e.getMessage());
+        }
+    }
+
+
     private @NonNull MultiValueMap<String, String> getStringStringMultiValueMap(NavigationPreRequest request, TransportMode mode) {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("startX", String.valueOf(request.start().longitude()));   // X가 경도
@@ -158,7 +207,7 @@ public class NavigationService {
         form.add("endY",   String.valueOf(request.end().latitude()));
         form.add("startName", request.start().name());                      // 원문 그대로
         form.add("endName",   request.end().name());
-        form.add("searchOption", mode.getOption());
+        form.add("searchOption", mode.getOption());  //대중교통이 아닐 경우에만 추가
         form.add("reqCoordType", "WGS84GEO");
         form.add("resCoordType", "WGS84GEO");
         return form;
@@ -271,5 +320,209 @@ public class NavigationService {
         if (description == null) return null;
         Matcher m = DISTANCE_TAIL.matcher(description);
         return m.find() ? m.replaceFirst(distance + "m 이동") : description;
+    }
+
+    /* ==================== 대중교통 ==================== */
+
+    private static final String WALK_MODE = "WALK";
+
+    /** 성공/실패를 metaData 유무로 먼저 가르고, 탈 수 있는 후보만 정렬해서 돌려준다. */
+    private List<TmapTransitResponse.Itinerary> usableItineraries(TmapTransitResponse res) {
+        if (res == null) throw new BusinessException(ErrorCode.TMAP_API_ERROR);
+        if (res.metaData() == null || res.metaData().plan() == null) throw toTransitException(res);
+
+        List<TmapTransitResponse.Itinerary> found = res.metaData().plan().itineraries();
+        if (found == null || found.isEmpty()) throw new BusinessException(ErrorCode.NOT_FOUND_ROUTE);
+
+        // 티맵은 정렬을 안 해준다. 시각장애인 기준으로 환승과 도보가 가장 큰 비용이다
+        List<TmapTransitResponse.Itinerary> usable = found.stream()
+                .filter(this::inService)
+                .sorted(Comparator
+                        .comparingInt((TmapTransitResponse.Itinerary i) -> orMax(i.transferCount()))
+                        .thenComparingInt(i -> orMax(i.totalWalkDistance())))
+                .toList();
+
+        if (usable.isEmpty()) throw new BusinessException(ErrorCode.NOT_IN_SERVICE);
+        return usable;
+    }
+
+    private int orMax(Integer value) {
+        return value == null ? Integer.MAX_VALUE : value;
+    }
+
+    /**
+     * 오류가 HTTP 200으로도 오고 400·429로도 오므로 상태코드가 아니라 본문으로 가른다.
+     * result는 API 층, error는 게이트웨이 층이고 둘이 같이 오지 않는다.
+     */
+    private BusinessException toTransitException(TmapTransitResponse res) {
+        if (res.result() != null && res.result().status() != null) {
+            String message = res.result().message();
+            return switch (res.result().status()) {
+                // 11 가까움 · 12 출발 정류장 없음 · 13 도착 정류장 없음 · 14 기타
+                case 11, 12, 13, 14 -> new BusinessException(ErrorCode.NOT_FOUND_ROUTE);
+                // 21 형식 · 22 누락 · 23 서비스 지역 아님 · 24 타임머신 시각
+                case 21, 22, 23, 24 -> new BusinessException(ErrorCode.INVALID_LOCATION, message);
+                default -> new BusinessException(ErrorCode.TMAP_API_ERROR, message);
+            };
+        }
+        // 인증 실패·한도 초과(QUOTA_EXCEEDED)가 여기로 온다
+        if (res.error() != null) return new BusinessException(ErrorCode.TMAP_API_ERROR, res.error().message());
+        return new BusinessException(ErrorCode.TMAP_API_ERROR);
+    }
+
+    /**
+     * service 0이 하나라도 섞이면 못 타는 경로다. searchDttm은 경로 탐색을 안 바꾸고
+     * 이 플래그만 바꾸므로 운행 종료 노선이 결과에 그대로 남는다. 도보 leg엔 service 키가 없다.
+     */
+    private boolean inService(TmapTransitResponse.Itinerary itinerary) {
+        if (itinerary.legs() == null) return false;
+        return itinerary.legs().stream()
+                .map(TmapTransitResponse.Leg::service)
+                .filter(Objects::nonNull)
+                .allMatch(service -> service == 1);
+    }
+
+    /** 같은 정류장에서 갈아탈 때 거리 0짜리 도보 leg가 온다. 그대로 두면 "0m 이동하세요"가 된다. */
+    private List<TmapTransitResponse.Leg> usableLegs(TmapTransitResponse.Itinerary itinerary) {
+        return itinerary.legs().stream()
+                .filter(leg -> !(WALK_MODE.equals(leg.mode())
+                        && (leg.distance() == null || leg.distance() == 0)))
+                .toList();
+    }
+
+    private TransitSummaryResponse toTransitSummary(NavigationPreRequest request,
+                                                    TmapTransitResponse.Itinerary itinerary,
+                                                    List<TmapTransitResponse.Leg> legs,
+                                                    int index) {
+        LocationInfo start = request.start();
+        LocationInfo end = request.end();
+        Integer totalFare = (itinerary.fare() == null || itinerary.fare().regular() == null)
+                ? null : itinerary.fare().regular().totalFare();
+
+        // 총계는 itinerary 값을 그대로 쓴다. leg distance 합과 안 맞으므로 합산하지 않는다
+        return new TransitSummaryResponse(
+                index,
+                request.mode(),
+                itinerary.totalDistance(), itinerary.totalTime(),
+                itinerary.totalWalkTime(), itinerary.totalWalkDistance(),
+                itinerary.transferCount(), totalFare,
+                legs.stream().map(this::toLegSummary).toList(),
+                (start.nickname() == null || start.nickname().isBlank()) ? start.name() : start.nickname(),
+                start.roadAddress(), List.of(start.latitude(), start.longitude()),
+                (end.nickname() == null || end.nickname().isBlank()) ? end.name() : end.nickname(),
+                end.roadAddress(), List.of(end.latitude(), end.longitude())
+        );
+    }
+
+    private TransitSummaryResponse.LegSummary toLegSummary(TmapTransitResponse.Leg leg) {
+        List<TmapTransitResponse.Station> stations = stationsOf(leg);
+        return new TransitSummaryResponse.LegSummary(
+                modeLabel(leg.mode()),
+                leg.route(),
+                routesOf(leg),
+                leg.start() == null ? null : leg.start().name(),
+                leg.end() == null ? null : leg.end().name(),
+                stations.isEmpty() ? null : stations.size() - 1,   // 승차 정류장을 포함해서 온다
+                leg.sectionTime(),
+                leg.distance());
+    }
+
+    /** 최종 출력이 TTS라 라벨로 내보낸다. 원문은 report에 그대로 남는다. */
+    private String modeLabel(String mode) {
+        if (mode == null) return null;
+        return switch (mode) {
+            case WALK_MODE -> "도보";
+            case "BUS" -> "버스";
+            case "SUBWAY" -> "지하철";
+            case "EXPRESSBUS" -> "고속/시외버스";
+            case "TRAIN" -> "기차";
+            case "AIRPLANE" -> "항공";
+            case "FERRY" -> "해운";
+            default -> mode;
+        };
+    }
+
+    /** 탈 수 있는 노선 = 대표 노선 + Lane 전부. Lane에 대표 노선은 안 들어온다. */
+    private List<String> routesOf(TmapTransitResponse.Leg leg) {
+        if (leg.route() == null) return List.of();
+        List<String> routes = new ArrayList<>();
+        routes.add(leg.route());
+        if (leg.lane() == null) return routes;
+        leg.lane().stream()
+                .filter(lane -> lane.service() != null && lane.service() == 1)
+                .map(TmapTransitResponse.Lane::route)
+                .filter(route -> route != null && !routes.contains(route))
+                .forEach(routes::add);
+        return routes;
+    }
+
+    private List<TmapTransitResponse.Station> stationsOf(TmapTransitResponse.Leg leg) {
+        if (leg.passStopList() == null || leg.passStopList().stations() == null) return List.of();
+        return leg.passStopList().stations();
+    }
+
+    private List<TransitRoute.TransitLeg> toTransitLegs(List<TmapTransitResponse.Leg> legs) {
+        List<TransitRoute.TransitLeg> result = new ArrayList<>();
+        for (TmapTransitResponse.Leg leg : legs) {
+            result.add(new TransitRoute.TransitLeg(
+                    result.size(),
+                    leg.mode(), leg.route(), leg.routeId(), leg.type(), leg.routeColor(),
+                    routesOf(leg),
+                    leg.sectionTime(), leg.distance(), leg.routePayment(),
+                    leg.start() == null ? null : leg.start().name(),
+                    leg.start() == null ? null : toCoordinate(leg.start().lat(), leg.start().lon()),
+                    leg.end() == null ? null : leg.end().name(),
+                    leg.end() == null ? null : toCoordinate(leg.end().lat(), leg.end().lon()),
+                    toTransitStations(leg),
+                    toTransitSteps(leg),
+                    leg.passShape() == null ? List.of() : toTransitPath(leg.passShape().linestring())));
+        }
+        return result;
+    }
+
+    private List<TransitRoute.TransitStation> toTransitStations(TmapTransitResponse.Leg leg) {
+        return stationsOf(leg).stream()
+                .map(station -> new TransitRoute.TransitStation(
+                        station.index(), station.stationID(), station.stationName(),
+                        // 정류장 좌표는 문자열로 온다. leg.start/end의 숫자와 값도 미세하게 다르다
+                        toCoordinate(toDouble(station.lat()), toDouble(station.lon()))))
+                .toList();
+    }
+
+    /** 환승 도보엔 steps가 아예 없다. 예외가 아니라 규칙이다 — 그 구간은 안내문이 없다. */
+    private List<TransitRoute.TransitStep> toTransitSteps(TmapTransitResponse.Leg leg) {
+        if (leg.steps() == null) return List.of();
+        List<TransitRoute.TransitStep> steps = new ArrayList<>();
+        for (TmapTransitResponse.Step step : leg.steps()) {
+            steps.add(new TransitRoute.TransitStep(
+                    steps.size(), step.description(), step.distance(), step.streetName(),
+                    toTransitPath(step.linestring())));
+        }
+        return steps;
+    }
+
+    /** "경도,위도 경도,위도 …" 공백 구분 문자열을 [위도, 경도] 목록으로 뒤집는다. */
+    private List<List<Double>> toTransitPath(String linestring) {
+        if (linestring == null || linestring.isBlank()) return List.of();
+        List<List<Double>> path = new ArrayList<>();
+        for (String pair : linestring.trim().split("\\s+")) {
+            String[] lonLat = pair.split(",");
+            if (lonLat.length != 2) continue;   // 좌표 사이 공백이 빠진 조각을 버린다
+            List<Double> coordinate = toCoordinate(toDouble(lonLat[1]), toDouble(lonLat[0]));
+            if (coordinate != null) path.add(coordinate);
+        }
+        return path;
+    }
+
+    private List<Double> toCoordinate(Double latitude, Double longitude) {
+        return (latitude == null || longitude == null) ? null : List.of(latitude, longitude);
+    }
+
+    private Double toDouble(String value) {
+        try {
+            return value == null ? null : Double.valueOf(value);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }
