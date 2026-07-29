@@ -8,8 +8,8 @@ public record RouteStep(
         Double longitude,
         String description,
         Integer turnType,
-        RouteStepType pointType,  //SP, GP, PP1,EP
-        FacilityType facility, // 다음 구간이 계단인지 횡단보도인지
+        String  pointType,  //SP, GP, PP1,EP
+        String  facility, // 다음 구간이 계단인지 횡단보도인지
         Integer distanceToNext,
         Integer timeToNext,
         Integer cumulativeDistance,

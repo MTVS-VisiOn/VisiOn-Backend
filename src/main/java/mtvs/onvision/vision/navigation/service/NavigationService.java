@@ -30,7 +30,7 @@ public class NavigationService {
     private static final Pattern DISTANCE_TAIL = Pattern.compile("\\d+m 이동$");
 
     //네비게이션 경로 찾기
-    public NavigationSummaryResponse searchNavigation(NavigationPreRequest request, CurrentUser currentUser) {
+    public NavigationSummary searchNavigation(NavigationPreRequest request, CurrentUser currentUser) {
         TransportMode mode = request.mode();
         MultiValueMap<String, String> form = getStringStringMultiValueMap(request, mode);
         try {
@@ -47,17 +47,22 @@ public class NavigationService {
                         .retrieve()  //응답 받아오기
                         .body(TmapPedestrianResponse.class);
                 // 요약 부분 생성
-                List<TmapPedestrianResponse.Feature> features = res.features();
-                TmapPedestrianResponse.Properties fStart = features.stream()
+                List<TmapPedestrianResponse.Feature> raw = res.features();
+
+                // 요약용 — totalDistance/totalTime은 RouteFeature에 없으니 원본에서 뽑는다
+                TmapPedestrianResponse.Properties fStart = raw.stream()
                         .map(TmapPedestrianResponse.Feature::properties)
                         .filter(p -> p.pointType() == RouteStepType.SP)
-                        .reduce((_, _) -> { throw new BusinessException(ErrorCode.TMAP_API_ERROR); })  //2개인 경우 에러
+                        .reduce((_, _) -> { throw new BusinessException(ErrorCode.TMAP_API_ERROR); })
                         .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROUTE));
+
+                // 여기서 한 번 정규화
                 Integer totalDistance = fStart.totalDistance();
                 Integer totalTime = fStart.totalTime();
-                List<TmapPedestrianResponse.Properties> lines = features.stream()
-                        .filter(f -> f.geometry().type() == GeometryType.LINE_STRING)
-                        .map(TmapPedestrianResponse.Feature::properties)
+                List<RouteFeature> features = raw.stream().map(RouteFeature::from).toList();
+
+                List<RouteFeature> lines = features.stream()
+                        .filter(f -> f.type() == GeometryType.LINE_STRING)
                         .toList();
 
                 int crosswalkCount = countGroups(lines, FacilityType.CROSSWALK);
@@ -66,7 +71,8 @@ public class NavigationService {
                 int underpassCount = countGroups(lines, FacilityType.UNDERPASS);
                 LocationInfo start = request.start();
                 LocationInfo end = request.end();
-                NavigationSummaryResponse summary = new NavigationSummaryResponse(
+                WalkSummaryResponse summary = new WalkSummaryResponse(
+                        request.mode(),
                         totalDistance, totalTime, crosswalkCount,
                         stairCount, overpassCount, underpassCount,
                         (start.nickname() == null || start.nickname().isBlank())? start.name(): start.nickname(),
@@ -76,7 +82,57 @@ public class NavigationService {
                 );
 
                 // RoutStep 생성
-                List<RouteStep> steps = toSteps(features);
+                List<RouteStep> steps = toSteps(features, mode);
+
+                //경로 redis 저장
+                NavigationRouteReport report = new NavigationRouteReport(summary, steps);
+                String json = objectMapper.writeValueAsString(report);
+                navigationRepository.saveRoute(currentUser.getId(), json);
+
+                // 출력은 요약만
+                return summary;
+            }
+            if (mode == TransportMode.CAR) {
+                //티맵에서 경로찾기
+                TmapCarResponse res = tmapRestClient.post()
+                        .uri(
+                                uriBuilder -> uriBuilder
+                                        .path(mode.getPath())
+                                        .queryParam("version", 1)
+                                        .build())
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .body(form)
+                        .retrieve()  //응답 받아오기
+                        .body(TmapCarResponse.class);
+                // 요약 부분 생성
+                List<TmapCarResponse.Feature> raw = res.features();
+
+                // 요약용 — 총거리·시간·요금은 첫 Point(S)에만 온다
+                TmapCarResponse.Properties fStart = raw.stream()
+                        .map(TmapCarResponse.Feature::properties)
+                        .filter(p -> p.pointType() == CarPointType.S)
+                        .reduce((_, _) -> { throw new BusinessException(ErrorCode.TMAP_API_ERROR); })
+                        .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROUTE));
+
+                // 여기서 한 번 정규화
+                List<RouteFeature> features = raw.stream().map(RouteFeature::from).toList();
+
+                // 자동차 facilityType은 "구간 안에 그게 있음"이라 개수를 세지 않는다.
+                // 고속도로 9982m가 통째로 교량으로 온 실측이 근거.
+                LocationInfo start = request.start();
+                LocationInfo end = request.end();
+                CarSummaryResponse summary = new CarSummaryResponse(
+                        request.mode(),
+                        fStart.totalDistance(), fStart.totalTime(),
+                        fStart.totalFare(), fStart.taxiFare(),
+                        (start.nickname() == null || start.nickname().isBlank())? start.name(): start.nickname(),
+                        start.roadAddress(), List.of(start.latitude(), start.longitude()),
+                        (end.nickname() == null || end.nickname().isBlank())? end.name(): end.nickname(),
+                        end.roadAddress(),List.of(end.latitude(), end.longitude())
+                );
+
+                // RoutStep 생성
+                List<RouteStep> steps = toSteps(features, mode);
 
                 //경로 redis 저장
                 NavigationRouteReport report = new NavigationRouteReport(summary, steps);
@@ -103,15 +159,17 @@ public class NavigationService {
         form.add("startName", request.start().name());                      // 원문 그대로
         form.add("endName",   request.end().name());
         form.add("searchOption", mode.getOption());
+        form.add("reqCoordType", "WGS84GEO");
+        form.add("resCoordType", "WGS84GEO");
         return form;
     }
 
     //횡단보도 세기
-    private int countGroups(List<TmapPedestrianResponse.Properties> lines, FacilityType type) {
+    private int countGroups(List<RouteFeature> lines, FacilityType type) {
         int count = 0;
         boolean inGroup = false;
-        for (TmapPedestrianResponse.Properties p : lines) {
-            boolean match = type.matches(p.facilityType());
+        for (RouteFeature f : lines) {
+            boolean match = (type == f.facility());
             if (match && !inGroup) count++;   //새구간의 시작
             inGroup = match;
         }
@@ -132,48 +190,49 @@ public class NavigationService {
         }
     }
 
-    private List<RouteStep> toSteps(List<TmapPedestrianResponse.Feature> features) {
+    private List<RouteStep> toSteps(List<RouteFeature> features, TransportMode mode) {
+        FacilityType defaultFacility = (mode == TransportMode.WALK)
+                ? FacilityType.WALKWAY : FacilityType.NORMAL;
+        boolean splitOnFacility = (mode == TransportMode.WALK);  // 자동차는 구간 전체에 뭉개져 온다
+
         List<RouteStep> steps = new ArrayList<>();
         Box box = null;
         int cumulative = 0;
 
-        for (TmapPedestrianResponse.Feature f : features) {
-            TmapPedestrianResponse.Properties p = f.properties();
-
-            if (f.geometry().type() == GeometryType.POINT) {
-                if (box != null) cumulative = flush(steps, box, cumulative);
-                List<Double> latLng = toLatLng(f.geometry().coordinates());
-                box = new Box();
+        for (RouteFeature f : features) {
+            if (f.type() == GeometryType.POINT) {
+                if (box != null) cumulative = flush(steps, box, cumulative, splitOnFacility);
+                List<Double> latLng = toLatLng(f.coordinates());
+                box = new Box(defaultFacility);
                 box.lat = latLng.get(0);
                 box.lng = latLng.get(1);
-                box.description = p.description();
-                box.turnType = p.turnType();
-                box.pointType = p.pointType();
+                box.description = f.description();
+                box.turnType = f.turnType();
+                box.pointType = f.pointType();
                 continue;
             }
 
-            FacilityType lineFacility = FacilityType.from(p.facilityType());
-            if (lineFacility == null) lineFacility = FacilityType.NORMAL;
+            FacilityType lineFacility = f.facility() == null ? defaultFacility : f.facility();
 
             // 시설이 바뀌면 여기서 상자를 닫고, 이 구간의 첫 좌표에서 새로 연다
-            if (box != null && !box.path.isEmpty() && lineFacility != box.facility) {
-                List<Double> here = toLatLng(f.geometry().coordinates().get(0));
-                cumulative = flush(steps, box, cumulative);
-                box = new Box();
+            if (splitOnFacility && box != null && !box.path.isEmpty() && lineFacility != box.facility) {
+                List<Double> here = toLatLng(f.coordinates().get(0));
+                cumulative = flush(steps, box, cumulative, splitOnFacility);
+                box = new Box(defaultFacility);
                 box.lat = here.get(0);
                 box.lng = here.get(1);
-                box.pointType = RouteStepType.FP;
+                box.pointType = RouteStepType.FP.getDescription();
                 box.description = lineFacility.getMessage();
             }
             if (box == null) continue;
 
             box.facility = lineFacility;
-            box.distance += p.distance();
-            box.time     += p.time();
-            appendPath(box.path, f.geometry().coordinates());
+            box.distance += f.distance();
+            box.time     += f.time();
+            appendPath(box.path, f.coordinates());
         }
 
-        if (box != null) flush(steps, box, cumulative);
+        if (box != null) flush(steps, box, cumulative, splitOnFacility);
         return steps;
     }
 
@@ -182,19 +241,26 @@ public class NavigationService {
         Double lat, lng;
         String description;
         Integer turnType;
-        RouteStepType pointType;
-        FacilityType facility = FacilityType.NORMAL;
+        String pointType;
+        FacilityType facility;   // 초기값은 생성자에서 모드별로 받는다
         int distance = 0;
         int time = 0;
         List<List<Double>> path = new ArrayList<>();
+
+        Box(FacilityType defaultFacility) {
+            this.facility = defaultFacility;
+        }
     }
 
-    private int flush(List<RouteStep> steps, Box box, int cumulative) {
+    // withFacility=false면 facility를 안 싣는다. 자동차는 facilityType이 구간 전체에 뭉개져 와서
+    // "경부고속도로 14348m = 교량"처럼 거짓이 된다. 그 정보는 turnType과 description에 이미 정확히 있다.
+    private int flush(List<RouteStep> steps, Box box, int cumulative, boolean withFacility) {
         boolean empty = box.path.isEmpty();          // EP는 뒤 구간이 없다
         steps.add(new RouteStep(
                 steps.size(), box.lat, box.lng,
                 withRealDistance(box.description, box.distance),
-                box.turnType, box.pointType, box.facility,
+                box.turnType, box.pointType,
+                (empty || !withFacility || box.facility == null) ? null : box.facility.getLabel(),
                 empty ? null : box.distance,
                 empty ? null : box.time,
                 cumulative, box.path));

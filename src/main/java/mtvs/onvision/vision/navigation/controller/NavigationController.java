@@ -6,7 +6,7 @@ import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.response.ApiResult;
 import mtvs.onvision.vision.common.response.SuccessCode;
 import mtvs.onvision.vision.navigation.dto.NavigationPreRequest;
-import mtvs.onvision.vision.navigation.dto.NavigationSummaryResponse;
+import mtvs.onvision.vision.navigation.dto.NavigationSummary;
 import mtvs.onvision.vision.navigation.service.NavigationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,9 +23,9 @@ public class NavigationController {
 
     //출발지,도착지 받고 경로 찾기
     @PostMapping
-    public ResponseEntity<ApiResult<NavigationSummaryResponse>> searchNavigation(@RequestBody @Valid NavigationPreRequest request,
-                                                                                 @AuthenticationPrincipal CurrentUser currentUser) {
-        NavigationSummaryResponse response = navigationService.searchNavigation(request, currentUser);
+    public ResponseEntity<ApiResult<NavigationSummary>> searchNavigation(@RequestBody @Valid NavigationPreRequest request,
+                                                                           @AuthenticationPrincipal CurrentUser currentUser) {
+        NavigationSummary response = navigationService.searchNavigation(request, currentUser);
         return ApiResult.ok(SuccessCode.BUSINESS_SUCCESS, response);
     }
 }

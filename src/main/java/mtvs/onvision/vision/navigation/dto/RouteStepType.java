@@ -1,5 +1,6 @@
 package mtvs.onvision.vision.navigation.dto;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -18,4 +19,14 @@ public enum RouteStepType {
     FP("시설 안내점");  //우리가 만든 타입
 
     private final String description;
+
+    @JsonCreator
+    public static RouteStepType from(String raw) {
+        for (RouteStepType pointType : RouteStepType.values()) {
+            if (pointType.name().equals(raw)) {
+                   return pointType;
+            }
+        }
+        return null;
+   }
 }
