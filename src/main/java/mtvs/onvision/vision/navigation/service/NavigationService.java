@@ -61,14 +61,14 @@ public class NavigationService {
                         .toList();
 
                 int crosswalkCount = countGroups(lines, FacilityType.CROSSWALK);
-                int stairDistance = countGroups(lines, FacilityType.STAIRS);
-                int overpassDistance = countGroups(lines, FacilityType.OVERPASS);
-                int underpassDistance = countGroups(lines, FacilityType.UNDERPASS);
+                int stairCount = countGroups(lines, FacilityType.STAIRS);
+                int overpassCount = countGroups(lines, FacilityType.OVERPASS);
+                int underpassCount = countGroups(lines, FacilityType.UNDERPASS);
                 LocationInfo start = request.start();
                 LocationInfo end = request.end();
                 NavigationSummaryResponse summary = new NavigationSummaryResponse(
                         totalDistance, totalTime, crosswalkCount,
-                        stairDistance, overpassDistance, underpassDistance,
+                        stairCount, overpassCount, underpassCount,
                         (start.nickname() == null || start.nickname().isBlank())? start.name(): start.nickname(),
                         start.roadAddress(), List.of(start.latitude(), start.longitude()),
                         (end.nickname() == null || end.nickname().isBlank())? end.name(): end.nickname(),
