@@ -363,7 +363,7 @@ class FavoriteServiceTest {
         class Context_with_results {
 
             @Test
-            @DisplayName("It : 페이지 정보를 유지한 채 FavoriteResponse로 변환한다")
+            @DisplayName("It : 페이지 정보를 유지한 채 LocationInfo 변환한다")
             void it_maps_to_response_keeping_page_metadata() {
                 //given
                 Page<Favorite> found = new PageImpl<>(

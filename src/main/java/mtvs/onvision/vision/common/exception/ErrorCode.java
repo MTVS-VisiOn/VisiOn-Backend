@@ -29,6 +29,7 @@ public enum ErrorCode {
     NOT_FOUND_ROOM(HttpStatus.CONFLICT, "연결된 세션 방이 없습니다."),
     FORBIDDEN_WARD(HttpStatus.FORBIDDEN, "피보호자는 권한이 없는 기능입니다."),
     NOT_DELETE_ROOM(HttpStatus.INTERNAL_SERVER_ERROR, "방이 지워지지 않았습니다."),
+    INVALID_MESSAGE_TYPE(HttpStatus.BAD_REQUEST, "메세지 타입을 인식할 수 없습니다."),
 
     /*Presence*/
     NOT_FOUND_CONNECT(HttpStatus.NOT_FOUND, "기기의 연결상태를 찾을 수 없습니다."),
@@ -39,6 +40,9 @@ public enum ErrorCode {
     /*Favorite*/
     EXIST_FAVORITE(HttpStatus.CONFLICT, "이미 저장된 장소입니다."),
     NOT_FOUND_FAVORITE(HttpStatus.NOT_FOUND, "해당 아이디의 즐겨찾기를 찾을 수 없습니다."),
+
+    /*Navigation*/
+    NOT_FOUND_ROUTE(HttpStatus.NOT_FOUND, "티맵에서 경로를 찾을 수 없습니다."),
 
     /*common*/
     REQUESTPARAM_REQUIRED(HttpStatus.BAD_REQUEST, "해당 파라미터는 필수값입니다. :::"),
