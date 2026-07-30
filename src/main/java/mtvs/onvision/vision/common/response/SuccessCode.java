@@ -35,6 +35,9 @@ public enum SuccessCode {
     /*Navigation*/
     NAVIGATION_SEARCH("경로가 성공적으로 검색되었습니다."),
     ROUTE_CREATED("경로가 정상적으로 저장되었습니다."),
+    ROUTE_READ("경로가 정상적으로 조회되었습니다."),
+    ROUTE_CANCELED("경로가 정상적으로 취소되었습니다."),
+    ROUTE_COMPLETED("경로가 정상적으로 완료되었습니다."),
 
 
     /*common*/

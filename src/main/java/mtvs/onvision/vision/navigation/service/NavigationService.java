@@ -12,6 +12,7 @@ import mtvs.onvision.vision.navigation.dto.*;
 import mtvs.onvision.vision.navigation.repository.NavigationRepository;
 import mtvs.onvision.vision.navigation.repository.RouteRepository;
 import mtvs.onvision.vision.user.domain.User;
+import mtvs.onvision.vision.user.domain.UserRole;
 import mtvs.onvision.vision.user.service.UserService;
 import org.jspecify.annotations.NonNull;
 import org.springframework.http.HttpStatusCode;
@@ -66,7 +67,7 @@ public class NavigationService {
                         .map(TmapPedestrianResponse.Feature::properties)
                         .filter(p -> p.pointType() == RouteStepType.SP)
                         .reduce((_, _) -> { throw new BusinessException(ErrorCode.TMAP_API_ERROR); })
-                        .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROUTE));
+                        .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_TMAP_ROUTE));
 
                 // 여기서 한 번 정규화
                 Integer totalDistance = fStart.totalDistance();
@@ -125,7 +126,7 @@ public class NavigationService {
                         .map(TmapCarResponse.Feature::properties)
                         .filter(p -> p.pointType() == CarPointType.S)
                         .reduce((_, _) -> { throw new BusinessException(ErrorCode.TMAP_API_ERROR); })
-                        .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROUTE));
+                        .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_TMAP_ROUTE));
 
                 // 여기서 한 번 정규화
                 List<RouteFeature> features = raw.stream().map(RouteFeature::from).toList();
@@ -227,6 +228,17 @@ public class NavigationService {
             routeRepository.save(newRoute);
         }
     }
+
+    @Transactional(readOnly = true)
+    public NavigationResponse getProcessingRoute(CurrentUser currentUser) {
+        Long wardId;
+        if (currentUser.getRole() == UserRole.WARD) wardId = currentUser.getId();
+        else wardId = userService.getWardIdFromGuardianId(currentUser.getId());
+        Route route = routeRepository.findByWardIdAndStatus(wardId, RouteStatus.IN_PROGRESS)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROUTE));
+        return NavigationResponse.from(route);
+    }
+
 
 
     private @NonNull MultiValueMap<String, String> getStringStringMultiValueMap(NavigationPreRequest request, TransportMode mode) {
@@ -362,7 +374,7 @@ public class NavigationService {
         if (res.metaData() == null || res.metaData().plan() == null) throw toTransitException(res);
 
         List<TmapTransitResponse.Itinerary> found = res.metaData().plan().itineraries();
-        if (found == null || found.isEmpty()) throw new BusinessException(ErrorCode.NOT_FOUND_ROUTE);
+        if (found == null || found.isEmpty()) throw new BusinessException(ErrorCode.NOT_FOUND_TMAP_ROUTE);
 
         // 티맵은 정렬을 안 해준다. 시각장애인 기준으로 환승과 도보가 가장 큰 비용이다
         List<TmapTransitResponse.Itinerary> usable = found.stream()
@@ -389,7 +401,7 @@ public class NavigationService {
             String message = res.result().message();
             return switch (res.result().status()) {
                 // 11 가까움 · 12 출발 정류장 없음 · 13 도착 정류장 없음 · 14 기타
-                case 11, 12, 13, 14 -> new BusinessException(ErrorCode.NOT_FOUND_ROUTE);
+                case 11, 12, 13, 14 -> new BusinessException(ErrorCode.NOT_FOUND_TMAP_ROUTE);
                 // 21 형식 · 22 누락 · 23 서비스 지역 아님 · 24 타임머신 시각
                 case 21, 22, 23, 24 -> new BusinessException(ErrorCode.INVALID_LOCATION, message);
                 default -> new BusinessException(ErrorCode.TMAP_API_ERROR, message);

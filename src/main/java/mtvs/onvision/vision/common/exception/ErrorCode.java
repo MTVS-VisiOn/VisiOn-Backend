@@ -42,11 +42,12 @@ public enum ErrorCode {
     NOT_FOUND_FAVORITE(HttpStatus.NOT_FOUND, "해당 아이디의 즐겨찾기를 찾을 수 없습니다."),
 
     /*Navigation*/
-    NOT_FOUND_ROUTE(HttpStatus.NOT_FOUND, "티맵에서 경로를 찾을 수 없습니다."),
+    NOT_FOUND_TMAP_ROUTE(HttpStatus.NOT_FOUND, "티맵에서 경로를 찾을 수 없습니다."),
     INVALID_LOCATION(HttpStatus.BAD_REQUEST, "잘못된 장소가 입력되었습니다."),
     INVALID_TRANSFER(HttpStatus.BAD_REQUEST, "잘못된 이동수단이 입력되었습니다."),
     NOT_IN_SERVICE(HttpStatus.NOT_FOUND, "지금은 운행 중인 대중교통이 없습니다."),
     INVALID_TRANSIT_INDEX(HttpStatus.BAD_REQUEST, "대중교통 경로의 인덱스가 없습니다."),
+    NOT_FOUND_ROUTE(HttpStatus.NOT_FOUND, "경로를 찾을 수 없습니다."),
 
 
     /*common*/

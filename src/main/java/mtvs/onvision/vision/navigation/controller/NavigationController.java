@@ -10,14 +10,12 @@ import mtvs.onvision.vision.common.response.SuccessCode;
 import mtvs.onvision.vision.navigation.domain.TransportMode;
 import mtvs.onvision.vision.navigation.dto.NavigationPreRequest;
 import mtvs.onvision.vision.navigation.dto.NavigationSummary;
+import mtvs.onvision.vision.navigation.dto.NavigationResponse;
 import mtvs.onvision.vision.navigation.dto.RouteRequest;
 import mtvs.onvision.vision.navigation.service.NavigationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -52,5 +50,12 @@ public class NavigationController {
         if (request.mode() == TransportMode.TRANSIT && request.index() == null) throw new BusinessException(ErrorCode.INVALID_TRANSIT_INDEX);
         navigationService.saveRoute(request, currentUser);
         return ApiResult.ok(SuccessCode.ROUTE_CREATED);
+    }
+
+    //진행중인 경로 조회
+    @GetMapping("/processing")
+    public ResponseEntity<ApiResult<NavigationResponse>> getProcessingRoute(@AuthenticationPrincipal CurrentUser currentUser) {
+        NavigationResponse response = navigationService.getProcessingRoute(currentUser);
+        return ApiResult.ok(SuccessCode.ROUTE_READ, response);
     }
 }

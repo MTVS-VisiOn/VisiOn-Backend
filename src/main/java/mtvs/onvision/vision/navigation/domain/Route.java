@@ -63,11 +63,11 @@ public class Route extends BaseEntity {
 
     public Route (NavigationRouteReport report, String json, User ward) {
         NavigationSummary summary = report.summary();
-        this.startingName = summary.startingName() == null? summary.startingRoadAddress() :  summary.startingName();
+        this.startingName = summary.startingName();
         this.startingAddress = summary.startingRoadAddress();
         this.startingLat = summary.startingCoordinate().getLast();
         this.startingLon = summary.startingCoordinate().getFirst();
-        this.destinationName = summary.destinationName()==null? summary.destinationRoadAddress():summary.destinationName();
+        this.destinationName = summary.destinationName();
         this.destinationAddress = summary.destinationRoadAddress();
         this.destinationLat = summary.destinationCoordinate().getLast();
         this.destinationLon = summary.destinationCoordinate().getFirst();
@@ -80,11 +80,11 @@ public class Route extends BaseEntity {
 
     public Route(TransitRoute report, String json, User ward) {
         NavigationSummary summary = report.summary();
-        this.startingName = summary.startingName() == null? summary.startingRoadAddress() :  summary.startingName();
+        this.startingName = summary.startingName();
         this.startingAddress = summary.startingRoadAddress();
         this.startingLat = summary.startingCoordinate().getLast();
         this.startingLon = summary.startingCoordinate().getFirst();
-        this.destinationName = summary.destinationName()==null? summary.destinationRoadAddress():summary.destinationName();
+        this.destinationName = summary.destinationName();
         this.destinationAddress = summary.destinationRoadAddress();
         this.destinationLat = summary.destinationCoordinate().getLast();
         this.destinationLon = summary.destinationCoordinate().getFirst();
