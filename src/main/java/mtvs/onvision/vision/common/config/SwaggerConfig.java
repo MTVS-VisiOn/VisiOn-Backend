@@ -57,4 +57,24 @@ public class SwaggerConfig {
     public GroupedOpenApi authApi() {
         return GroupedOpenApi.builder().group("auth API").pathsToMatch("/api/auth/**").build();
     }
+
+    @Bean
+    public GroupedOpenApi presenceApi() {
+        return GroupedOpenApi.builder().group("presence API").pathsToMatch("/api/presence/**").build();
+    }
+
+    @Bean
+    public GroupedOpenApi locationApi() {
+        return GroupedOpenApi.builder().group("location API").pathsToMatch("/api/locations/**").build();
+    }
+
+    @Bean
+    public GroupedOpenApi favoriteApi() {
+        return GroupedOpenApi.builder().group("favorite API").pathsToMatch("/api/favorites/**").build();
+    }
+
+    @Bean
+    public GroupedOpenApi navigationApi() {
+        return GroupedOpenApi.builder().group("navigation API").pathsToMatch("/api/navigations/**").build();
+    }
 }

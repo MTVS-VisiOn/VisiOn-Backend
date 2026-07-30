@@ -17,6 +17,15 @@ spring:
       port: 6379
 jwt:
   validations:
-    access: 900000
+    access: 900000   #밀리초 단위
     refresh: 604800000
     register: 900000
+redis:
+  expired:
+    presence: 180  #초단위
+    location: 30  #분단위
+    navigation: 30  #분단위
+
+tmap:
+  base-url: https://apis.openapi.sk.com
+  app-key: test

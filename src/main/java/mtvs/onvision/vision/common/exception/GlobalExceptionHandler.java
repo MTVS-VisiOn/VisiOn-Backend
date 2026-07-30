@@ -12,7 +12,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResult<Void>> handleBusinessException(BusinessException exception) {
         ErrorCode code = exception.getErrorCode();
-        return ApiResult.error(code);
+        return ApiResult.error(code, exception.getMessage());
     }
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResult<Void>> handleValidation(
@@ -29,4 +29,13 @@ public class GlobalExceptionHandler {
         String errorMessage = ErrorCode.REQUESTPARAM_REQUIRED.getMessage() + e.getParameterName();
         return ApiResult.error(ErrorCode.REQUESTPARAM_REQUIRED, errorMessage);
     }
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiResult<Void>> handleMissingRequestParam(
+            Exception e
+    ) {
+        String errorMessage = ErrorCode.BUSINESS_ERROR.getMessage() + e.getMessage();
+        return ApiResult.error(ErrorCode.BUSINESS_ERROR, errorMessage);
+    }
+
+
 }
