@@ -240,6 +240,14 @@ public class NavigationService {
     }
 
 
+    @Transactional
+    public void completeRoute(CurrentUser currentUser) {
+        Route route = routeRepository.findByWardIdAndStatus(currentUser.getId(), RouteStatus.IN_PROGRESS)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROUTE));
+        route.completed();
+    }
+
+
 
     private @NonNull MultiValueMap<String, String> getStringStringMultiValueMap(NavigationPreRequest request, TransportMode mode) {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();

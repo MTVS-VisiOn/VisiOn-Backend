@@ -98,4 +98,8 @@ public class Route extends BaseEntity {
     public void canceled() {
         this.status = RouteStatus.CANCELLED;
     }
+
+    public void completed() {
+        this.status = RouteStatus.COMPLETED;
+    }
 }

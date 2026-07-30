@@ -58,4 +58,11 @@ public class NavigationController {
         NavigationResponse response = navigationService.getProcessingRoute(currentUser);
         return ApiResult.ok(SuccessCode.ROUTE_READ, response);
     }
+
+    //경로 완료
+    @PatchMapping("/complete")
+    public ResponseEntity<ApiResult<Void>> completeRoute(@AuthenticationPrincipal CurrentUser currentUser) {
+        navigationService.completeRoute(currentUser);
+        return ApiResult.ok(SuccessCode.ROUTE_COMPLETED);
+    }
 }
