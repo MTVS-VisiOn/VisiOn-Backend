@@ -1,6 +1,5 @@
 package mtvs.onvision.vision.navigation.service;
 
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.exception.BusinessException;
@@ -207,7 +206,7 @@ public class NavigationService {
 
     //경로 선택
     @Transactional
-    public void saveRoute(@Valid RouteRequest request, CurrentUser currentUser) {
+    public void saveRoute(RouteRequest request, CurrentUser currentUser) {
         TransportMode mode = request.mode();
         User ward = userService.currentUserToUser(currentUser.getId());
         Optional<Route> route = routeRepository.findByWardIdAndStatus(currentUser.getId(), RouteStatus.IN_PROGRESS);

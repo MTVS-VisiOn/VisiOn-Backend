@@ -52,6 +52,7 @@ public class Route extends BaseEntity {
     @Column(nullable = false)
     private Integer totalTime;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private TransportMode mode;
 
@@ -65,12 +66,12 @@ public class Route extends BaseEntity {
     public Route (TransportMode mode, NavigationSummary summary, String json, User ward) {
         this.startingName = summary.startingName();
         this.startingAddress = summary.startingRoadAddress();
-        this.startingLat = summary.startingCoordinate().getLast();
-        this.startingLon = summary.startingCoordinate().getFirst();
+        this.startingLat = summary.startingCoordinate().getFirst();
+        this.startingLon = summary.startingCoordinate().getLast();
         this.destinationName = summary.destinationName();
         this.destinationAddress = summary.destinationRoadAddress();
-        this.destinationLat = summary.destinationCoordinate().getLast();
-        this.destinationLon = summary.destinationCoordinate().getFirst();
+        this.destinationLat = summary.destinationCoordinate().getFirst();
+        this.destinationLon = summary.destinationCoordinate().getLast();
         this.status = RouteStatus.IN_PROGRESS;
         this.totalDistance = summary.totalDistance();
         this.totalTime = summary.totalTime();
@@ -80,7 +81,7 @@ public class Route extends BaseEntity {
     }
 
     public void canceled() {
-        this.status = RouteStatus.CANCELLED;
+        this.status = RouteStatus.CANCELED;
     }
 
     public void completed() {
