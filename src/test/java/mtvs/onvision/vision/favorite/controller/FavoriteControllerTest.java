@@ -196,7 +196,7 @@ class FavoriteControllerTest {
                         .andExpect(status().isOk())
                         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                         .andExpect(jsonPath("$.code").value(SuccessCode.FAVORITE_READ.name()))
-                        .andExpect(jsonPath("$.data.content[0].favoriteId").value(1))
+                        .andExpect(jsonPath("$.data.content[0].id").value(1))
                         .andExpect(jsonPath("$.data.content[0].name").value("화목순대국"))
                         .andExpect(jsonPath("$.data.content[0].nickname").value("맛집"))
                         .andDo(print());
