@@ -1,26 +1,30 @@
 package mtvs.onvision.vision.navigation.service;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
+import mtvs.onvision.vision.navigation.domain.Route;
+import mtvs.onvision.vision.navigation.domain.RouteStatus;
 import mtvs.onvision.vision.navigation.domain.TransportMode;
 import mtvs.onvision.vision.navigation.dto.*;
 import mtvs.onvision.vision.navigation.repository.NavigationRepository;
+import mtvs.onvision.vision.navigation.repository.RouteRepository;
+import mtvs.onvision.vision.user.domain.User;
+import mtvs.onvision.vision.user.service.UserService;
 import org.jspecify.annotations.NonNull;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -30,7 +34,11 @@ public class NavigationService {
     private final RestClient tmapRestClient;
     private final NavigationRepository navigationRepository;
     private final ObjectMapper objectMapper;
+    private final RouteRepository routeRepository;
+
     private static final Pattern DISTANCE_TAIL = Pattern.compile("\\d+m 이동$");
+    private final UserService userService;
+
 
     //네비게이션 경로 찾기
     public NavigationSummary searchNavigation(NavigationPreRequest request, CurrentUser currentUser) {
@@ -161,8 +169,6 @@ public class NavigationService {
         TransportMode mode = request.mode();
         TmapTransitRequest req = TmapTransitRequest.from(request);
         try {
-            if (mode != TransportMode.TRANSIT) throw new BusinessException(ErrorCode.INVALID_TRANSFER);
-
             TmapTransitResponse res = tmapRestClient.post()
                     .uri(uriBuilder -> uriBuilder.path(mode.getPath()).build())
                     .contentType(MediaType.APPLICATION_JSON)
@@ -195,6 +201,30 @@ public class NavigationService {
             throw e;
         } catch (Exception e) {
             throw new BusinessException(ErrorCode.TMAP_API_ERROR, e.getMessage());
+        }
+    }
+
+    //경로 선택
+    @Transactional
+    public void saveRoute(@Valid RouteRequest request, CurrentUser currentUser) {
+        TransportMode mode = request.mode();
+        User ward = userService.currentUserToUser(currentUser.getId());
+        Optional<Route> route = routeRepository.findByWardIdAndStatus(currentUser.getId(), RouteStatus.IN_PROGRESS);
+        route.ifPresent(Route::canceled);
+        String json = navigationRepository.getRoute(currentUser.getId(), mode.getPrefix()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROUTE));
+        if (mode.equals(TransportMode.WALK) || mode.equals(TransportMode.CAR)) {
+            NavigationRouteReport report = objectMapper.readValue(json, NavigationRouteReport.class);
+            Route newRoute = new Route(report, json,ward);
+            routeRepository.save(newRoute);
+        } else {
+            //대중교통일때
+            TransitRoute report = Arrays.stream(objectMapper.readValue(json, TransitRoute[].class))
+                    .filter(candidate -> Objects.equals(candidate.summary().index(), request.index()))
+                    .findFirst()
+                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROUTE));
+            String reportjson = objectMapper.writeValueAsString(report);
+            Route newRoute = new Route(report, reportjson, ward);
+            routeRepository.save(newRoute);
         }
     }
 

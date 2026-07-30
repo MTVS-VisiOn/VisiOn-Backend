@@ -3,14 +3,9 @@ package mtvs.onvision.vision.navigation.dto;
 import jakarta.validation.constraints.NotNull;
 import mtvs.onvision.vision.navigation.domain.TransportMode;
 
-public record NavigationPreRequest(
-    @NotNull
-    TransportMode mode,
-
-    @NotNull
-    LocationInfo start,
-    @NotNull
-    LocationInfo end
+public record RouteRequest(
+        @NotNull
+        TransportMode mode,
+        Integer index
 ) {
-
 }
