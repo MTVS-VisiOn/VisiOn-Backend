@@ -65,4 +65,10 @@ public class NavigationController {
         navigationService.completeRoute(currentUser);
         return ApiResult.ok(SuccessCode.ROUTE_COMPLETED);
     }
+
+    @PatchMapping("/cancel")
+    public ResponseEntity<ApiResult<Void>> cancelRoute(@AuthenticationPrincipal CurrentUser currentUser) {
+        navigationService.cancelRoute(currentUser);
+        return ApiResult.ok(SuccessCode.ROUTE_CANCELED);
+    }
 }
