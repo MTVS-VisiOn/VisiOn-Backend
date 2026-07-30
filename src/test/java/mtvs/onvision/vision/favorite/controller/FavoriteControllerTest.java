@@ -239,7 +239,7 @@ class FavoriteControllerTest {
     }
 
     @Nested
-    @DisplayName("Describe: PATCH /api/favorites/{favoriteId} 엔드포인트는")
+    @DisplayName("Describe: PATCH /api/favorites/{id} 엔드포인트는")
     class updateFavorite {
 
         @Nested
@@ -331,7 +331,7 @@ class FavoriteControllerTest {
     }
 
     @Nested
-    @DisplayName("Describe: DELETE /api/favorites/{favoriteId} 엔드포인트는")
+    @DisplayName("Describe: DELETE /api/favorites/{id} 엔드포인트는")
     class deleteFavorite {
 
         @Nested

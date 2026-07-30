@@ -3,6 +3,8 @@ package mtvs.onvision.vision.signalling;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 import lombok.RequiredArgsConstructor;
+import mtvs.onvision.vision.common.exception.BusinessException;
+import mtvs.onvision.vision.common.exception.ErrorCode;
 
 @RequiredArgsConstructor
 public enum MessageType {
@@ -30,6 +32,6 @@ public enum MessageType {
         for (MessageType t : values()) {
             if (t.message.equals(value)) return t;
         }
-        throw new IllegalArgumentException("알 수 없는 메시지 타입: " + value);
+        throw new BusinessException(ErrorCode.INVALID_MESSAGE_TYPE);
     }
 }

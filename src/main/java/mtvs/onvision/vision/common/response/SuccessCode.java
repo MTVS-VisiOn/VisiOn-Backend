@@ -32,6 +32,13 @@ public enum SuccessCode {
     FAVORITE_UPDATED("즐겨찾기가 정상적으로 수정되었습니다."),
     FAVORITE_DELETED("즐겨찾기가 정상적으로 삭제되었습니다."),
 
+    /*Navigation*/
+    NAVIGATION_SEARCH("경로가 성공적으로 검색되었습니다."),
+    ROUTE_CREATED("경로가 정상적으로 저장되었습니다."),
+    ROUTE_READ("경로가 정상적으로 조회되었습니다."),
+    ROUTE_CANCELED("경로가 정상적으로 취소되었습니다."),
+    ROUTE_COMPLETED("경로가 정상적으로 완료되었습니다."),
+
 
     /*common*/
     BUSINESS_SUCCESS("정상적으로 작성되었습니다.");
