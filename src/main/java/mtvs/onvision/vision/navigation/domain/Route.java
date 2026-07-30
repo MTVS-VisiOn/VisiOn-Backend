@@ -5,9 +5,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import mtvs.onvision.vision.common.domain.BaseEntity;
-import mtvs.onvision.vision.navigation.dto.NavigationRouteReport;
 import mtvs.onvision.vision.navigation.dto.NavigationSummary;
-import mtvs.onvision.vision.navigation.dto.TransitRoute;
 import mtvs.onvision.vision.user.domain.User;
 
 @Entity
@@ -54,6 +52,9 @@ public class Route extends BaseEntity {
     @Column(nullable = false)
     private Integer totalTime;
 
+    @Column(nullable = false)
+    private TransportMode mode;
+
     @Column(nullable = false, columnDefinition = "text")
     private String report;   //경로 전체 json
 
@@ -61,8 +62,7 @@ public class Route extends BaseEntity {
     @JoinColumn(nullable = false)
     private User ward;
 
-    public Route (NavigationRouteReport report, String json, User ward) {
-        NavigationSummary summary = report.summary();
+    public Route (TransportMode mode, NavigationSummary summary, String json, User ward) {
         this.startingName = summary.startingName();
         this.startingAddress = summary.startingRoadAddress();
         this.startingLat = summary.startingCoordinate().getLast();
@@ -74,23 +74,7 @@ public class Route extends BaseEntity {
         this.status = RouteStatus.IN_PROGRESS;
         this.totalDistance = summary.totalDistance();
         this.totalTime = summary.totalTime();
-        this.report = json;
-        this.ward = ward;
-    }
-
-    public Route(TransitRoute report, String json, User ward) {
-        NavigationSummary summary = report.summary();
-        this.startingName = summary.startingName();
-        this.startingAddress = summary.startingRoadAddress();
-        this.startingLat = summary.startingCoordinate().getLast();
-        this.startingLon = summary.startingCoordinate().getFirst();
-        this.destinationName = summary.destinationName();
-        this.destinationAddress = summary.destinationRoadAddress();
-        this.destinationLat = summary.destinationCoordinate().getLast();
-        this.destinationLon = summary.destinationCoordinate().getFirst();
-        this.status = RouteStatus.IN_PROGRESS;
-        this.totalDistance = summary.totalDistance();
-        this.totalTime = summary.totalTime();
+        this.mode = mode;
         this.report = json;
         this.ward = ward;
     }

@@ -49,7 +49,7 @@ public class NavigationController {
                                                      @AuthenticationPrincipal CurrentUser currentUser) {
         if (request.mode() == TransportMode.TRANSIT && request.index() == null) throw new BusinessException(ErrorCode.INVALID_TRANSIT_INDEX);
         navigationService.saveRoute(request, currentUser);
-        return ApiResult.ok(SuccessCode.ROUTE_CREATED);
+        return ApiResult.created(SuccessCode.ROUTE_CREATED);
     }
 
     //진행중인 경로 조회

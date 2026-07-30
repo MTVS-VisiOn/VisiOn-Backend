@@ -215,7 +215,7 @@ public class NavigationService {
         String json = navigationRepository.getRoute(currentUser.getId(), mode.getPrefix()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROUTE));
         if (mode.equals(TransportMode.WALK) || mode.equals(TransportMode.CAR)) {
             NavigationRouteReport report = objectMapper.readValue(json, NavigationRouteReport.class);
-            Route newRoute = new Route(report, json,ward);
+            Route newRoute = new Route(mode, report.summary(), json,ward);
             routeRepository.save(newRoute);
         } else {
             //대중교통일때
@@ -223,8 +223,7 @@ public class NavigationService {
                     .filter(candidate -> Objects.equals(candidate.summary().index(), request.index()))
                     .findFirst()
                     .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROUTE));
-            String reportjson = objectMapper.writeValueAsString(report);
-            Route newRoute = new Route(report, reportjson, ward);
+            Route newRoute = new Route(mode, report.summary(), objectMapper.writeValueAsString(report), ward);
             routeRepository.save(newRoute);
         }
     }
