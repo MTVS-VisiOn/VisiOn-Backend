@@ -72,4 +72,9 @@ public class SwaggerConfig {
     public GroupedOpenApi favoriteApi() {
         return GroupedOpenApi.builder().group("favorite API").pathsToMatch("/api/favorites/**").build();
     }
+
+    @Bean
+    public GroupedOpenApi navigationApi() {
+        return GroupedOpenApi.builder().group("navigation API").pathsToMatch("/api/navigations/**").build();
+    }
 }
