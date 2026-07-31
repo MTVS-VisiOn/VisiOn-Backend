@@ -9,6 +9,7 @@ import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.server.HandshakeInterceptor;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.List;
 import java.util.Map;
@@ -39,6 +40,8 @@ public class AuthHandshakeInterceptor implements HandshakeInterceptor {
         if (auth != null && !auth.isEmpty()) {
             return auth.get(0).replace("Bearer ", "");
         }
-        return null;
+        // 브라우저 WebSocket 은 헤더를 못 붙이므로 쿼리 파라미터도 허용
+        return UriComponentsBuilder.fromUri(request.getURI()).build()
+                .getQueryParams().getFirst("token");
     }
 }
