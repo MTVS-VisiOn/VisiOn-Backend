@@ -304,7 +304,7 @@ class UserServiceTest {
             @DisplayName("It : 로그인 성공 및 KeyPair 반환")
             void it_success_login() {
                 //given
-                given(userRepository.findByEmail(email)).willReturn(Optional.of(user));
+                given(userRepository.findByEmailAndDeletedAtIsNull(email)).willReturn(Optional.of(user));
                 given(passwordEncoder.matches(password, encodedPassword)).willReturn(true);
                 given(jwtTokenProvider.issueKeyPair(userId, email, user.getRole())).willReturn(keyPair);
                 //when
@@ -328,7 +328,7 @@ class UserServiceTest {
             @DisplayName("It : NOT_FOUND_USER 오류 발생")
             void it_throws_not_found_user() {
                 //given
-                given(userRepository.findByEmail(email)).willReturn(Optional.empty());
+                given(userRepository.findByEmailAndDeletedAtIsNull(email)).willReturn(Optional.empty());
                 //when&then
                 BusinessException exception = assertThrows(BusinessException.class, () -> userService.login(loginRequest));
                 assertThat(exception.getMessage()).isEqualTo(ErrorCode.NOT_FOUND_USER.getMessage());
@@ -349,7 +349,7 @@ class UserServiceTest {
             @DisplayName("It : NOT_MATCH_PASSWORD 오류 발생")
             void it_throws_not_match_password() {
                 //given
-                given(userRepository.findByEmail(email)).willReturn(Optional.of(user));
+                given(userRepository.findByEmailAndDeletedAtIsNull(email)).willReturn(Optional.of(user));
                 given(passwordEncoder.matches(password, encodedPassword)).willReturn(false);
                 //when&then
                 BusinessException exception = assertThrows(BusinessException.class, () -> userService.login(loginRequest));
@@ -448,7 +448,7 @@ class UserServiceTest {
             @DisplayName("It : CurrentUser 조회 성공")
             void it_success_load_user() {
                 //given
-                given(userRepository.findByEmail(email)).willReturn(Optional.of(user));
+                given(userRepository.findByEmailAndDeletedAtIsNull(email)).willReturn(Optional.of(user));
                 //when
                 UserDetails response = userService.loadUserByUsername(email);
 
@@ -471,7 +471,7 @@ class UserServiceTest {
             @DisplayName("It : NOT_FOUND_USER 오류 발생")
             void it_throws_not_found_user() {
                 //given
-                given(userRepository.findByEmail(email)).willReturn(Optional.empty());
+                given(userRepository.findByEmailAndDeletedAtIsNull(email)).willReturn(Optional.empty());
                 //when&then
                 BusinessException exception = assertThrows(BusinessException.class, () -> userService.loadUserByUsername(email));
                 assertThat(exception.getMessage()).isEqualTo(ErrorCode.NOT_FOUND_USER.getMessage());

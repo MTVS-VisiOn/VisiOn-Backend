@@ -13,6 +13,7 @@ import mtvs.onvision.vision.user.domain.UserRole;
 import mtvs.onvision.vision.user.dto.ResisterGuardianResponse;
 import mtvs.onvision.vision.user.dto.SettingRequest;
 import mtvs.onvision.vision.user.dto.SignupRequest;
+import mtvs.onvision.vision.user.dto.GuardianResponse;
 import mtvs.onvision.vision.user.repository.RegisterTokenRepository;
 import mtvs.onvision.vision.user.repository.RelationRepository;
 import mtvs.onvision.vision.user.repository.UserRepository;
@@ -73,7 +74,7 @@ public class UserService implements UserDetailsService {
 
     @Transactional
     public KeyPair login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.email()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
+        User user = userRepository.findByEmailAndDeletedAtIsNull(request.email()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
         PreConditions.check(!passwordEncoder.matches(request.password(), user.getPassword()), ErrorCode.NOT_MATCH_PASSWORD);
         KeyPair keyPair = jwtTokenProvider.issueKeyPair(user.getId(), user.getEmail(), user.getRole());
         refreshTokenRepository.save(user.getId(), keyPair.refreshToken());
@@ -94,7 +95,7 @@ public class UserService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userRepository.findByEmail(username).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
+        User user = userRepository.findByEmailAndDeletedAtIsNull(username).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
         return new CurrentUser(user.getId(), user.getEmail(), user.getRole());
     }
 
@@ -115,4 +116,11 @@ public class UserService implements UserDetailsService {
     }
 
 
+    @Transactional(readOnly = true)
+    public GuardianResponse getGuardianInfo(CurrentUser currentUser) {
+        User guardian = userRepository.getReferenceById(currentUser.getId());
+        Long wardId = getWardIdFromGuardianId(currentUser.getId());
+        User ward = userRepository.getReferenceById(wardId);
+        return GuardianResponse.from(guardian, ward);
+    }
 }

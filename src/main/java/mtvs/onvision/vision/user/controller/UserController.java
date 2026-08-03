@@ -12,6 +12,7 @@ import mtvs.onvision.vision.user.domain.UserRole;
 import mtvs.onvision.vision.user.dto.ResisterGuardianResponse;
 import mtvs.onvision.vision.user.dto.SettingRequest;
 import mtvs.onvision.vision.user.dto.SignupRequest;
+import mtvs.onvision.vision.user.dto.GuardianResponse;
 import mtvs.onvision.vision.user.service.UserService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -49,5 +50,12 @@ public class UserController implements UserControllerSupporter {
                                                                   @AuthenticationPrincipal CurrentUser currentUser) {
         userService.updateGuardianSettings(request, currentUser);
         return ApiResult.ok(SuccessCode.SETTING_SUCCESS);
+    }
+
+    //보호자 계정 정보 조회
+    @GetMapping("/guardian/me")
+    public ResponseEntity<ApiResult<GuardianResponse>> getGuardianInfo(@AuthenticationPrincipal CurrentUser currentUser) {
+        GuardianResponse response = userService.getGuardianInfo(currentUser);
+        return ApiResult.ok(SuccessCode.USER_READ, response);
     }
 }
