@@ -1,7 +1,6 @@
 package mtvs.onvision.vision.common.config;
 
 import lombok.RequiredArgsConstructor;
-import mtvs.onvision.vision.auth.service.JwtTokenProvider;
 import mtvs.onvision.vision.common.interceptor.AuthHandshakeInterceptor;
 import mtvs.onvision.vision.signalling.SignalHandler;
 import mtvs.onvision.vision.user.repository.RelationRepository;
@@ -17,17 +16,17 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 @RequiredArgsConstructor
 public class WebSocketConfig implements WebSocketConfigurer {
     private final RelationRepository relationRepository;
-    private final JwtTokenProvider tokenProvider;
+    private final AuthHandshakeInterceptor authHandshakeInterceptor;
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(signalingSocketHandler(relationRepository), "/signal")  //핸들러와 연결될 endpoint
-                .addInterceptors(new AuthHandshakeInterceptor(tokenProvider))
+                .addInterceptors(authHandshakeInterceptor)
                 .setAllowedOriginPatterns("*")                 //CORS 설정
                 .withSockJS();
 
         // 테스트용 raw WS (SockJS 없음)
         registry.addHandler(signalingSocketHandler(relationRepository), "/signal-raw")
-                .addInterceptors(new AuthHandshakeInterceptor(tokenProvider))
+                .addInterceptors(authHandshakeInterceptor)
                 .setAllowedOriginPatterns("*");//SockJS 설정
     }
 
