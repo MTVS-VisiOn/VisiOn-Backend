@@ -9,6 +9,7 @@ import mtvs.onvision.vision.common.filter.JwtAuthenticationFilter;
 import mtvs.onvision.vision.common.response.SuccessCode;
 import mtvs.onvision.vision.navigation.domain.TransportMode;
 import mtvs.onvision.vision.navigation.dto.LocationInfo;
+import mtvs.onvision.vision.navigation.dto.MapResponse;
 import mtvs.onvision.vision.navigation.dto.NavigationPreRequest;
 import mtvs.onvision.vision.navigation.dto.NavigationResponse;
 import mtvs.onvision.vision.navigation.dto.RouteRequest;
@@ -28,6 +29,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
@@ -422,6 +427,90 @@ class NavigationControllerTest {
                 mockMvc.perform(patch("/api/navigations/cancel").with(csrf()))
                         .andExpect(status().isNotFound())
                         .andExpect(jsonPath("$.code").value(ErrorCode.NOT_FOUND_ROUTE.name()))
+                        .andDo(print());
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Describe: GET /api/navigations/map 엔드포인트는")
+    class getMapRoute {
+
+        private MapResponse mapResponse() {
+            return new MapResponse(
+                    "말죽거리공원사거리", "서울 서초구 강남대로 213", 37.479103, 127.037476,
+                    24269, 360, Instant.parse("2026-08-03T07:08:00Z"), TransportMode.WALK,
+                    List.of(Map.of("latitude", 37.504585, "longitude", 127.024798),
+                            Map.of("latitude", 37.503900, "longitude", 127.025200)));
+        }
+
+        @Nested
+        @DisplayName("Context: 진행 중인 경로가 있으면")
+        class Context_with_route {
+
+            @Test
+            @DisplayName("It : 200 상태와 목적지·소요시간을 반환한다")
+            void it_return_200_with_content() throws Exception {
+                //given
+                given(navigationService.getMapRoute(any())).willReturn(mapResponse());
+
+                //when-then
+                mockMvc.perform(get("/api/navigations/map"))
+                        .andExpect(status().isOk())
+                        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                        .andExpect(jsonPath("$.code").value(SuccessCode.ROUTE_READ.name()))
+                        .andExpect(jsonPath("$.data.name").value("말죽거리공원사거리"))
+                        .andExpect(jsonPath("$.data.distanceM").value(24269))
+                        .andExpect(jsonPath("$.data.etaMin").value(360))
+                        .andExpect(jsonPath("$.data.mode").value("WALK"))
+                        .andDo(print());
+            }
+
+            @Test
+            @DisplayName("(위도 37 · 경도 127)It : path를 좌표 객체 배열로 내보낸다")
+            void it_writes_path_as_object_array() throws Exception {
+                //given : 프론트는 [위도, 경도] 쌍이 아니라 {latitude, longitude}를 받는다
+                given(navigationService.getMapRoute(any())).willReturn(mapResponse());
+
+                //when-then
+                mockMvc.perform(get("/api/navigations/map"))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.data.path").isArray())
+                        .andExpect(jsonPath("$.data.path[0].latitude").value(37.504585))
+                        .andExpect(jsonPath("$.data.path[0].longitude").value(127.024798))
+                        .andDo(print());
+            }
+
+            @Test
+            @DisplayName("(ISO8601 UTC)It : departureTime을 Z가 붙은 문자열로 내보낸다")
+            void it_writes_departure_time_as_utc() throws Exception {
+                //given : 숫자(epoch)나 Z 없는 문자열로 나가면 프론트가 경과시간을 못 만든다
+                given(navigationService.getMapRoute(any())).willReturn(mapResponse());
+
+                //when-then
+                mockMvc.perform(get("/api/navigations/map"))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.data.departureTime").value("2026-08-03T07:08:00Z"))
+                        .andDo(print());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 진행 중인 경로가 없으면")
+        class Context_without_route {
+
+            @Test
+            @DisplayName("It : 404가 아니라 200과 data:null을 반환한다")
+            void it_return_200_with_null_data() throws Exception {
+                //given : 목적지 미설정은 오류가 아니다
+                given(navigationService.getMapRoute(any())).willReturn(null);
+
+                //when-then
+                mockMvc.perform(get("/api/navigations/map"))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.success").value(true))
+                        .andExpect(jsonPath("$.code").value(SuccessCode.ROUTE_READ.name()))
+                        .andExpect(jsonPath("$.data").doesNotExist())
                         .andDo(print());
             }
         }
