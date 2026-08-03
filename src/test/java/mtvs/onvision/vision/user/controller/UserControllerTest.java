@@ -21,6 +21,7 @@ import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.common.filter.JwtAuthenticationFilter;
 import mtvs.onvision.vision.common.response.SuccessCode;
 import mtvs.onvision.vision.user.domain.UserRole;
+import mtvs.onvision.vision.user.dto.GuardianResponse;
 import mtvs.onvision.vision.user.dto.ResisterGuardianResponse;
 import mtvs.onvision.vision.user.dto.SettingRequest;
 import mtvs.onvision.vision.user.dto.SignupRequest;
@@ -677,6 +678,82 @@ class UserControllerTest {
                         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                         .andExpect(jsonPath("$.code").value(ErrorCode.NOT_FOUND_GUARDIAN.name()))
                         .andExpect(jsonPath("$.message").value(ErrorCode.NOT_FOUND_GUARDIAN.getMessage()))
+                        .andDo(print());
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Describe: GET /guardian/me 엔드포인트는")
+    class getGuardianInfo {
+
+        CurrentUser currentUser = new CurrentUser(userId, email, UserRole.GUARDIAN);
+        Long wardId = 2L;
+        String wardNickname = "피보호자";
+        String wardPhoneNumber = "010-9999-8888";
+
+        @BeforeEach
+        void setUp() {
+            SecurityContextHolder.getContext().setAuthentication(
+                    new UsernamePasswordAuthenticationToken(currentUser, null, currentUser.getAuthorities()));
+        }
+
+        @AfterEach
+        void tearDown() {
+            SecurityContextHolder.clearContext();
+        }
+
+        @Nested
+        @DisplayName("Context: 인증된 보호자가 요청하면")
+        class Context_with_authenticated_guardian {
+
+            @Test
+            @DisplayName("It : 200 상태와 보호자·피보호자 정보를 반환한다")
+            void it_return_200_ok_and_guardian_info() throws Exception {
+                //given
+                GuardianResponse response = new GuardianResponse(
+                        userId, email, UserRole.GUARDIAN, nickname,
+                        new GuardianResponse.WardInfo(wardId, wardNickname, wardPhoneNumber));
+                given(userService.getGuardianInfo(currentUser)).willReturn(response);
+
+                //when-then
+                mockMvc.perform(
+                                get("/api/users/guardian/me")
+                        )
+                        .andExpect(status().isOk())
+                        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                        .andExpect(jsonPath("$.code").value(SuccessCode.USER_READ.name()))
+                        .andExpect(jsonPath("$.message").value(SuccessCode.USER_READ.getSuccessMessage()))
+                        .andExpect(jsonPath("$.data.id").value(userId))
+                        .andExpect(jsonPath("$.data.email").value(email))
+                        .andExpect(jsonPath("$.data.role").value(UserRole.GUARDIAN.name()))
+                        .andExpect(jsonPath("$.data.nickname").value(nickname))
+                        .andExpect(jsonPath("$.data.ward.id").value(wardId))
+                        .andExpect(jsonPath("$.data.ward.nickname").value(wardNickname))
+                        .andExpect(jsonPath("$.data.ward.phoneNumber").value(wardPhoneNumber))
+                        .andDo(print());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 보호자의 관계가 존재하지 않으면")
+        class Context_with_no_relation {
+
+            @Test
+            @DisplayName("It : 404 상태와 NOT_FOUND_RELATION을 반환한다")
+            void it_return_404_not_found_and_no_relation() throws Exception {
+                //given
+                given(userService.getGuardianInfo(currentUser))
+                        .willThrow(new BusinessException(ErrorCode.NOT_FOUND_RELATION));
+
+                //when-then
+                mockMvc.perform(
+                                get("/api/users/guardian/me")
+                        )
+                        .andExpect(status().isNotFound())
+                        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                        .andExpect(jsonPath("$.code").value(ErrorCode.NOT_FOUND_RELATION.name()))
+                        .andExpect(jsonPath("$.message").value(ErrorCode.NOT_FOUND_RELATION.getMessage()))
                         .andDo(print());
             }
         }

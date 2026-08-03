@@ -21,6 +21,7 @@ import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.user.domain.Relation;
 import mtvs.onvision.vision.user.domain.User;
 import mtvs.onvision.vision.user.domain.UserRole;
+import mtvs.onvision.vision.user.dto.GuardianResponse;
 import mtvs.onvision.vision.user.dto.ResisterGuardianResponse;
 import mtvs.onvision.vision.user.dto.SettingRequest;
 import mtvs.onvision.vision.user.dto.SignupRequest;
@@ -575,6 +576,97 @@ class UserServiceTest {
                 //when&then
                 BusinessException exception = assertThrows(BusinessException.class, () -> userService.updateGuardianSettings(settingRequest, currentUser));
                 assertThat(exception.getMessage()).isEqualTo(ErrorCode.NOT_FOUND_GUARDIAN.getMessage());
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Describe: getGuardianInfo 메서드는")
+    class Describe_with_getGuardianInfo {
+
+        CurrentUser currentUser = new CurrentUser(userId, email, UserRole.GUARDIAN);
+        User guardian;
+        Relation relation;
+
+        @BeforeEach
+        void setup() {
+            guardian = new User(email, encodedPassword, nickname, phoneNumber, UserRole.GUARDIAN);
+            ReflectionTestUtils.setField(guardian, "id", userId);
+            ward = new User("ward@test.com", encodedPassword, "피보호자", "010-9999-8888", UserRole.WARD);
+            ReflectionTestUtils.setField(ward, "id", wardId);
+            relation = new Relation(ward, guardian);
+        }
+
+        @Nested
+        @DisplayName("Context: 보호자와 연결된 피보호자가 모두 존재하면")
+        class Context_with_available_data {
+
+            @Test
+            @DisplayName("It : 보호자 정보와 피보호자 정보를 함께 반환한다")
+            void it_success_get_guardian_info() {
+                //given
+                given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(guardian));
+                given(relationRepository.findByGuardianId(userId)).willReturn(Optional.of(relation));
+                given(userRepository.findByIdAndDeletedAtIsNull(wardId)).willReturn(Optional.of(ward));
+                //when
+                GuardianResponse response = userService.getGuardianInfo(currentUser);
+
+                //then
+                assertThat(response.id()).isEqualTo(userId);
+                assertThat(response.email()).isEqualTo(email);
+                assertThat(response.role()).isEqualTo(UserRole.GUARDIAN);
+                assertThat(response.nickname()).isEqualTo(nickname);
+                assertThat(response.ward().id()).isEqualTo(wardId);
+                assertThat(response.ward().nickname()).isEqualTo(ward.getNickname());
+                assertThat(response.ward().phoneNumber()).isEqualTo(ward.getPhoneNumber());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 보호자 계정이 존재하지 않으면")
+        class Context_with_unavailable_guardian {
+
+            @Test
+            @DisplayName("It : NOT_FOUND_USER 오류 발생")
+            void it_throws_not_found_user() {
+                //given
+                given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.empty());
+                //when&then
+                BusinessException exception = assertThrows(BusinessException.class, () -> userService.getGuardianInfo(currentUser));
+                assertThat(exception.getMessage()).isEqualTo(ErrorCode.NOT_FOUND_USER.getMessage());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 보호자의 관계가 존재하지 않으면")
+        class Context_with_no_relation {
+
+            @Test
+            @DisplayName("It : NOT_FOUND_RELATION 오류 발생")
+            void it_throws_not_found_relation() {
+                //given
+                given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(guardian));
+                given(relationRepository.findByGuardianId(userId)).willReturn(Optional.empty());
+                //when&then
+                BusinessException exception = assertThrows(BusinessException.class, () -> userService.getGuardianInfo(currentUser));
+                assertThat(exception.getMessage()).isEqualTo(ErrorCode.NOT_FOUND_RELATION.getMessage());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 연결된 피보호자 계정이 존재하지 않으면")
+        class Context_with_unavailable_ward {
+
+            @Test
+            @DisplayName("It : NOT_FOUND_USER 오류 발생")
+            void it_throws_not_found_user() {
+                //given
+                given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(guardian));
+                given(relationRepository.findByGuardianId(userId)).willReturn(Optional.of(relation));
+                given(userRepository.findByIdAndDeletedAtIsNull(wardId)).willReturn(Optional.empty());
+                //when&then
+                BusinessException exception = assertThrows(BusinessException.class, () -> userService.getGuardianInfo(currentUser));
+                assertThat(exception.getMessage()).isEqualTo(ErrorCode.NOT_FOUND_USER.getMessage());
             }
         }
     }
