@@ -118,9 +118,9 @@ public class UserService implements UserDetailsService {
 
     @Transactional(readOnly = true)
     public GuardianResponse getGuardianInfo(CurrentUser currentUser) {
-        User guardian = userRepository.getReferenceById(currentUser.getId());
+        User guardian = userRepository.findByIdAndDeletedAtIsNull(currentUser.getId()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
         Long wardId = getWardIdFromGuardianId(currentUser.getId());
-        User ward = userRepository.getReferenceById(wardId);
+        User ward = userRepository.findByIdAndDeletedAtIsNull(wardId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
         return GuardianResponse.from(guardian, ward);
     }
 }
