@@ -22,7 +22,7 @@ import mtvs.onvision.vision.user.domain.Relation;
 import mtvs.onvision.vision.user.domain.User;
 import mtvs.onvision.vision.user.domain.UserRole;
 import mtvs.onvision.vision.user.dto.UserResponse;
-import mtvs.onvision.vision.user.dto.ResisterGuardianResponse;
+import mtvs.onvision.vision.user.dto.RegisterGuardianResponse;
 import mtvs.onvision.vision.user.dto.SettingRequest;
 import mtvs.onvision.vision.user.dto.SignupRequest;
 import mtvs.onvision.vision.user.repository.RegisterTokenRepository;
@@ -520,10 +520,10 @@ class UserServiceTest {
                 //given
                 given(jwtTokenProvider.issueRegisterToken(userId, email, UserRole.WARD)).willReturn(registerToken);
                 //when
-                ResisterGuardianResponse response = userService.getGuardianRegisterToken(currentUser);
+                RegisterGuardianResponse response = userService.getGuardianRegisterToken(currentUser);
 
                 //then
-                assertThat(response.token()).isEqualTo(registerToken);
+                assertThat(response.registerToken()).isEqualTo(registerToken);
                 verify(registerTokenRepository).save(userId, registerToken);
             }
         }

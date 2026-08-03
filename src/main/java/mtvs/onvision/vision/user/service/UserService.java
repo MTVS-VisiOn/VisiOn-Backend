@@ -10,7 +10,7 @@ import mtvs.onvision.vision.common.util.PreConditions;
 import mtvs.onvision.vision.user.domain.Relation;
 import mtvs.onvision.vision.user.domain.User;
 import mtvs.onvision.vision.user.domain.UserRole;
-import mtvs.onvision.vision.user.dto.ResisterGuardianResponse;
+import mtvs.onvision.vision.user.dto.RegisterGuardianResponse;
 import mtvs.onvision.vision.user.dto.SettingRequest;
 import mtvs.onvision.vision.user.dto.SignupRequest;
 import mtvs.onvision.vision.user.dto.UserResponse;
@@ -60,10 +60,10 @@ public class UserService implements UserDetailsService {
     }
 
     @Transactional
-    public ResisterGuardianResponse getGuardianRegisterToken(CurrentUser currentUser) {
+    public RegisterGuardianResponse getGuardianRegisterToken(CurrentUser currentUser) {
         String registerToken = jwtTokenProvider.issueRegisterToken(currentUser.getId(), currentUser.getEmail(), UserRole.WARD);
         registerTokenRepository.save(currentUser.getId(), registerToken);
-        return new ResisterGuardianResponse(registerToken);
+        return new RegisterGuardianResponse(registerToken);
     }
 
     @Transactional

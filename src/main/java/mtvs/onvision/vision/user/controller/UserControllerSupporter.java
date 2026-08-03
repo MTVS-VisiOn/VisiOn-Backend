@@ -13,7 +13,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.response.ApiResult;
 import mtvs.onvision.vision.user.dto.UserResponse;
-import mtvs.onvision.vision.user.dto.ResisterGuardianResponse;
+import mtvs.onvision.vision.user.dto.RegisterGuardianResponse;
 import mtvs.onvision.vision.user.dto.SettingRequest;
 import mtvs.onvision.vision.user.dto.SignupRequest;
 import org.springframework.http.MediaType;
@@ -158,7 +158,9 @@ public interface UserControllerSupporter {
                                                         "success": true,
                                                         "code": "REGISTER_TOKEN_CREATED",
                                                         "message": "보호자 등록 토큰이 정상적으로 생성되었습니다.",
-                                                        "data": null
+                                                        "data": {
+                                                            "registerToken": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyIiwiZW1haWwiOiJ0ZXN0MUBuYXZlci5jb20iLCJyb2xlIjoiR1VBUkRJQU4iLCJpYXQiOjE3ODQ2OTc2OTgsImV4cCI6MTc4NDY5ODU5OH0.JdRlH8l-sMTe9Z7QQQmxtLbgT9qNWWkuabcFkw8cpEWVgPGihH8u1HqLofCr80ejBYGA5hIfY6Buzu9-r5IyQA"
+                                                        }
                                                     }
                                                     """
                                     )
@@ -167,7 +169,7 @@ public interface UserControllerSupporter {
             )
     })
     @SecurityRequirement(name = "Bearer Authentication")
-    ResponseEntity<ApiResult<ResisterGuardianResponse>> getGuardianRegisterToken(CurrentUser currentUser);
+    ResponseEntity<ApiResult<RegisterGuardianResponse>> getGuardianRegisterToken(CurrentUser currentUser);
 
     @Operation(
             summary = "보호자 설정 세팅",

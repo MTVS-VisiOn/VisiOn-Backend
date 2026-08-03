@@ -22,7 +22,7 @@ import mtvs.onvision.vision.common.filter.JwtAuthenticationFilter;
 import mtvs.onvision.vision.common.response.SuccessCode;
 import mtvs.onvision.vision.user.domain.UserRole;
 import mtvs.onvision.vision.user.dto.UserResponse;
-import mtvs.onvision.vision.user.dto.ResisterGuardianResponse;
+import mtvs.onvision.vision.user.dto.RegisterGuardianResponse;
 import mtvs.onvision.vision.user.dto.SettingRequest;
 import mtvs.onvision.vision.user.dto.SignupRequest;
 import mtvs.onvision.vision.user.service.UserService;
@@ -562,7 +562,7 @@ class UserControllerTest {
             void it_return_200_ok_and_register_token() throws Exception {
                 //given
                 given(userService.getGuardianRegisterToken(currentUser))
-                        .willReturn(new ResisterGuardianResponse(registerToken));
+                        .willReturn(new RegisterGuardianResponse(registerToken));
 
                 //when-then
                 mockMvc.perform(
@@ -572,7 +572,7 @@ class UserControllerTest {
                         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                         .andExpect(jsonPath("$.code").value(SuccessCode.REGISTER_TOKEN_CREATED.name()))
                         .andExpect(jsonPath("$.message").value(SuccessCode.REGISTER_TOKEN_CREATED.getSuccessMessage()))
-                        .andExpect(jsonPath("$.data.token").value(registerToken))
+                        .andExpect(jsonPath("$.data.registerToken").value(registerToken))
                         .andDo(print());
             }
         }
