@@ -215,7 +215,7 @@ class PresenceControllerTest {
             void it_return_200_ok_and_presence() throws Exception {
                 //given
                 PresenceResponse response =
-                        new PresenceResponse(77, true, PresenceType.NORMAL.getDescription());
+                        new PresenceResponse(77, true, true, PresenceType.NORMAL.getDescription());
                 given(presenceService.getWardPresence(any(CurrentUser.class))).willReturn(response);
 
                 //when-then
@@ -228,6 +228,7 @@ class PresenceControllerTest {
                         .andExpect(jsonPath("$.message").value(SuccessCode.PRESENCE_READ.getSuccessMessage()))
                         .andExpect(jsonPath("$.data.battery").value(77))
                         .andExpect(jsonPath("$.data.deviceConnected").value(true))
+                        .andExpect(jsonPath("$.data.deviceNetwork").value(true))
                         .andExpect(jsonPath("$.data.status").value(PresenceType.NORMAL.getDescription()))
                         .andDo(print());
             }
