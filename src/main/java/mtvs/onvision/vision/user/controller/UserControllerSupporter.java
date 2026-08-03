@@ -12,7 +12,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.response.ApiResult;
-import mtvs.onvision.vision.user.dto.GuardianResponse;
+import mtvs.onvision.vision.user.dto.UserResponse;
 import mtvs.onvision.vision.user.dto.ResisterGuardianResponse;
 import mtvs.onvision.vision.user.dto.SettingRequest;
 import mtvs.onvision.vision.user.dto.SignupRequest;
@@ -219,8 +219,12 @@ public interface UserControllerSupporter {
                                                            CurrentUser currentUser);
 
     @Operation(
-            summary = "보호자 계정 정보 조회",
-            description = "보호자 본인의 계정 정보와 연결된 피보호자 정보를 함께 조회한다",
+            summary = "계정 정보 조회",
+            description = """
+                    로그인한 본인의 계정 정보를 조회한다. **역할과 무관하게 같은 경로를 쓴다.**
+
+                    `GUARDIAN`이면 연결된 피보호자 정보가 `ward`에 함께 담기고,
+                    `WARD`이면 `ward`는 **`null`**이다""",
             extensions = @Extension(properties = @ExtensionProperty(name = "x-order", value = "4"))
     )
     @ApiResponses(value = {
@@ -230,26 +234,46 @@ public interface UserControllerSupporter {
                     content = {
                             @Content(
                                     mediaType = MediaType.APPLICATION_JSON_VALUE,
-                                    examples = @ExampleObject(
-                                            value = """
-                                                    {
-                                                        "success": true,
-                                                        "code": "USER_READ",
-                                                        "message": "계정정보가 정상적으로 조회되었습니다.",
-                                                        "data": {
-                                                            "id": 1,
-                                                            "email": "test1@naver.com",
-                                                            "role": "GUARDIAN",
-                                                            "nickname": "test1",
-                                                            "ward": {
-                                                                "id": 2,
-                                                                "nickname": "test2",
-                                                                "phoneNumber": "010-0000-0002"
+                                    examples = {
+                                            @ExampleObject(
+                                                    name = "보호자(GUARDIAN)",
+                                                    value = """
+                                                            {
+                                                                "success": true,
+                                                                "code": "USER_READ",
+                                                                "message": "계정정보가 정상적으로 조회되었습니다.",
+                                                                "data": {
+                                                                    "id": 1,
+                                                                    "email": "test1@naver.com",
+                                                                    "role": "GUARDIAN",
+                                                                    "nickname": "test1",
+                                                                    "ward": {
+                                                                        "id": 2,
+                                                                        "nickname": "test2",
+                                                                        "phoneNumber": "010-0000-0002"
+                                                                    }
+                                                                }
                                                             }
-                                                        }
-                                                    }
-                                                    """
-                                    )
+                                                            """
+                                            ),
+                                            @ExampleObject(
+                                                    name = "피보호자(WARD)",
+                                                    value = """
+                                                            {
+                                                                "success": true,
+                                                                "code": "USER_READ",
+                                                                "message": "계정정보가 정상적으로 조회되었습니다.",
+                                                                "data": {
+                                                                    "id": 2,
+                                                                    "email": "test2@naver.com",
+                                                                    "role": "WARD",
+                                                                    "nickname": "test2",
+                                                                    "ward": null
+                                                                }
+                                                            }
+                                                            """
+                                            )
+                                    }
                             )
                     }
             ),
@@ -274,6 +298,6 @@ public interface UserControllerSupporter {
             )
     })
     @SecurityRequirement(name = "Bearer Authentication")
-    ResponseEntity<ApiResult<GuardianResponse>> getGuardianInfo(CurrentUser currentUser);
+    ResponseEntity<ApiResult<UserResponse>> getUserInfo(CurrentUser currentUser);
 
 }

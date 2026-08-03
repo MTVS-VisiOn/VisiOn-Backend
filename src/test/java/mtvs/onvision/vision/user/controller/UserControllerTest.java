@@ -21,7 +21,7 @@ import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.common.filter.JwtAuthenticationFilter;
 import mtvs.onvision.vision.common.response.SuccessCode;
 import mtvs.onvision.vision.user.domain.UserRole;
-import mtvs.onvision.vision.user.dto.GuardianResponse;
+import mtvs.onvision.vision.user.dto.UserResponse;
 import mtvs.onvision.vision.user.dto.ResisterGuardianResponse;
 import mtvs.onvision.vision.user.dto.SettingRequest;
 import mtvs.onvision.vision.user.dto.SignupRequest;
@@ -711,10 +711,10 @@ class UserControllerTest {
             @DisplayName("It : 200 상태와 보호자·피보호자 정보를 반환한다")
             void it_return_200_ok_and_guardian_info() throws Exception {
                 //given
-                GuardianResponse response = new GuardianResponse(
+                UserResponse response = new UserResponse(
                         userId, email, UserRole.GUARDIAN, nickname,
-                        new GuardianResponse.WardInfo(wardId, wardNickname, wardPhoneNumber));
-                given(userService.getGuardianInfo(currentUser)).willReturn(response);
+                        new UserResponse.WardInfo(wardId, wardNickname, wardPhoneNumber));
+                given(userService.getUserInfo(currentUser)).willReturn(response);
 
                 //when-then
                 mockMvc.perform(
@@ -743,7 +743,7 @@ class UserControllerTest {
             @DisplayName("It : 404 상태와 NOT_FOUND_RELATION을 반환한다")
             void it_return_404_not_found_and_no_relation() throws Exception {
                 //given
-                given(userService.getGuardianInfo(currentUser))
+                given(userService.getUserInfo(currentUser))
                         .willThrow(new BusinessException(ErrorCode.NOT_FOUND_RELATION));
 
                 //when-then

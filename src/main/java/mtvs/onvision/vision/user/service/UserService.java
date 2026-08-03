@@ -13,7 +13,7 @@ import mtvs.onvision.vision.user.domain.UserRole;
 import mtvs.onvision.vision.user.dto.ResisterGuardianResponse;
 import mtvs.onvision.vision.user.dto.SettingRequest;
 import mtvs.onvision.vision.user.dto.SignupRequest;
-import mtvs.onvision.vision.user.dto.GuardianResponse;
+import mtvs.onvision.vision.user.dto.UserResponse;
 import mtvs.onvision.vision.user.repository.RegisterTokenRepository;
 import mtvs.onvision.vision.user.repository.RelationRepository;
 import mtvs.onvision.vision.user.repository.UserRepository;
@@ -117,10 +117,15 @@ public class UserService implements UserDetailsService {
 
 
     @Transactional(readOnly = true)
-    public GuardianResponse getGuardianInfo(CurrentUser currentUser) {
-        User guardian = userRepository.findByIdAndDeletedAtIsNull(currentUser.getId()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
-        Long wardId = getWardIdFromGuardianId(currentUser.getId());
-        User ward = userRepository.findByIdAndDeletedAtIsNull(wardId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
-        return GuardianResponse.from(guardian, ward);
+    public UserResponse getUserInfo(CurrentUser currentUser) {
+        if (currentUser.getRole().equals(UserRole.GUARDIAN)) {
+            User guardian = userRepository.findByIdAndDeletedAtIsNull(currentUser.getId()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
+            Long wardId = getWardIdFromGuardianId(currentUser.getId());
+            User ward = userRepository.findByIdAndDeletedAtIsNull(wardId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
+            return UserResponse.from(guardian, ward);
+        }else {
+            User ward = userRepository.findByIdAndDeletedAtIsNull(currentUser.getId()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
+            return UserResponse.from(ward);
+        }
     }
 }

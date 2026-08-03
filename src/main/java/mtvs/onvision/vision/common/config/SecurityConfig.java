@@ -30,7 +30,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/users/refresh").permitAll()
                         .requestMatchers("/api/users/guardian/register-token").hasAuthority("WARD")
                         .requestMatchers("/api/users/settings").hasAuthority("GUARDIAN")
-                        .requestMatchers("/api/users/guardian/me").hasAuthority("GUARDIAN")
+                        .requestMatchers("/api/users/me").hasAnyAuthority("WARD","GUARDIAN")
                         .requestMatchers("/api/common", "/api/auth/logout").authenticated()
                         .requestMatchers(HttpMethod.POST,"/api/presence").hasAuthority("WARD")
                         .requestMatchers(HttpMethod.GET,"/api/presence").hasAuthority("GUARDIAN")

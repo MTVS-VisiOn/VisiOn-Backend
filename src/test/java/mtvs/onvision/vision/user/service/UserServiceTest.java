@@ -21,7 +21,7 @@ import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.user.domain.Relation;
 import mtvs.onvision.vision.user.domain.User;
 import mtvs.onvision.vision.user.domain.UserRole;
-import mtvs.onvision.vision.user.dto.GuardianResponse;
+import mtvs.onvision.vision.user.dto.UserResponse;
 import mtvs.onvision.vision.user.dto.ResisterGuardianResponse;
 import mtvs.onvision.vision.user.dto.SettingRequest;
 import mtvs.onvision.vision.user.dto.SignupRequest;
@@ -609,7 +609,7 @@ class UserServiceTest {
                 given(relationRepository.findByGuardianId(userId)).willReturn(Optional.of(relation));
                 given(userRepository.findByIdAndDeletedAtIsNull(wardId)).willReturn(Optional.of(ward));
                 //when
-                GuardianResponse response = userService.getGuardianInfo(currentUser);
+                UserResponse response = userService.getUserInfo(currentUser);
 
                 //then
                 assertThat(response.id()).isEqualTo(userId);
@@ -632,7 +632,7 @@ class UserServiceTest {
                 //given
                 given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.empty());
                 //when&then
-                BusinessException exception = assertThrows(BusinessException.class, () -> userService.getGuardianInfo(currentUser));
+                BusinessException exception = assertThrows(BusinessException.class, () -> userService.getUserInfo(currentUser));
                 assertThat(exception.getMessage()).isEqualTo(ErrorCode.NOT_FOUND_USER.getMessage());
             }
         }
@@ -648,7 +648,7 @@ class UserServiceTest {
                 given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(guardian));
                 given(relationRepository.findByGuardianId(userId)).willReturn(Optional.empty());
                 //when&then
-                BusinessException exception = assertThrows(BusinessException.class, () -> userService.getGuardianInfo(currentUser));
+                BusinessException exception = assertThrows(BusinessException.class, () -> userService.getUserInfo(currentUser));
                 assertThat(exception.getMessage()).isEqualTo(ErrorCode.NOT_FOUND_RELATION.getMessage());
             }
         }
@@ -665,7 +665,7 @@ class UserServiceTest {
                 given(relationRepository.findByGuardianId(userId)).willReturn(Optional.of(relation));
                 given(userRepository.findByIdAndDeletedAtIsNull(wardId)).willReturn(Optional.empty());
                 //when&then
-                BusinessException exception = assertThrows(BusinessException.class, () -> userService.getGuardianInfo(currentUser));
+                BusinessException exception = assertThrows(BusinessException.class, () -> userService.getUserInfo(currentUser));
                 assertThat(exception.getMessage()).isEqualTo(ErrorCode.NOT_FOUND_USER.getMessage());
             }
         }
