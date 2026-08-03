@@ -1,5 +1,7 @@
 package mtvs.onvision.vision.signalling;
 
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import mtvs.onvision.vision.common.exception.BusinessException;
@@ -9,6 +11,7 @@ import mtvs.onvision.vision.user.domain.Relation;
 import mtvs.onvision.vision.user.domain.UserRole;
 import mtvs.onvision.vision.user.repository.RelationRepository;
 import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.PingMessage;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
@@ -36,6 +39,10 @@ public class SignalHandler extends TextWebSocketHandler {
 
     private static final long GRACE_SECONDS = 60;
 
+    //터널(cloudflared ~100초)과 이동통신사 NAT(5~30분)가 유휴 WS 를 끊는 것을 막는다.
+    //프로덕션 nginx 는 3600초라 여기서는 여유가 있다.
+    private static final long PING_INTERVAL_SECONDS = 30;
+
     // 방의 최대 인원수
     private static final int MAXIMUM = 2;
 
@@ -46,6 +53,35 @@ public class SignalHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionEstablished(WebSocketSession session){
         log.info(">>> [ws] 클라이언트 접속 : 사용자 - {}, 세션 - {}", session.getAttributes().get("userId"), session.getId());
+    }
+
+    //빈이 만들어진 직후 시작됨
+    //보호자가 방열고 일정시간 이상 기다리면 프록시가 끊고 방이 끊기는 것을 막음
+    //브라우저 RN이 프로토콜 레벨에서 Pong을 돌려주므로 클라이언트 변경이 0이다.
+    //scheduleAtFixedRate() : 예외가 밖으로 새면 scheduleAtFixedRate 는 반복을 영구 취소한다(로그도 없음).
+    //그래서 pingAll 안에서 세션 단위로 잡는다.
+    @PostConstruct
+    public void startKeepAlive() {
+        scheduler.scheduleAtFixedRate(this::pingAll,
+                PING_INTERVAL_SECONDS, PING_INTERVAL_SECONDS, TimeUnit.SECONDS);
+    }
+
+    //컨테이너가 빈을 버리기 직전 스케줄러 종료
+    @PreDestroy
+    public void stopScheduler() {
+        scheduler.shutdownNow();
+    }
+
+
+    private void pingAll() {
+        for (WebSocketSession session : sessions.values()) {
+            if(!session.isOpen()) continue;
+            try {
+                session.sendMessage(new PingMessage());
+            }catch (Exception e) {
+                log.info(">>> [ws] ping 실패, 세션 {} : {}", session.getId(), e.getMessage());
+            }
+        }
     }
 
     //양방향 데이터 통신

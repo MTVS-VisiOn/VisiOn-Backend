@@ -1,6 +1,7 @@
 package mtvs.onvision.vision.common.interceptor;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import mtvs.onvision.vision.auth.dto.TokenBody;
 import mtvs.onvision.vision.auth.service.JwtTokenProvider;
 import org.jspecify.annotations.Nullable;
@@ -14,6 +15,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class AuthHandshakeInterceptor implements HandshakeInterceptor {
@@ -27,6 +29,9 @@ public class AuthHandshakeInterceptor implements HandshakeInterceptor {
             attributes.put("role", tokenBody.role());
             return true;
         }
+        // 거부하면 브라우저에는 1006 만 보이고 이유가 남지 않는다.
+        // "토큰을 안 실어 보냈다"와 "토큰이 무효다"를 여기서 갈라준다. 토큰 값 자체는 찍지 않는다.
+        log.warn(">>> [ws] 핸드셰이크 거부 — 토큰 {}", token == null ? "없음" : "무효");
         return false;
     }
 

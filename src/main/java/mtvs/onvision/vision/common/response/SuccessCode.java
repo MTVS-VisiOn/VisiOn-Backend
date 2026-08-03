@@ -39,6 +39,9 @@ public enum SuccessCode {
     ROUTE_CANCELED("경로가 정상적으로 취소되었습니다."),
     ROUTE_COMPLETED("경로가 정상적으로 완료되었습니다."),
 
+    /*Signalling*/
+    ICE_SERVERS_READ("ICE 서버 정보가 정상적으로 조회되었습니다."),
+
 
     /*common*/
     BUSINESS_SUCCESS("정상적으로 작성되었습니다.");

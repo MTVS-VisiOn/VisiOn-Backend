@@ -30,6 +30,7 @@ public enum ErrorCode {
     FORBIDDEN_WARD(HttpStatus.FORBIDDEN, "피보호자는 권한이 없는 기능입니다."),
     NOT_DELETE_ROOM(HttpStatus.INTERNAL_SERVER_ERROR, "방이 지워지지 않았습니다."),
     INVALID_MESSAGE_TYPE(HttpStatus.BAD_REQUEST, "메세지 타입을 인식할 수 없습니다."),
+    NOT_CREATE_TURN_CREDENTIAL(HttpStatus.INTERNAL_SERVER_ERROR, "TURN 인증 정보를 생성하지 못했습니다."),
 
     /*Presence*/
     NOT_FOUND_CONNECT(HttpStatus.NOT_FOUND, "기기의 연결상태를 찾을 수 없습니다."),
