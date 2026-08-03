@@ -53,7 +53,9 @@ public class UserController implements UserControllerSupporter {
     }
 
     //보호자 계정 정보 조회
+    @Override
     @GetMapping("/guardian/me")
+    @ApiUnauthorized
     public ResponseEntity<ApiResult<GuardianResponse>> getGuardianInfo(@AuthenticationPrincipal CurrentUser currentUser) {
         GuardianResponse response = userService.getGuardianInfo(currentUser);
         return ApiResult.ok(SuccessCode.USER_READ, response);

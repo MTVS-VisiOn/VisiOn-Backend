@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.response.ApiResult;
+import mtvs.onvision.vision.user.dto.GuardianResponse;
 import mtvs.onvision.vision.user.dto.ResisterGuardianResponse;
 import mtvs.onvision.vision.user.dto.SettingRequest;
 import mtvs.onvision.vision.user.dto.SignupRequest;
@@ -216,5 +217,63 @@ public interface UserControllerSupporter {
     @SecurityRequirement(name = "Bearer Authentication")
     ResponseEntity<ApiResult<Void>> updateGuardianSettings(SettingRequest request,
                                                            CurrentUser currentUser);
+
+    @Operation(
+            summary = "보호자 계정 정보 조회",
+            description = "보호자 본인의 계정 정보와 연결된 피보호자 정보를 함께 조회한다",
+            extensions = @Extension(properties = @ExtensionProperty(name = "x-order", value = "4"))
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "계정 정보 조회 성공",
+                    content = {
+                            @Content(
+                                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                                    examples = @ExampleObject(
+                                            value = """
+                                                    {
+                                                        "success": true,
+                                                        "code": "USER_READ",
+                                                        "message": "계정정보가 정상적으로 조회되었습니다.",
+                                                        "data": {
+                                                            "id": 1,
+                                                            "email": "test1@naver.com",
+                                                            "role": "GUARDIAN",
+                                                            "nickname": "test1",
+                                                            "ward": {
+                                                                "id": 2,
+                                                                "nickname": "test2",
+                                                                "phoneNumber": "010-0000-0002"
+                                                            }
+                                                        }
+                                                    }
+                                                    """
+                                    )
+                            )
+                    }
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "계정 또는 보호자-피보호자 관계를 찾을 수 없을 때",
+                    content = {
+                            @Content(
+                                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                                    examples = @ExampleObject(
+                                            value = """
+                                                    {
+                                                        "success": false,
+                                                        "code": "NOT_FOUND_RELATION",
+                                                        "message": "해당하는 relation 을 찾을 수 없습니다.",
+                                                        "data": null
+                                                    }
+                                                    """
+                                    )
+                            )
+                    }
+            )
+    })
+    @SecurityRequirement(name = "Bearer Authentication")
+    ResponseEntity<ApiResult<GuardianResponse>> getGuardianInfo(CurrentUser currentUser);
 
 }
