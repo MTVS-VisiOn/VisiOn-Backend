@@ -84,7 +84,9 @@ public class NavigationController implements NavigationControllerSupporter {
     }
 
     //지도 표시를 위한 경로 조회
+    @Override
     @GetMapping("/map")
+    @ApiUnauthorized
     public ResponseEntity<ApiResult<MapResponse>> getMapRoute(@AuthenticationPrincipal CurrentUser currentUser) {
         MapResponse response = navigationService.getMapRoute(currentUser);
         return ApiResult.ok(SuccessCode.ROUTE_READ, response);
