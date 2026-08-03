@@ -684,8 +684,8 @@ class UserControllerTest {
     }
 
     @Nested
-    @DisplayName("Describe: GET /guardian/me 엔드포인트는")
-    class getGuardianInfo {
+    @DisplayName("Describe: GET /me 엔드포인트는")
+    class getUserInfo {
 
         CurrentUser currentUser = new CurrentUser(userId, email, UserRole.GUARDIAN);
         Long wardId = 2L;
@@ -718,7 +718,7 @@ class UserControllerTest {
 
                 //when-then
                 mockMvc.perform(
-                                get("/api/users/guardian/me")
+                                get("/api/users/me")
                         )
                         .andExpect(status().isOk())
                         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
@@ -748,12 +748,45 @@ class UserControllerTest {
 
                 //when-then
                 mockMvc.perform(
-                                get("/api/users/guardian/me")
+                                get("/api/users/me")
                         )
                         .andExpect(status().isNotFound())
                         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                         .andExpect(jsonPath("$.code").value(ErrorCode.NOT_FOUND_RELATION.name()))
                         .andExpect(jsonPath("$.message").value(ErrorCode.NOT_FOUND_RELATION.getMessage()))
+                        .andDo(print());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 인증된 피보호자가 요청하면")
+        class Context_with_authenticated_ward {
+
+            CurrentUser wardUser = new CurrentUser(wardId, "ward@test.com", UserRole.WARD);
+
+            @BeforeEach
+            void setUpWard() {
+                SecurityContextHolder.getContext().setAuthentication(
+                        new UsernamePasswordAuthenticationToken(wardUser, null, wardUser.getAuthorities()));
+            }
+
+            @Test
+            @DisplayName("It : 200 상태와 ward가 null인 본인 정보를 반환한다")
+            void it_return_200_ok_and_ward_info() throws Exception {
+                //given
+                UserResponse response = new UserResponse(
+                        wardId, "ward@test.com", UserRole.WARD, wardNickname, null);
+                given(userService.getUserInfo(wardUser)).willReturn(response);
+
+                //when-then
+                mockMvc.perform(
+                                get("/api/users/me")
+                        )
+                        .andExpect(status().isOk())
+                        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                        .andExpect(jsonPath("$.data.id").value(wardId))
+                        .andExpect(jsonPath("$.data.role").value(UserRole.WARD.name()))
+                        .andExpect(jsonPath("$.data.ward").doesNotExist())
                         .andDo(print());
             }
         }

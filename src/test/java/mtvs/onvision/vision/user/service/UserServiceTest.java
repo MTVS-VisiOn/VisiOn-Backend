@@ -33,7 +33,9 @@ import java.util.Optional;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -581,8 +583,8 @@ class UserServiceTest {
     }
 
     @Nested
-    @DisplayName("Describe: getGuardianInfo 메서드는")
-    class Describe_with_getGuardianInfo {
+    @DisplayName("Describe: getUserInfo 메서드는")
+    class Describe_with_getUserInfo {
 
         CurrentUser currentUser = new CurrentUser(userId, email, UserRole.GUARDIAN);
         User guardian;
@@ -667,6 +669,30 @@ class UserServiceTest {
                 //when&then
                 BusinessException exception = assertThrows(BusinessException.class, () -> userService.getUserInfo(currentUser));
                 assertThat(exception.getMessage()).isEqualTo(ErrorCode.NOT_FOUND_USER.getMessage());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 호출자가 WARD면")
+        class Context_with_ward_role {
+
+            CurrentUser wardUser = new CurrentUser(wardId, "ward@test.com", UserRole.WARD);
+
+            @Test
+            @DisplayName("It : 관계를 조회하지 않고 ward가 null인 본인 정보만 반환한다")
+            void it_returns_self_without_ward() {
+                //given
+                given(userRepository.findByIdAndDeletedAtIsNull(wardId)).willReturn(Optional.of(ward));
+                //when
+                UserResponse response = userService.getUserInfo(wardUser);
+
+                //then
+                assertThat(response.id()).isEqualTo(wardId);
+                assertThat(response.email()).isEqualTo(ward.getEmail());
+                assertThat(response.role()).isEqualTo(UserRole.WARD);
+                assertThat(response.nickname()).isEqualTo(ward.getNickname());
+                assertThat(response.ward()).isNull();
+                verify(relationRepository, never()).findByGuardianId(anyLong());
             }
         }
     }
