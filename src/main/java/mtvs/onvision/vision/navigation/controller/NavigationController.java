@@ -9,10 +9,7 @@ import mtvs.onvision.vision.common.response.ApiResult;
 import mtvs.onvision.vision.common.response.SuccessCode;
 import mtvs.onvision.vision.common.swagger.ApiUnauthorized;
 import mtvs.onvision.vision.navigation.domain.TransportMode;
-import mtvs.onvision.vision.navigation.dto.NavigationPreRequest;
-import mtvs.onvision.vision.navigation.dto.NavigationSummary;
-import mtvs.onvision.vision.navigation.dto.NavigationResponse;
-import mtvs.onvision.vision.navigation.dto.RouteRequest;
+import mtvs.onvision.vision.navigation.dto.*;
 import mtvs.onvision.vision.navigation.service.NavigationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -84,5 +81,12 @@ public class NavigationController implements NavigationControllerSupporter {
     public ResponseEntity<ApiResult<Void>> cancelRoute(@AuthenticationPrincipal CurrentUser currentUser) {
         navigationService.cancelRoute(currentUser);
         return ApiResult.ok(SuccessCode.ROUTE_CANCELED);
+    }
+
+    //지도 표시를 위한 경로 조회
+    @GetMapping("/map")
+    public ResponseEntity<ApiResult<MapResponse>> getMapRoute(@AuthenticationPrincipal CurrentUser currentUser) {
+        MapResponse response = navigationService.getMapRoute(currentUser);
+        return ApiResult.ok(SuccessCode.ROUTE_READ, response);
     }
 }
