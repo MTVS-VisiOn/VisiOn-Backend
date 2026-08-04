@@ -25,11 +25,13 @@ public class DataInitConfig {
     @Transactional
     CommandLineRunner init() {
         return _ -> {
-            User ward = new User("test@naver.com", passwordEncoder.encode("test1234"),"test", "010-0000-0000" , UserRole.WARD);
-            userRepository.save(ward);
-            User guardian = new User("test1@naver.com", passwordEncoder.encode("test1234"), "test", "010-0000-0001", UserRole.GUARDIAN);
-            userRepository.save(guardian);
-            relationRepository.save(new Relation(ward, guardian));
+            if (userRepository.count() == 0) {
+                User ward = new User("test@naver.com", passwordEncoder.encode("test1234"),"test", "010-0000-0000" , UserRole.WARD);
+                userRepository.save(ward);
+                User guardian = new User("test1@naver.com", passwordEncoder.encode("test1234"), "test", "010-0000-0001", UserRole.GUARDIAN);
+                userRepository.save(guardian);
+                relationRepository.save(new Relation(ward, guardian));
+            }
         };
     }
 
