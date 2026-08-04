@@ -12,8 +12,8 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.response.ApiResult;
-import mtvs.onvision.vision.user.dto.ResisterGuardianResponse;
-import mtvs.onvision.vision.user.dto.SettingRequest;
+import mtvs.onvision.vision.user.dto.UserResponse;
+import mtvs.onvision.vision.user.dto.RegisterGuardianResponse;
 import mtvs.onvision.vision.user.dto.SignupRequest;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -157,7 +157,9 @@ public interface UserControllerSupporter {
                                                         "success": true,
                                                         "code": "REGISTER_TOKEN_CREATED",
                                                         "message": "보호자 등록 토큰이 정상적으로 생성되었습니다.",
-                                                        "data": null
+                                                        "data": {
+                                                            "registerToken": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyIiwiZW1haWwiOiJ0ZXN0MUBuYXZlci5jb20iLCJyb2xlIjoiR1VBUkRJQU4iLCJpYXQiOjE3ODQ2OTc2OTgsImV4cCI6MTc4NDY5ODU5OH0.JdRlH8l-sMTe9Z7QQQmxtLbgT9qNWWkuabcFkw8cpEWVgPGihH8u1HqLofCr80ejBYGA5hIfY6Buzu9-r5IyQA"
+                                                        }
                                                     }
                                                     """
                                     )
@@ -166,36 +168,68 @@ public interface UserControllerSupporter {
             )
     })
     @SecurityRequirement(name = "Bearer Authentication")
-    ResponseEntity<ApiResult<ResisterGuardianResponse>> getGuardianRegisterToken(CurrentUser currentUser);
+    ResponseEntity<ApiResult<RegisterGuardianResponse>> getGuardianRegisterToken(CurrentUser currentUser);
 
     @Operation(
-            summary = "보호자 설정 세팅",
-            description = "보호자의 앱의 경우 알림 설정이 가능",
-            extensions = @Extension(properties = @ExtensionProperty(name = "x-order", value = "3"))
+            summary = "계정 정보 조회",
+            description = """
+                    로그인한 본인의 계정 정보를 조회한다. **역할과 무관하게 같은 경로를 쓴다.**
+
+                    `GUARDIAN`이면 연결된 피보호자 정보가 `ward`에 함께 담기고,
+                    `WARD`이면 `ward`는 **`null`**이다""",
+            extensions = @Extension(properties = @ExtensionProperty(name = "x-order", value = "4"))
     )
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "200",
-                    description = "세팅 성공",
+                    description = "계정 정보 조회 성공",
                     content = {
                             @Content(
                                     mediaType = MediaType.APPLICATION_JSON_VALUE,
-                                    examples = @ExampleObject(
-                                            value = """
-                                                    {
-                                                        "success": true,
-                                                        "code": "SETTING_SUCCESS",
-                                                        "message": "설정이 정상적으로 저장되었습니다.",
-                                                        "data": null
-                                                    }
-                                                    """
-                                    )
+                                    examples = {
+                                            @ExampleObject(
+                                                    name = "보호자(GUARDIAN)",
+                                                    value = """
+                                                            {
+                                                                "success": true,
+                                                                "code": "USER_READ",
+                                                                "message": "계정정보가 정상적으로 조회되었습니다.",
+                                                                "data": {
+                                                                    "id": 1,
+                                                                    "role": "GUARDIAN",
+                                                                    "nickname": "test1",
+                                                                    "ward": {
+                                                                        "id": 2,
+                                                                        "nickname": "test2",
+                                                                        "phoneNumber": "010-0000-0002"
+                                                                    }
+                                                                }
+                                                            }
+                                                            """
+                                            ),
+                                            @ExampleObject(
+                                                    name = "피보호자(WARD)",
+                                                    value = """
+                                                            {
+                                                                "success": true,
+                                                                "code": "USER_READ",
+                                                                "message": "계정정보가 정상적으로 조회되었습니다.",
+                                                                "data": {
+                                                                    "id": 2,
+                                                                    "role": "WARD",
+                                                                    "nickname": "test2",
+                                                                    "ward": null
+                                                                }
+                                                            }
+                                                            """
+                                            )
+                                    }
                             )
                     }
             ),
             @ApiResponse(
-                    responseCode = "400",
-                    description = "요청 형식이 잘못되었을떄(필수 세팅값이 null일때)",
+                    responseCode = "404",
+                    description = "계정 또는 보호자-피보호자 관계를 찾을 수 없을 때",
                     content = {
                             @Content(
                                     mediaType = MediaType.APPLICATION_JSON_VALUE,
@@ -203,8 +237,8 @@ public interface UserControllerSupporter {
                                             value = """
                                                     {
                                                         "success": false,
-                                                        "code": "VALIDATION_FAILED",
-                                                        "message": "필수 설정입니다.",
+                                                        "code": "NOT_FOUND_RELATION",
+                                                        "message": "해당하는 relation 을 찾을 수 없습니다.",
                                                         "data": null
                                                     }
                                                     """
@@ -214,7 +248,6 @@ public interface UserControllerSupporter {
             )
     })
     @SecurityRequirement(name = "Bearer Authentication")
-    ResponseEntity<ApiResult<Void>> updateGuardianSettings(SettingRequest request,
-                                                           CurrentUser currentUser);
+    ResponseEntity<ApiResult<UserResponse>> getUserInfo(CurrentUser currentUser);
 
 }

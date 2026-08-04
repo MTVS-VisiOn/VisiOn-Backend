@@ -99,20 +99,37 @@ public interface LocationControllerSupporter {
                     content = {
                             @Content(
                                     mediaType = MediaType.APPLICATION_JSON_VALUE,
-                                    examples = @ExampleObject(
-                                            value = """
-                                                    {
-                                                        "success": true,
-                                                        "code": "LOCATION_READ",
-                                                        "message": "실시간 위치가 정상적으로 조회되었습니다.",
-                                                        "data": {
-                                                            "isCponnected": true,
-                                                            "lastAddress": "서울특별시 강남구 테헤란로 212 멀티캠퍼스",
-                                                            "status": "도보로 이동중"
-                                                        }
-                                                    }
-                                                    """
-                                    )
+                                    examples = {
+                                            @ExampleObject(
+                                                    name = "최근 위치 있음",
+                                                    value = """
+                                                            {
+                                                                "success": true,
+                                                                "code": "LOCATION_READ",
+                                                                "message": "실시간 위치가 정상적으로 조회되었습니다.",
+                                                                "data": {
+                                                                    "latitude": 37.501274,
+                                                                    "longitude": 127.039585,
+                                                                    "address": "서울특별시 강남구 테헤란로 212 멀티캠퍼스",
+                                                                    "status": "도보로 이동중",
+                                                                    "recordedAt": "2026-08-04T05:32:10.123Z"
+                                                                }
+                                                            }
+                                                            """
+                                            ),
+                                            @ExampleObject(
+                                                    name = "최근 위치 없음",
+                                                    description = "피보호자가 아직 위치를 보내지 않았거나 보관 기한이 지난 경우. 오류가 아니라 200에 data가 null이다",
+                                                    value = """
+                                                            {
+                                                                "success": true,
+                                                                "code": "LOCATION_READ",
+                                                                "message": "실시간 위치가 정상적으로 조회되었습니다.",
+                                                                "data": null
+                                                            }
+                                                            """
+                                            )
+                                    }
                             )
                     }
             ),

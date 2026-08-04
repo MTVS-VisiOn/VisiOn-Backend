@@ -254,6 +254,27 @@ public class NavigationService {
     }
 
 
+    @Transactional(readOnly = true)
+    public MapResponse getMapRoute(CurrentUser currentUser) {
+        Long wardId = userService.getWardIdFromGuardianId(currentUser.getId());
+        Optional<Route> opRoute = routeRepository.findByWardIdAndStatus(wardId, RouteStatus.IN_PROGRESS);
+        if (opRoute.isPresent()) {
+            Route route = opRoute.get();
+            TransportMode mode = route.getMode();
+            String json = route.getReport();
+            if (mode.equals(TransportMode.WALK) || mode.equals(TransportMode.CAR)) {
+                NavigationRouteReport report = objectMapper.readValue(json, NavigationRouteReport.class);
+                return MapResponse.from(report, mode, route.getCreatedAt());
+            } else {
+                //대중교통일때
+                TransitRoute report = objectMapper.readValue(json, TransitRoute.class);
+                return MapResponse.from(report, route.getCreatedAt());
+            }
+        }
+        else return null;
+    }
+
+
 
     private @NonNull MultiValueMap<String, String> getStringStringMultiValueMap(NavigationPreRequest request, TransportMode mode) {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();

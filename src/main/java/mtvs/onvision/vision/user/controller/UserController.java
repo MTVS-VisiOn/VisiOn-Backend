@@ -9,9 +9,9 @@ import mtvs.onvision.vision.common.response.ApiResult;
 import mtvs.onvision.vision.common.response.SuccessCode;
 import mtvs.onvision.vision.common.swagger.ApiUnauthorized;
 import mtvs.onvision.vision.user.domain.UserRole;
-import mtvs.onvision.vision.user.dto.ResisterGuardianResponse;
-import mtvs.onvision.vision.user.dto.SettingRequest;
+import mtvs.onvision.vision.user.dto.RegisterGuardianResponse;
 import mtvs.onvision.vision.user.dto.SignupRequest;
+import mtvs.onvision.vision.user.dto.UserResponse;
 import mtvs.onvision.vision.user.service.UserService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -37,17 +37,17 @@ public class UserController implements UserControllerSupporter {
     @Override
     @GetMapping("/guardian/register-token")
     @ApiUnauthorized
-    public ResponseEntity<ApiResult<ResisterGuardianResponse>> getGuardianRegisterToken(@AuthenticationPrincipal CurrentUser currentUser) {
-        ResisterGuardianResponse response = userService.getGuardianRegisterToken(currentUser);
+    public ResponseEntity<ApiResult<RegisterGuardianResponse>> getGuardianRegisterToken(@AuthenticationPrincipal CurrentUser currentUser) {
+        RegisterGuardianResponse response = userService.getGuardianRegisterToken(currentUser);
         return ApiResult.ok(SuccessCode.REGISTER_TOKEN_CREATED, response);
     }
 
+    //보호자 계정 정보 조회
     @Override
-    @PutMapping("/settings")
+    @GetMapping("/me")
     @ApiUnauthorized
-    public ResponseEntity<ApiResult<Void>> updateGuardianSettings(@RequestBody @Valid SettingRequest request,
-                                                                  @AuthenticationPrincipal CurrentUser currentUser) {
-        userService.updateGuardianSettings(request, currentUser);
-        return ApiResult.ok(SuccessCode.SETTING_SUCCESS);
+    public ResponseEntity<ApiResult<UserResponse>> getUserInfo(@AuthenticationPrincipal CurrentUser currentUser) {
+        UserResponse response = userService.getUserInfo(currentUser);
+        return ApiResult.ok(SuccessCode.USER_READ, response);
     }
 }

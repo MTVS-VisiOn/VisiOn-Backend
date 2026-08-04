@@ -43,12 +43,11 @@ public class LocationService {
 
     public LastLocationResponse getLastLocation(CurrentUser currentUser) {
         Long wardId = userService.getWardIdFromGuardianId(currentUser.getId());
-        boolean isConnected = presenceService.getIsConnected(wardId);
-        // 연결 상태가 아니라면 현재 위치를 내보낼 수 없음
-        if (!isConnected) return new LastLocationResponse(false, null, MovementStatus.UNKNOWN.getMessage());
         //좌표 구하기
-        String json  = realtimeLocationRepository.getLastLocation(wardId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_LAST_LOCATION));
-        LocationReport report = objectMapper.readValue(json, LocationReport.class);
+        Optional<String> json  = realtimeLocationRepository.getLastLocation(wardId);
+        if (json.isEmpty()) return null;
+
+        LocationReport report = objectMapper.readValue(json.get(), LocationReport.class);
         Double latitude = report.latitude();
         Double longitude = report.longitude();
 
@@ -67,7 +66,7 @@ public class LocationService {
         String presentAddress = res.addressInfo().fullAddress();
         String roadAddress = presentAddress.substring(presentAddress.lastIndexOf(",") + 1);
 
-        return new LastLocationResponse(true, roadAddress, report.status().getMessage());
+        return new LastLocationResponse(latitude, longitude, roadAddress, report.status().getMessage() ,report.recordedAt());
     }
 
 
@@ -99,11 +98,6 @@ public class LocationService {
 
     //이동 상태 판별하기
     private MovementStatus classifyMovement(LocationRequest report, Long wardId) {
-        // speed가 있으면 그걸로 판별
-        Float mps = report.speed();
-        if (mps != null) return bySpeed(mps);
-
-        //없으면 직접 판별
         Optional<String> preJson  = realtimeLocationRepository.getLastLocation(wardId);
         if (preJson.isEmpty()) return MovementStatus.UNKNOWN;
 

@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.response.ApiResult;
+import mtvs.onvision.vision.navigation.dto.MapResponse;
 import mtvs.onvision.vision.navigation.dto.NavigationPreRequest;
 import mtvs.onvision.vision.navigation.dto.NavigationResponse;
 import mtvs.onvision.vision.navigation.dto.NavigationSummary;
@@ -1044,4 +1045,105 @@ public interface NavigationControllerSupporter {
             )
     })
     ResponseEntity<ApiResult<Void>> cancelRoute(CurrentUser currentUser);
+
+    @Operation(
+            summary = "지도 표시용 경로 조회",
+            description = """
+                    보호자 화면의 지도에 목적지와 경로선을 그리기 위한 조회 API.
+
+                    `/processing`과 달리 턴바이턴 안내 정보를 빼고 **지도에 필요한 값만** 내보낸다.
+                    `path`는 구간별 좌표를 하나로 이어붙인 것이며 `{latitude, longitude}` 객체 배열이다.
+
+                    **진행 중인 경로가 없으면 404가 아니라 `data: null`이다.** 목적지 미설정은 오류가 아니다.
+
+                    거리·시간은 **경로를 저장한 시점의 전체 값**이다. 이동한 만큼 줄어들지 않는다""",
+            extensions = @Extension(properties = @ExtensionProperty(name = "x-order", value = "7"))
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "조회 성공",
+                    content = {
+                            @Content(
+                                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                                    examples = {
+                                            @ExampleObject(
+                                                    name = "진행 중인 경로가 있을 때",
+                                                    value = """
+                                                            {
+                                                                "success": true,
+                                                                "code": "ROUTE_READ",
+                                                                "message": "경로가 정상적으로 조회되었습니다.",
+                                                                "data": {
+                                                                    "name": "말죽거리공원사거리",
+                                                                    "address": "서울 서초구 강남대로 213",
+                                                                    "latitude": 37.479103,
+                                                                    "longitude": 127.037476,
+                                                                    "distanceM": 24269,
+                                                                    "etaMin": 360,
+                                                                    "departureTime": "2026-08-03T07:08:00Z",
+                                                                    "mode": "WALK",
+                                                                    "path": [
+                                                                        { "latitude": 37.504585, "longitude": 127.024798 },
+                                                                        { "latitude": 37.503900, "longitude": 127.025200 }
+                                                                    ]
+                                                                }
+                                                            }
+                                                            """
+                                            ),
+                                            @ExampleObject(
+                                                    name = "진행 중인 경로가 없을 때",
+                                                    value = """
+                                                            {
+                                                                "success": true,
+                                                                "code": "ROUTE_READ",
+                                                                "message": "경로가 정상적으로 조회되었습니다.",
+                                                                "data": null
+                                                            }
+                                                            """
+                                            )
+                                    }
+                            )
+                    }
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "피보호자 권한으로 실행했을때",
+                    content = {
+                            @Content(
+                                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                                    examples = @ExampleObject(
+                                            value = """
+                                                    {
+                                                        "success": false,
+                                                        "code": "ACCESS_DENIED",
+                                                        "message": "권한이 없습니다.",
+                                                        "data": null
+                                                    }
+                                                    """
+                                    )
+                            )
+                    }
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "보호자-피보호자 관계를 찾을 수 없을때",
+                    content = {
+                            @Content(
+                                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                                    examples = @ExampleObject(
+                                            value = """
+                                                    {
+                                                        "success": false,
+                                                        "code": "NOT_FOUND_RELATION",
+                                                        "message": "해당하는 relation 을 찾을 수 없습니다.",
+                                                        "data": null
+                                                    }
+                                                    """
+                                    )
+                            )
+                    }
+            )
+    })
+    ResponseEntity<ApiResult<MapResponse>> getMapRoute(CurrentUser currentUser);
 }

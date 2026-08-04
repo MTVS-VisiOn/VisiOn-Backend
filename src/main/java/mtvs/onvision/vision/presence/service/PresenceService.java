@@ -34,7 +34,7 @@ public class PresenceService {
         Optional<String> json = presenceRepository.getLastHeartbeat(wardId);
         //상태값 없으면 연경x
         if (json.isEmpty())
-            return new PresenceResponse(null, false, PresenceType.NOT_FOUND.getDescription());
+            return new PresenceResponse(null, false, false,  PresenceType.NOT_FOUND.getDescription());
         //있으면 연결상태 판별
         //마지막 동기화 시간이 2분 이내 인지와 네트워크가 연결된 상태인지 확인
         HeartbeatRequest heartbeat = objectMapper.readValue(json.get(), HeartbeatRequest.class);
@@ -48,7 +48,7 @@ public class PresenceService {
             if (networkConnected) status = PresenceType.NOT_NETWORK;
             else status = PresenceType.NOT_FOUND;
         }
-        return new PresenceResponse(heartbeat.battery(),  heartbeat.deviceConnected(), status.getDescription());
+        return new PresenceResponse(heartbeat.battery(),  heartbeat.deviceConnected(), networkConnected, status.getDescription());
     }
 
     public boolean getIsConnected(Long wardId) {
