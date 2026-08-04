@@ -13,6 +13,7 @@
 - [ ] Favorite
 - [x] Route
 - [ ] Location
+- [ ] Signal
 - [ ] Call
 - [ ] VoiceInstruction
 - [ ] AlertEvent
