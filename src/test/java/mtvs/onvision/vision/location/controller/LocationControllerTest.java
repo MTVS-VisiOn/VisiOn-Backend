@@ -80,7 +80,7 @@ class LocationControllerTest {
     }
 
     private LocationRequest request(Double latitude, Double longitude) {
-        return new LocationRequest(latitude, longitude, 12.5f, 1.4f, Instant.now());
+        return new LocationRequest(latitude, longitude, 12.5f, Instant.now());
     }
 
     @Nested
@@ -109,11 +109,11 @@ class LocationControllerTest {
             }
 
             @Test
-            @DisplayName("(accuracy와 speed가 없어도)It : 201 상태를 반환한다")
+            @DisplayName("(accuracy가 없어도)It : 201 상태를 반환한다")
             void it_return_201_created_without_nullable_fields() throws Exception {
                 //given
                 LocationRequest request =
-                        new LocationRequest(37.501274, 127.039585, null, null, Instant.now());
+                        new LocationRequest(37.501274, 127.039585, null, Instant.now());
 
                 //when-then
                 mockMvc.perform(
@@ -198,7 +198,7 @@ class LocationControllerTest {
             void it_return_400_badRequest_and_recorded_at_not_null() throws Exception {
                 //given
                 LocationRequest request =
-                        new LocationRequest(37.501274, 127.039585, 12.5f, 1.4f, null);
+                        new LocationRequest(37.501274, 127.039585, 12.5f, null);
 
                 //when-then
                 mockMvc.perform(
@@ -219,15 +219,16 @@ class LocationControllerTest {
     class getLastLocation {
 
         @Nested
-        @DisplayName("Context: 피보호자가 연결 상태이면")
-        class Context_with_connected_ward {
+        @DisplayName("Context: 최근 위치가 존재하면")
+        class Context_with_available_last_location {
 
             @Test
-            @DisplayName("It : 200 상태와 주소, 이동 상태를 반환한다")
+            @DisplayName("It : 200 상태와 좌표, 주소, 이동 상태, 측정 시각을 반환한다")
             void it_return_200_ok_and_last_location() throws Exception {
                 //given
                 LastLocationResponse response = new LastLocationResponse(
-                        true, "경기도 부천시 원미구 부일로 123", MovementStatus.ON_FOOT.getMessage());
+                        37.501274, 127.039585, "경기도 부천시 원미구 부일로 123",
+                        MovementStatus.ON_FOOT.getMessage(), Instant.parse("2026-08-04T05:32:10.123Z"));
                 given(locationService.getLastLocation(any(CurrentUser.class))).willReturn(response);
 
                 //when-then
@@ -238,32 +239,11 @@ class LocationControllerTest {
                         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                         .andExpect(jsonPath("$.code").value(SuccessCode.LOCATION_READ.name()))
                         .andExpect(jsonPath("$.message").value(SuccessCode.LOCATION_READ.getSuccessMessage()))
-                        .andExpect(jsonPath("$.data.lastAddress").value("경기도 부천시 원미구 부일로 123"))
+                        .andExpect(jsonPath("$.data.latitude").value(37.501274))
+                        .andExpect(jsonPath("$.data.longitude").value(127.039585))
+                        .andExpect(jsonPath("$.data.address").value("경기도 부천시 원미구 부일로 123"))
                         .andExpect(jsonPath("$.data.status").value(MovementStatus.ON_FOOT.getMessage()))
-                        .andDo(print());
-            }
-        }
-
-        @Nested
-        @DisplayName("Context: 피보호자가 연결 상태가 아니면")
-        class Context_with_disconnected_ward {
-
-            @Test
-            @DisplayName("It : 200 상태와 주소 없는 응답을 반환한다")
-            void it_return_200_ok_and_empty_address() throws Exception {
-                //given
-                LastLocationResponse response =
-                        new LastLocationResponse(false, null, MovementStatus.UNKNOWN.getMessage());
-                given(locationService.getLastLocation(any(CurrentUser.class))).willReturn(response);
-
-                //when-then
-                mockMvc.perform(
-                                get("/api/locations")
-                        )
-                        .andExpect(status().isOk())
-                        .andExpect(jsonPath("$.code").value(SuccessCode.LOCATION_READ.name()))
-                        .andExpect(jsonPath("$.data.lastAddress").doesNotExist())
-                        .andExpect(jsonPath("$.data.status").value(MovementStatus.UNKNOWN.getMessage()))
+                        .andExpect(jsonPath("$.data.recordedAt").exists())
                         .andDo(print());
             }
         }
@@ -273,21 +253,20 @@ class LocationControllerTest {
         class Context_with_no_last_location {
 
             @Test
-            @DisplayName("It : 404 상태와 NOT_FOUND_LAST_LOCATION을 반환한다")
-            void it_return_404_not_found_and_no_last_location() throws Exception {
-                //given
-                doThrow(new BusinessException(ErrorCode.NOT_FOUND_LAST_LOCATION))
-                        .when(locationService)
-                        .getLastLocation(any(CurrentUser.class));
+            @DisplayName("It : 200 상태와 data가 null인 응답을 반환한다")
+            void it_return_200_ok_and_null_data() throws Exception {
+                //given : 위치가 없는 것은 오류가 아니다
+                given(locationService.getLastLocation(any(CurrentUser.class))).willReturn(null);
 
                 //when-then
                 mockMvc.perform(
                                 get("/api/locations")
                         )
-                        .andExpect(status().isNotFound())
+                        .andExpect(status().isOk())
                         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                        .andExpect(jsonPath("$.code").value(ErrorCode.NOT_FOUND_LAST_LOCATION.name()))
-                        .andExpect(jsonPath("$.message").value(ErrorCode.NOT_FOUND_LAST_LOCATION.getMessage()))
+                        .andExpect(jsonPath("$.code").value(SuccessCode.LOCATION_READ.name()))
+                        .andExpect(jsonPath("$.message").value(SuccessCode.LOCATION_READ.getSuccessMessage()))
+                        .andExpect(jsonPath("$.data").doesNotExist())
                         .andDo(print());
             }
         }

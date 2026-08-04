@@ -104,6 +104,7 @@ class PresenceServiceTest {
                 //then
                 assertThat(response.battery()).isNull();
                 assertThat(response.deviceConnected()).isFalse();
+                assertThat(response.deviceNetwork()).isFalse();
                 assertThat(response.status()).isEqualTo(PresenceType.NOT_FOUND.getDescription());
             }
         }
@@ -127,6 +128,7 @@ class PresenceServiceTest {
                 //then
                 assertThat(response.battery()).isEqualTo(77);
                 assertThat(response.deviceConnected()).isTrue();
+                assertThat(response.deviceNetwork()).isTrue();
                 assertThat(response.status()).isEqualTo(PresenceType.NORMAL.getDescription());
             }
         }
@@ -147,7 +149,9 @@ class PresenceServiceTest {
                 //when
                 PresenceResponse response = presenceService.getWardPresence(guardian);
 
-                //then
+                //then : deviceConnected(Quest↔폰)는 살아 있고 deviceNetwork(Quest↔인터넷)만 끊긴 상태
+                assertThat(response.deviceConnected()).isTrue();
+                assertThat(response.deviceNetwork()).isFalse();
                 assertThat(response.status()).isEqualTo(PresenceType.NOT_NETWORK.getDescription());
             }
         }

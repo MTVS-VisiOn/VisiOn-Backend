@@ -36,13 +36,6 @@ public record LocationRequest(
         )
         Float accuracy,           // 위치 정확도(m), 반경 오차, nullable
 
-        @PositiveOrZero(message = "속도(m/s) 값은 0이상의 양수입니다.")
-        @Schema(
-                examples = "1.8",
-                description = "속도(m/s), 0이상의 양수"
-        )
-        Float speed,              // 속도(m/s), nullable
-
         @NotNull(message = "측정 시각은 필수값입니다.")
         @Schema(
                 examples = "2026-07-26T14:32:10.123Z",

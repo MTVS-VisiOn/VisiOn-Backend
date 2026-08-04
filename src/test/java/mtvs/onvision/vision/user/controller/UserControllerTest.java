@@ -21,8 +21,8 @@ import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.common.filter.JwtAuthenticationFilter;
 import mtvs.onvision.vision.common.response.SuccessCode;
 import mtvs.onvision.vision.user.domain.UserRole;
-import mtvs.onvision.vision.user.dto.ResisterGuardianResponse;
-import mtvs.onvision.vision.user.dto.SettingRequest;
+import mtvs.onvision.vision.user.dto.UserResponse;
+import mtvs.onvision.vision.user.dto.RegisterGuardianResponse;
 import mtvs.onvision.vision.user.dto.SignupRequest;
 import mtvs.onvision.vision.user.service.UserService;
 import tools.jackson.databind.ObjectMapper;
@@ -34,7 +34,6 @@ import static org.mockito.Mockito.doThrow;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -561,7 +560,7 @@ class UserControllerTest {
             void it_return_200_ok_and_register_token() throws Exception {
                 //given
                 given(userService.getGuardianRegisterToken(currentUser))
-                        .willReturn(new ResisterGuardianResponse(registerToken));
+                        .willReturn(new RegisterGuardianResponse(registerToken));
 
                 //when-then
                 mockMvc.perform(
@@ -571,18 +570,20 @@ class UserControllerTest {
                         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                         .andExpect(jsonPath("$.code").value(SuccessCode.REGISTER_TOKEN_CREATED.name()))
                         .andExpect(jsonPath("$.message").value(SuccessCode.REGISTER_TOKEN_CREATED.getSuccessMessage()))
-                        .andExpect(jsonPath("$.data.token").value(registerToken))
+                        .andExpect(jsonPath("$.data.registerToken").value(registerToken))
                         .andDo(print());
             }
         }
     }
 
     @Nested
-    @DisplayName("Describe: PUT /settings 엔드포인트는")
-    class updateGuardianSettings {
+    @DisplayName("Describe: GET /me 엔드포인트는")
+    class getUserInfo {
 
         CurrentUser currentUser = new CurrentUser(userId, email, UserRole.GUARDIAN);
-        SettingRequest request;
+        Long wardId = 2L;
+        String wardNickname = "피보호자";
+        String wardPhoneNumber = "010-9999-8888";
 
         @BeforeEach
         void setUp() {
@@ -596,87 +597,89 @@ class UserControllerTest {
         }
 
         @Nested
-        @DisplayName("Context: 올바른 설정값이 주어지면")
-        class Context_with_valid_setting {
-            @BeforeEach
-            void setUpRequest() {
-                request = new SettingRequest(true, false);
-            }
+        @DisplayName("Context: 인증된 보호자가 요청하면")
+        class Context_with_authenticated_guardian {
 
             @Test
-            @DisplayName("It : 200 상태와 성공 메시지를 반환한다")
-            void it_return_200_ok_and_success_message() throws Exception {
+            @DisplayName("It : 200 상태와 보호자·피보호자 정보를 반환한다")
+            void it_return_200_ok_and_guardian_info() throws Exception {
                 //given
-                doNothing().when(userService).updateGuardianSettings(eq(request), eq(currentUser));
+                UserResponse response = new UserResponse(
+                        userId, UserRole.GUARDIAN, nickname,
+                        new UserResponse.WardInfo(wardId, wardNickname, wardPhoneNumber));
+                given(userService.getUserInfo(currentUser)).willReturn(response);
 
                 //when-then
                 mockMvc.perform(
-                                put("/api/users/settings")
-                                        .with(csrf())
-                                        .contentType(MediaType.APPLICATION_JSON)
-                                        .content(om.writeValueAsString(request))
+                                get("/api/users/me")
                         )
                         .andExpect(status().isOk())
                         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                        .andExpect(jsonPath("$.code").value(SuccessCode.SETTING_SUCCESS.name()))
-                        .andExpect(jsonPath("$.message").value(SuccessCode.SETTING_SUCCESS.getSuccessMessage()))
+                        .andExpect(jsonPath("$.code").value(SuccessCode.USER_READ.name()))
+                        .andExpect(jsonPath("$.message").value(SuccessCode.USER_READ.getSuccessMessage()))
+                        .andExpect(jsonPath("$.data.id").value(userId))
+                        .andExpect(jsonPath("$.data.email").doesNotExist())
+                        .andExpect(jsonPath("$.data.role").value(UserRole.GUARDIAN.name()))
+                        .andExpect(jsonPath("$.data.nickname").value(nickname))
+                        .andExpect(jsonPath("$.data.ward.id").value(wardId))
+                        .andExpect(jsonPath("$.data.ward.nickname").value(wardNickname))
+                        .andExpect(jsonPath("$.data.ward.phoneNumber").value(wardPhoneNumber))
                         .andDo(print());
             }
         }
 
         @Nested
-        @DisplayName("Context: 필수 설정값이 null이면")
-        class Context_with_null_setting {
-            @BeforeEach
-            void setUpRequest() {
-                request = new SettingRequest(null, false);
-            }
+        @DisplayName("Context: 보호자의 관계가 존재하지 않으면")
+        class Context_with_no_relation {
 
             @Test
-            @DisplayName("It : 400 상태와 검증 실패 이유를 반환한다")
-            void it_return_400_badRequest_and_setting_not_null() throws Exception {
-                //when-then
-                mockMvc.perform(
-                                put("/api/users/settings")
-                                        .with(csrf())
-                                        .contentType(MediaType.APPLICATION_JSON)
-                                        .content(om.writeValueAsString(request))
-                        )
-                        .andExpect(status().isBadRequest())
-                        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                        .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()))
-                        .andExpect(jsonPath("$.message").value("필수 설정입니다."))
-                        .andDo(print());
-            }
-        }
-
-        @Nested
-        @DisplayName("Context: 로그인한 보호자의 관계가 존재하지 않으면")
-        class Context_with_relation_not_found {
-            @BeforeEach
-            void setUpRequest() {
-                request = new SettingRequest(true, false);
-            }
-
-            @Test
-            @DisplayName("It : 404 상태와 NOT_FOUND_GUARDIAN을 반환한다")
-            void it_return_404_not_found_and_no_guardian() throws Exception {
+            @DisplayName("It : 404 상태와 NOT_FOUND_RELATION을 반환한다")
+            void it_return_404_not_found_and_no_relation() throws Exception {
                 //given
-                doThrow(new BusinessException(ErrorCode.NOT_FOUND_GUARDIAN))
-                        .when(userService)
-                        .updateGuardianSettings(eq(request), eq(currentUser));
+                given(userService.getUserInfo(currentUser))
+                        .willThrow(new BusinessException(ErrorCode.NOT_FOUND_RELATION));
 
                 //when-then
                 mockMvc.perform(
-                                put("/api/users/settings")
-                                        .with(csrf())
-                                        .contentType(MediaType.APPLICATION_JSON)
-                                        .content(om.writeValueAsString(request))
+                                get("/api/users/me")
                         )
                         .andExpect(status().isNotFound())
                         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                        .andExpect(jsonPath("$.code").value(ErrorCode.NOT_FOUND_GUARDIAN.name()))
-                        .andExpect(jsonPath("$.message").value(ErrorCode.NOT_FOUND_GUARDIAN.getMessage()))
+                        .andExpect(jsonPath("$.code").value(ErrorCode.NOT_FOUND_RELATION.name()))
+                        .andExpect(jsonPath("$.message").value(ErrorCode.NOT_FOUND_RELATION.getMessage()))
+                        .andDo(print());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 인증된 피보호자가 요청하면")
+        class Context_with_authenticated_ward {
+
+            CurrentUser wardUser = new CurrentUser(wardId, "ward@test.com", UserRole.WARD);
+
+            @BeforeEach
+            void setUpWard() {
+                SecurityContextHolder.getContext().setAuthentication(
+                        new UsernamePasswordAuthenticationToken(wardUser, null, wardUser.getAuthorities()));
+            }
+
+            @Test
+            @DisplayName("It : 200 상태와 ward가 null인 본인 정보를 반환한다")
+            void it_return_200_ok_and_ward_info() throws Exception {
+                //given
+                UserResponse response = new UserResponse(
+                        wardId, UserRole.WARD, wardNickname, null);
+                given(userService.getUserInfo(wardUser)).willReturn(response);
+
+                //when-then
+                mockMvc.perform(
+                                get("/api/users/me")
+                        )
+                        .andExpect(status().isOk())
+                        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                        .andExpect(jsonPath("$.data.id").value(wardId))
+                        .andExpect(jsonPath("$.data.role").value(UserRole.WARD.name()))
+                        .andExpect(jsonPath("$.data.ward").doesNotExist())
                         .andDo(print());
             }
         }

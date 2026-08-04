@@ -21,10 +21,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -548,6 +551,204 @@ class NavigationServiceTest {
                 BusinessException exception = assertThrows(BusinessException.class,
                         () -> navigationService.cancelRoute(ward));
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.NOT_FOUND_ROUTE);
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Describe: getMapRoute 메서드는")
+    class Describe_with_getMapRoute {
+
+        /** 감사 리스너가 안 도는 단위 테스트라 createdAt을 직접 넣어야 한다. null이면 시간대 변환에서 NPE다 */
+        private final LocalDateTime departedAt = LocalDateTime.of(2026, 8, 3, 16, 8);
+
+        /** step 두 개에 좌표 두 개씩. 이어붙인 결과가 4개여야 flatMap이 제대로 편 것이다 */
+        private String walkReportJsonWithPath() {
+            return fixtureMapper.writeValueAsString(new NavigationRouteReport(
+                    walkSummary(),
+                    List.of(
+                            new RouteStep(0, 37.504585, 127.024798, "55m 이동",
+                                    null, "출발지", null, 55, 40, 0,
+                                    List.of(List.of(37.504585, 127.024798), List.of(37.504562, 127.024810))),
+                            new RouteStep(1, 37.504100, 127.025000, "직진",
+                                    null, "일반 안내점", null, 60, 45, 55,
+                                    List.of(List.of(37.504100, 127.025000), List.of(37.503900, 127.025200))))));
+        }
+
+        /** 도보 leg : passShape이 없어 path가 비고, 좌표는 steps 안에 있다 */
+        private TransitRoute.TransitLeg walkLeg() {
+            return new TransitRoute.TransitLeg(
+                    0, "WALK", null, null, null, null, List.of(), 120, 100, null,
+                    "신논현역", List.of(37.504585, 127.024798),
+                    "신논현역.(구)교보타워사거리", List.of(37.504000, 127.025000),
+                    List.of(),
+                    List.of(new TransitRoute.TransitStep(0, "직진", 100, "강남대로",
+                            List.of(List.of(37.504585, 127.024798), List.of(37.504300, 127.024900)))),
+                    List.of());
+        }
+
+        /** 대중교통 leg : path에 좌표가 있고 steps는 비어 있다 */
+        private TransitRoute.TransitLeg busLeg() {
+            return new TransitRoute.TransitLeg(
+                    1, "BUS", "광역:9711", "1234", 11, "0068B7", List.of("광역:9711"), 564, 2955, 2900,
+                    "신논현역.(구)교보타워사거리", List.of(37.504000, 127.025000),
+                    "교육개발원입구", List.of(37.479103, 127.037476),
+                    List.of(), List.of(),
+                    List.of(List.of(37.504000, 127.025000), List.of(37.479103, 127.037476)));
+        }
+
+        private String transitReportJson() {
+            return fixtureMapper.writeValueAsString(
+                    new TransitRoute(transitSummary(0), List.of(walkLeg(), busLeg())));
+        }
+
+        private Route route(TransportMode mode, NavigationSummary summary, String json) {
+            Route route = new Route(mode, summary, json, wardEntity);
+            ReflectionTestUtils.setField(route, "createdAt", departedAt);
+            return route;
+        }
+
+        @Nested
+        @DisplayName("Context: 진행 중인 경로가 없으면")
+        class Context_without_route {
+
+            @Test
+            @DisplayName("It : 예외가 아니라 null을 반환한다")
+            void it_returns_null() {
+                //given : 목적지 미설정은 오류가 아니다. 프론트가 data:null을 '정보 없음'으로 읽는다
+                given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
+                given(routeRepository.findByWardIdAndStatus(wardId, RouteStatus.IN_PROGRESS))
+                        .willReturn(Optional.empty());
+
+                //when
+                MapResponse response = navigationService.getMapRoute(guardian);
+
+                //then
+                assertThat(response).isNull();
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 호출자가 GUARDIAN이면")
+        class Context_with_guardian {
+
+            @Test
+            @DisplayName("It : 본인이 아니라 피보호자의 경로를 조회한다")
+            void it_reads_ward_route() {
+                //given
+                given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
+                given(routeRepository.findByWardIdAndStatus(wardId, RouteStatus.IN_PROGRESS))
+                        .willReturn(Optional.of(route(TransportMode.WALK, walkSummary(), walkReportJsonWithPath())));
+
+                //when
+                navigationService.getMapRoute(guardian);
+
+                //then
+                verify(routeRepository).findByWardIdAndStatus(wardId, RouteStatus.IN_PROGRESS);
+                verify(routeRepository, never()).findByWardIdAndStatus(guardianId, RouteStatus.IN_PROGRESS);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 보행 경로가 진행 중이면")
+        class Context_with_walk_route {
+
+            private MapResponse call() {
+                given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
+                given(routeRepository.findByWardIdAndStatus(wardId, RouteStatus.IN_PROGRESS))
+                        .willReturn(Optional.of(route(TransportMode.WALK, walkSummary(), walkReportJsonWithPath())));
+                return navigationService.getMapRoute(guardian);
+            }
+
+            @Test
+            @DisplayName("It : 목적지 정보를 내보낸다")
+            void it_returns_destination() {
+                //when
+                MapResponse response = call();
+
+                //then
+                assertThat(response.name()).isEqualTo("말죽거리공원사거리");
+                assertThat(response.address()).isEqualTo("서울 서초구 강남대로 213");
+                assertThat(response.latitude()).isEqualTo(37.479103);
+                assertThat(response.longitude()).isEqualTo(127.037476);
+                assertThat(response.mode()).isEqualTo(TransportMode.WALK);
+            }
+
+            @Test
+            @DisplayName("(초가 아니라 분)It : totalTime을 60으로 나눠 etaMin으로 내보낸다")
+            void it_converts_seconds_to_minutes() {
+                //when : TMap totalTime은 초 단위다. 그대로 내보내면 21600분이 된다
+                MapResponse response = call();
+
+                //then
+                assertThat(response.distanceM()).isEqualTo(24269);
+                assertThat(response.etaMin()).isEqualTo(360);
+            }
+
+            @Test
+            @DisplayName("(안내 지점이 아니라 도로)It : step의 pathToNext를 전부 이어붙인다")
+            void it_flattens_path_to_next() {
+                //when : RouteStep의 latitude/longitude만 쓰면 턴 지점을 직선으로 이은 선이 된다
+                MapResponse response = call();
+
+                //then
+                assertThat(response.path()).hasSize(4);
+                assertThat(response.path().getFirst())
+                        .containsEntry("latitude", 37.504585)
+                        .containsEntry("longitude", 127.024798);
+                assertThat(response.path().getLast())
+                        .containsEntry("latitude", 37.503900)
+                        .containsEntry("longitude", 127.025200);
+            }
+
+            @Test
+            @DisplayName("It : createdAt을 시스템 시간대로 해석해 Instant로 내보낸다")
+            void it_converts_created_at_to_instant() {
+                //when : LocalDateTime을 UTC로 단정하면 개발 PC(KST)에서 9시간 어긋난다
+                MapResponse response = call();
+
+                //then
+                assertThat(response.departureTime())
+                        .isEqualTo(departedAt.atZone(ZoneId.systemDefault()).toInstant());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 대중교통 경로가 진행 중이면")
+        class Context_with_transit_route {
+
+            private MapResponse call() {
+                given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
+                given(routeRepository.findByWardIdAndStatus(wardId, RouteStatus.IN_PROGRESS))
+                        .willReturn(Optional.of(route(TransportMode.TRANSIT, transitSummary(0), transitReportJson())));
+                return navigationService.getMapRoute(guardian);
+            }
+
+            @Test
+            @DisplayName("It : mode를 TRANSIT으로 내보낸다")
+            void it_returns_transit_mode() {
+                //when
+                MapResponse response = call();
+
+                //then
+                assertThat(response.mode()).isEqualTo(TransportMode.TRANSIT);
+                assertThat(response.etaMin()).isEqualTo(15);
+            }
+
+            @Test
+            @DisplayName("(도보는 steps · 대중교통은 path)It : leg마다 다른 자리에서 좌표를 모은다")
+            void it_collects_path_from_both_places() {
+                //when : 도보 leg은 passShape이 없어 path가 비고 좌표가 steps 안에 있다
+                MapResponse response = call();
+
+                //then : 도보 2개 + 버스 2개
+                assertThat(response.path()).hasSize(4);
+                assertThat(response.path().getFirst())
+                        .containsEntry("latitude", 37.504585)
+                        .containsEntry("longitude", 127.024798);
+                assertThat(response.path().getLast())
+                        .containsEntry("latitude", 37.479103)
+                        .containsEntry("longitude", 127.037476);
             }
         }
     }

@@ -41,3 +41,8 @@ out/
 .env.dev
 .env.prod
 .env.test
+
+### 로컬 테스트 도구 (커밋 금지) ###
+# 시그널링 수동 테스트 페이지. SecurityConfig 가 permitAll 로 끝나므로
+# 커밋되면 배포 환경에서 누구나 접근 가능해진다.
+src/main/resources/static/signal-test.html

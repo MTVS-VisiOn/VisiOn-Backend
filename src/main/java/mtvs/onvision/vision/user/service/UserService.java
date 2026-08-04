@@ -10,9 +10,9 @@ import mtvs.onvision.vision.common.util.PreConditions;
 import mtvs.onvision.vision.user.domain.Relation;
 import mtvs.onvision.vision.user.domain.User;
 import mtvs.onvision.vision.user.domain.UserRole;
-import mtvs.onvision.vision.user.dto.ResisterGuardianResponse;
-import mtvs.onvision.vision.user.dto.SettingRequest;
+import mtvs.onvision.vision.user.dto.RegisterGuardianResponse;
 import mtvs.onvision.vision.user.dto.SignupRequest;
+import mtvs.onvision.vision.user.dto.UserResponse;
 import mtvs.onvision.vision.user.repository.RegisterTokenRepository;
 import mtvs.onvision.vision.user.repository.RelationRepository;
 import mtvs.onvision.vision.user.repository.UserRepository;
@@ -59,21 +59,15 @@ public class UserService implements UserDetailsService {
     }
 
     @Transactional
-    public ResisterGuardianResponse getGuardianRegisterToken(CurrentUser currentUser) {
+    public RegisterGuardianResponse getGuardianRegisterToken(CurrentUser currentUser) {
         String registerToken = jwtTokenProvider.issueRegisterToken(currentUser.getId(), currentUser.getEmail(), UserRole.WARD);
         registerTokenRepository.save(currentUser.getId(), registerToken);
-        return new ResisterGuardianResponse(registerToken);
-    }
-
-    @Transactional
-    public void updateGuardianSettings(SettingRequest request, CurrentUser currentUser) {
-        Relation relation = relationRepository.findByGuardianId(currentUser.getId()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_GUARDIAN));
-        relation.updateSettings(request);
+        return new RegisterGuardianResponse(registerToken);
     }
 
     @Transactional
     public KeyPair login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.email()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
+        User user = userRepository.findByEmailAndDeletedAtIsNull(request.email()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
         PreConditions.check(!passwordEncoder.matches(request.password(), user.getPassword()), ErrorCode.NOT_MATCH_PASSWORD);
         KeyPair keyPair = jwtTokenProvider.issueKeyPair(user.getId(), user.getEmail(), user.getRole());
         refreshTokenRepository.save(user.getId(), keyPair.refreshToken());
@@ -94,7 +88,7 @@ public class UserService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userRepository.findByEmail(username).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
+        User user = userRepository.findByEmailAndDeletedAtIsNull(username).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
         return new CurrentUser(user.getId(), user.getEmail(), user.getRole());
     }
 
@@ -115,4 +109,16 @@ public class UserService implements UserDetailsService {
     }
 
 
+    @Transactional(readOnly = true)
+    public UserResponse getUserInfo(CurrentUser currentUser) {
+        if (currentUser.getRole().equals(UserRole.GUARDIAN)) {
+            User guardian = userRepository.findByIdAndDeletedAtIsNull(currentUser.getId()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
+            Long wardId = getWardIdFromGuardianId(currentUser.getId());
+            User ward = userRepository.findByIdAndDeletedAtIsNull(wardId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
+            return UserResponse.from(guardian, ward);
+        }else {
+            User ward = userRepository.findByIdAndDeletedAtIsNull(currentUser.getId()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
+            return UserResponse.from(ward);
+        }
+    }
 }

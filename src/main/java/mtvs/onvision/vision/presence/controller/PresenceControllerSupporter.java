@@ -98,20 +98,56 @@ public interface PresenceControllerSupporter {
                     content = {
                             @Content(
                                     mediaType = MediaType.APPLICATION_JSON_VALUE,
-                                    examples = @ExampleObject(
-                                            value = """
-                                                    {
-                                                        "success": true,
-                                                        "code": "PRESENCE_READ",
-                                                        "message": "기기 상태 확인이 정상적으로 조회되었습니다.",
-                                                        "data": {
-                                                            "battery": null,
-                                                            "deviceConnected": false,
-                                                            "status": "연결 없음"
-                                                        }
-                                                    }
-                                                    """
-                                    )
+                                    examples = {
+                                            @ExampleObject(
+                                                    name = "정상",
+                                                    value = """
+                                                            {
+                                                                "success": true,
+                                                                "code": "PRESENCE_READ",
+                                                                "message": "기기 상태 확인이 정상적으로 조회되었습니다.",
+                                                                "data": {
+                                                                    "battery": 77,
+                                                                    "deviceConnected": true,
+                                                                    "deviceNetwork": true,
+                                                                    "status": "정상"
+                                                                }
+                                                            }
+                                                            """
+                                            ),
+                                            @ExampleObject(
+                                                    name = "기기는 붙어 있고 인터넷만 끊겼을 때",
+                                                    value = """
+                                                            {
+                                                                "success": true,
+                                                                "code": "PRESENCE_READ",
+                                                                "message": "기기 상태 확인이 정상적으로 조회되었습니다.",
+                                                                "data": {
+                                                                    "battery": 77,
+                                                                    "deviceConnected": true,
+                                                                    "deviceNetwork": false,
+                                                                    "status": "네트워크 중단"
+                                                                }
+                                                            }
+                                                            """
+                                            ),
+                                            @ExampleObject(
+                                                    name = "생존신호가 없을 때",
+                                                    value = """
+                                                            {
+                                                                "success": true,
+                                                                "code": "PRESENCE_READ",
+                                                                "message": "기기 상태 확인이 정상적으로 조회되었습니다.",
+                                                                "data": {
+                                                                    "battery": null,
+                                                                    "deviceConnected": false,
+                                                                    "deviceNetwork": false,
+                                                                    "status": "연결 없음"
+                                                                }
+                                                            }
+                                                            """
+                                            )
+                                    }
                             )
                     }
             ),
