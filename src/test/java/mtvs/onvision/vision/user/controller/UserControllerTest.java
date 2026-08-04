@@ -712,7 +712,7 @@ class UserControllerTest {
             void it_return_200_ok_and_guardian_info() throws Exception {
                 //given
                 UserResponse response = new UserResponse(
-                        userId, email, UserRole.GUARDIAN, nickname,
+                        userId, UserRole.GUARDIAN, nickname,
                         new UserResponse.WardInfo(wardId, wardNickname, wardPhoneNumber));
                 given(userService.getUserInfo(currentUser)).willReturn(response);
 
@@ -725,7 +725,7 @@ class UserControllerTest {
                         .andExpect(jsonPath("$.code").value(SuccessCode.USER_READ.name()))
                         .andExpect(jsonPath("$.message").value(SuccessCode.USER_READ.getSuccessMessage()))
                         .andExpect(jsonPath("$.data.id").value(userId))
-                        .andExpect(jsonPath("$.data.email").value(email))
+                        .andExpect(jsonPath("$.data.email").doesNotExist())
                         .andExpect(jsonPath("$.data.role").value(UserRole.GUARDIAN.name()))
                         .andExpect(jsonPath("$.data.nickname").value(nickname))
                         .andExpect(jsonPath("$.data.ward.id").value(wardId))
@@ -775,7 +775,7 @@ class UserControllerTest {
             void it_return_200_ok_and_ward_info() throws Exception {
                 //given
                 UserResponse response = new UserResponse(
-                        wardId, "ward@test.com", UserRole.WARD, wardNickname, null);
+                        wardId, UserRole.WARD, wardNickname, null);
                 given(userService.getUserInfo(wardUser)).willReturn(response);
 
                 //when-then

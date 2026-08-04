@@ -246,7 +246,6 @@ public interface UserControllerSupporter {
                                                                 "message": "계정정보가 정상적으로 조회되었습니다.",
                                                                 "data": {
                                                                     "id": 1,
-                                                                    "email": "test1@naver.com",
                                                                     "role": "GUARDIAN",
                                                                     "nickname": "test1",
                                                                     "ward": {
@@ -267,7 +266,6 @@ public interface UserControllerSupporter {
                                                                 "message": "계정정보가 정상적으로 조회되었습니다.",
                                                                 "data": {
                                                                     "id": 2,
-                                                                    "email": "test2@naver.com",
                                                                     "role": "WARD",
                                                                     "nickname": "test2",
                                                                     "ward": null

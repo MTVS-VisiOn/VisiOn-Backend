@@ -615,7 +615,6 @@ class UserServiceTest {
 
                 //then
                 assertThat(response.id()).isEqualTo(userId);
-                assertThat(response.email()).isEqualTo(email);
                 assertThat(response.role()).isEqualTo(UserRole.GUARDIAN);
                 assertThat(response.nickname()).isEqualTo(nickname);
                 assertThat(response.ward().id()).isEqualTo(wardId);
@@ -688,7 +687,6 @@ class UserServiceTest {
 
                 //then
                 assertThat(response.id()).isEqualTo(wardId);
-                assertThat(response.email()).isEqualTo(ward.getEmail());
                 assertThat(response.role()).isEqualTo(UserRole.WARD);
                 assertThat(response.nickname()).isEqualTo(ward.getNickname());
                 assertThat(response.ward()).isNull();
