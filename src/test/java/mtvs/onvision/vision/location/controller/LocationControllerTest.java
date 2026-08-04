@@ -223,11 +223,12 @@ class LocationControllerTest {
         class Context_with_available_last_location {
 
             @Test
-            @DisplayName("It : 200 상태와 주소, 이동 상태를 반환한다")
+            @DisplayName("It : 200 상태와 좌표, 주소, 이동 상태, 측정 시각을 반환한다")
             void it_return_200_ok_and_last_location() throws Exception {
                 //given
                 LastLocationResponse response = new LastLocationResponse(
-                        true, "경기도 부천시 원미구 부일로 123", MovementStatus.ON_FOOT.getMessage());
+                        37.501274, 127.039585, "경기도 부천시 원미구 부일로 123",
+                        MovementStatus.ON_FOOT.getMessage(), Instant.parse("2026-08-04T05:32:10.123Z"));
                 given(locationService.getLastLocation(any(CurrentUser.class))).willReturn(response);
 
                 //when-then
@@ -238,8 +239,11 @@ class LocationControllerTest {
                         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                         .andExpect(jsonPath("$.code").value(SuccessCode.LOCATION_READ.name()))
                         .andExpect(jsonPath("$.message").value(SuccessCode.LOCATION_READ.getSuccessMessage()))
-                        .andExpect(jsonPath("$.data.lastAddress").value("경기도 부천시 원미구 부일로 123"))
+                        .andExpect(jsonPath("$.data.latitude").value(37.501274))
+                        .andExpect(jsonPath("$.data.longitude").value(127.039585))
+                        .andExpect(jsonPath("$.data.address").value("경기도 부천시 원미구 부일로 123"))
                         .andExpect(jsonPath("$.data.status").value(MovementStatus.ON_FOOT.getMessage()))
+                        .andExpect(jsonPath("$.data.recordedAt").exists())
                         .andDo(print());
             }
         }

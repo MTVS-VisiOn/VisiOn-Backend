@@ -308,12 +308,13 @@ class LocationServiceTest {
         class Context_with_available_last_location {
 
             @Test
-            @DisplayName("It : 좌표로 티맵을 호출해 도로명 주소와 이동 상태를 반환한다")
+            @DisplayName("It : 좌표로 티맵을 호출해 좌표·도로명 주소·이동 상태·측정 시각을 반환한다")
             void it_return_address_and_status() {
                 //given
+                Instant recordedAt = Instant.parse("2026-08-04T05:32:10.123Z");
                 String latestJson = "{\"latest\":true}";
                 LocationReport latest = new LocationReport(
-                        wardId, 37.5, 127.0, 10f, MovementStatus.ON_FOOT, Instant.now());
+                        wardId, 37.5, 127.0, 10f, MovementStatus.ON_FOOT, recordedAt);
 
                 given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
                 given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.of(latestJson));
@@ -329,10 +330,35 @@ class LocationServiceTest {
                 LastLocationResponse response = locationService.getLastLocation(guardian);
 
                 //then
-                assertThat(response.isConnected()).isTrue();
-                assertThat(response.lastAddress()).isEqualTo("경기도 부천시 원미구 부일로 123");
+                assertThat(response.latitude()).isEqualTo(37.5);
+                assertThat(response.longitude()).isEqualTo(127.0);
+                assertThat(response.address()).isEqualTo("경기도 부천시 원미구 부일로 123");
                 assertThat(response.status()).isEqualTo(MovementStatus.ON_FOOT.getMessage());
+                assertThat(response.recordedAt()).isEqualTo(recordedAt);
                 tmapServer.verify();
+            }
+
+            @Test
+            @DisplayName("It : 측정 시각은 서버 수신 시각이 아니라 단말이 보낸 값 그대로다")
+            void it_passes_through_recorded_at() {
+                //given : 프론트가 §4.9의 "마지막 수신 n분 전"을 판단하는 근거라 가공하지 않는다
+                Instant recordedAt = Instant.now().minusSeconds(600);
+                String latestJson = "{\"latest\":true}";
+                LocationReport latest = new LocationReport(
+                        wardId, 37.5, 127.0, 10f, MovementStatus.STATIONARY, recordedAt);
+
+                given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.of(latestJson));
+                given(objectMapper.readValue(latestJson, LocationReport.class)).willReturn(latest);
+
+                tmapServer.expect(requestTo(startsWith(BASE_URL + "/tmap/geo/reversegeocoding")))
+                        .andRespond(withSuccess(TMAP_RESPONSE, MediaType.APPLICATION_JSON));
+
+                //when
+                LastLocationResponse response = locationService.getLastLocation(guardian);
+
+                //then
+                assertThat(response.recordedAt()).isEqualTo(recordedAt);
             }
 
             @Test

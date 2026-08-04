@@ -66,7 +66,7 @@ public class LocationService {
         String presentAddress = res.addressInfo().fullAddress();
         String roadAddress = presentAddress.substring(presentAddress.lastIndexOf(",") + 1);
 
-        return new LastLocationResponse(true, roadAddress, report.status().getMessage());
+        return new LastLocationResponse(latitude, longitude, roadAddress, report.status().getMessage() ,report.recordedAt());
     }
 
 

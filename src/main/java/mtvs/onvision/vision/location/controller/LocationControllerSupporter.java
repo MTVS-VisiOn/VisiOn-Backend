@@ -108,9 +108,11 @@ public interface LocationControllerSupporter {
                                                                 "code": "LOCATION_READ",
                                                                 "message": "실시간 위치가 정상적으로 조회되었습니다.",
                                                                 "data": {
-                                                                    "isConnected": true,
-                                                                    "lastAddress": "서울특별시 강남구 테헤란로 212 멀티캠퍼스",
-                                                                    "status": "도보로 이동중"
+                                                                    "latitude": 37.501274,
+                                                                    "longitude": 127.039585,
+                                                                    "address": "서울특별시 강남구 테헤란로 212 멀티캠퍼스",
+                                                                    "status": "도보로 이동중",
+                                                                    "recordedAt": "2026-08-04T05:32:10.123Z"
                                                                 }
                                                             }
                                                             """
