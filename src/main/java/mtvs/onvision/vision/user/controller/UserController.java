@@ -10,7 +10,6 @@ import mtvs.onvision.vision.common.response.SuccessCode;
 import mtvs.onvision.vision.common.swagger.ApiUnauthorized;
 import mtvs.onvision.vision.user.domain.UserRole;
 import mtvs.onvision.vision.user.dto.RegisterGuardianResponse;
-import mtvs.onvision.vision.user.dto.SettingRequest;
 import mtvs.onvision.vision.user.dto.SignupRequest;
 import mtvs.onvision.vision.user.dto.UserResponse;
 import mtvs.onvision.vision.user.service.UserService;
@@ -41,15 +40,6 @@ public class UserController implements UserControllerSupporter {
     public ResponseEntity<ApiResult<RegisterGuardianResponse>> getGuardianRegisterToken(@AuthenticationPrincipal CurrentUser currentUser) {
         RegisterGuardianResponse response = userService.getGuardianRegisterToken(currentUser);
         return ApiResult.ok(SuccessCode.REGISTER_TOKEN_CREATED, response);
-    }
-
-    @Override
-    @PutMapping("/settings")
-    @ApiUnauthorized
-    public ResponseEntity<ApiResult<Void>> updateGuardianSettings(@RequestBody @Valid SettingRequest request,
-                                                                  @AuthenticationPrincipal CurrentUser currentUser) {
-        userService.updateGuardianSettings(request, currentUser);
-        return ApiResult.ok(SuccessCode.SETTING_SUCCESS);
     }
 
     //보호자 계정 정보 조회

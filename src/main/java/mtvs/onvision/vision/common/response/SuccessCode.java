@@ -10,7 +10,6 @@ public enum SuccessCode {
     USER_CREATED("계정이 정상적으로 생성되었습니다."),
     USER_READ("계정정보가 정상적으로 조회되었습니다."),
     REGISTER_TOKEN_CREATED("보호자 등록 토큰이 정상적으로 생성되었습니다."),
-    SETTING_SUCCESS("설정이 정상적으로 저장되었습니다."),
 
 
     /*Auth*/

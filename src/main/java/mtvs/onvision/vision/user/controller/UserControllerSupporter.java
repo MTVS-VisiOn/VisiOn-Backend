@@ -14,7 +14,6 @@ import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.response.ApiResult;
 import mtvs.onvision.vision.user.dto.UserResponse;
 import mtvs.onvision.vision.user.dto.RegisterGuardianResponse;
-import mtvs.onvision.vision.user.dto.SettingRequest;
 import mtvs.onvision.vision.user.dto.SignupRequest;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -170,55 +169,6 @@ public interface UserControllerSupporter {
     })
     @SecurityRequirement(name = "Bearer Authentication")
     ResponseEntity<ApiResult<RegisterGuardianResponse>> getGuardianRegisterToken(CurrentUser currentUser);
-
-    @Operation(
-            summary = "보호자 설정 세팅",
-            description = "보호자의 앱의 경우 알림 설정이 가능",
-            extensions = @Extension(properties = @ExtensionProperty(name = "x-order", value = "3"))
-    )
-    @ApiResponses(value = {
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "세팅 성공",
-                    content = {
-                            @Content(
-                                    mediaType = MediaType.APPLICATION_JSON_VALUE,
-                                    examples = @ExampleObject(
-                                            value = """
-                                                    {
-                                                        "success": true,
-                                                        "code": "SETTING_SUCCESS",
-                                                        "message": "설정이 정상적으로 저장되었습니다.",
-                                                        "data": null
-                                                    }
-                                                    """
-                                    )
-                            )
-                    }
-            ),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "요청 형식이 잘못되었을떄(필수 세팅값이 null일때)",
-                    content = {
-                            @Content(
-                                    mediaType = MediaType.APPLICATION_JSON_VALUE,
-                                    examples = @ExampleObject(
-                                            value = """
-                                                    {
-                                                        "success": false,
-                                                        "code": "VALIDATION_FAILED",
-                                                        "message": "필수 설정입니다.",
-                                                        "data": null
-                                                    }
-                                                    """
-                                    )
-                            )
-                    }
-            )
-    })
-    @SecurityRequirement(name = "Bearer Authentication")
-    ResponseEntity<ApiResult<Void>> updateGuardianSettings(SettingRequest request,
-                                                           CurrentUser currentUser);
 
     @Operation(
             summary = "계정 정보 조회",
