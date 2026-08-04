@@ -80,7 +80,7 @@ class LocationControllerTest {
     }
 
     private LocationRequest request(Double latitude, Double longitude) {
-        return new LocationRequest(latitude, longitude, 12.5f, 1.4f, Instant.now());
+        return new LocationRequest(latitude, longitude, 12.5f, Instant.now());
     }
 
     @Nested
@@ -109,11 +109,11 @@ class LocationControllerTest {
             }
 
             @Test
-            @DisplayName("(accuracy와 speed가 없어도)It : 201 상태를 반환한다")
+            @DisplayName("(accuracy가 없어도)It : 201 상태를 반환한다")
             void it_return_201_created_without_nullable_fields() throws Exception {
                 //given
                 LocationRequest request =
-                        new LocationRequest(37.501274, 127.039585, null, null, Instant.now());
+                        new LocationRequest(37.501274, 127.039585, null, Instant.now());
 
                 //when-then
                 mockMvc.perform(
@@ -198,7 +198,7 @@ class LocationControllerTest {
             void it_return_400_badRequest_and_recorded_at_not_null() throws Exception {
                 //given
                 LocationRequest request =
-                        new LocationRequest(37.501274, 127.039585, 12.5f, 1.4f, null);
+                        new LocationRequest(37.501274, 127.039585, 12.5f, null);
 
                 //when-then
                 mockMvc.perform(
@@ -219,8 +219,8 @@ class LocationControllerTest {
     class getLastLocation {
 
         @Nested
-        @DisplayName("Context: 피보호자가 연결 상태이면")
-        class Context_with_connected_ward {
+        @DisplayName("Context: 최근 위치가 존재하면")
+        class Context_with_available_last_location {
 
             @Test
             @DisplayName("It : 200 상태와 주소, 이동 상태를 반환한다")
@@ -240,30 +240,6 @@ class LocationControllerTest {
                         .andExpect(jsonPath("$.message").value(SuccessCode.LOCATION_READ.getSuccessMessage()))
                         .andExpect(jsonPath("$.data.lastAddress").value("경기도 부천시 원미구 부일로 123"))
                         .andExpect(jsonPath("$.data.status").value(MovementStatus.ON_FOOT.getMessage()))
-                        .andDo(print());
-            }
-        }
-
-        @Nested
-        @DisplayName("Context: 피보호자가 연결 상태가 아니면")
-        class Context_with_disconnected_ward {
-
-            @Test
-            @DisplayName("It : 200 상태와 주소 없는 응답을 반환한다")
-            void it_return_200_ok_and_empty_address() throws Exception {
-                //given
-                LastLocationResponse response =
-                        new LastLocationResponse(false, null, MovementStatus.UNKNOWN.getMessage());
-                given(locationService.getLastLocation(any(CurrentUser.class))).willReturn(response);
-
-                //when-then
-                mockMvc.perform(
-                                get("/api/locations")
-                        )
-                        .andExpect(status().isOk())
-                        .andExpect(jsonPath("$.code").value(SuccessCode.LOCATION_READ.name()))
-                        .andExpect(jsonPath("$.data.lastAddress").doesNotExist())
-                        .andExpect(jsonPath("$.data.status").value(MovementStatus.UNKNOWN.getMessage()))
                         .andDo(print());
             }
         }
