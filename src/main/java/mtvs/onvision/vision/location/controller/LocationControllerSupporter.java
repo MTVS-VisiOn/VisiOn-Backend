@@ -99,20 +99,35 @@ public interface LocationControllerSupporter {
                     content = {
                             @Content(
                                     mediaType = MediaType.APPLICATION_JSON_VALUE,
-                                    examples = @ExampleObject(
-                                            value = """
-                                                    {
-                                                        "success": true,
-                                                        "code": "LOCATION_READ",
-                                                        "message": "실시간 위치가 정상적으로 조회되었습니다.",
-                                                        "data": {
-                                                            "isConnected": true,
-                                                            "lastAddress": "서울특별시 강남구 테헤란로 212 멀티캠퍼스",
-                                                            "status": "도보로 이동중"
-                                                        }
-                                                    }
-                                                    """
-                                    )
+                                    examples = {
+                                            @ExampleObject(
+                                                    name = "최근 위치 있음",
+                                                    value = """
+                                                            {
+                                                                "success": true,
+                                                                "code": "LOCATION_READ",
+                                                                "message": "실시간 위치가 정상적으로 조회되었습니다.",
+                                                                "data": {
+                                                                    "isConnected": true,
+                                                                    "lastAddress": "서울특별시 강남구 테헤란로 212 멀티캠퍼스",
+                                                                    "status": "도보로 이동중"
+                                                                }
+                                                            }
+                                                            """
+                                            ),
+                                            @ExampleObject(
+                                                    name = "최근 위치 없음",
+                                                    description = "피보호자가 아직 위치를 보내지 않았거나 보관 기한이 지난 경우. 오류가 아니라 200에 data가 null이다",
+                                                    value = """
+                                                            {
+                                                                "success": true,
+                                                                "code": "LOCATION_READ",
+                                                                "message": "실시간 위치가 정상적으로 조회되었습니다.",
+                                                                "data": null
+                                                            }
+                                                            """
+                                            )
+                                    }
                             )
                     }
             ),
@@ -128,25 +143,6 @@ public interface LocationControllerSupporter {
                                                         "success": false,
                                                         "code": "ACCESS_DENIED",
                                                         "message": "권한이 없습니다.",
-                                                        "data": null
-                                                    }
-                                                    """
-                                    )
-                            )
-                    }
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "피보호자가 아직 위치를 보내지 않았거나 보관 기한이 지났을때",
-                    content = {
-                            @Content(
-                                    mediaType = MediaType.APPLICATION_JSON_VALUE,
-                                    examples = @ExampleObject(
-                                            value = """
-                                                    {
-                                                        "success": false,
-                                                        "code": "NOT_FOUND_LAST_LOCATION",
-                                                        "message": "마지막 위치를 찾을 수 없습니다.",
                                                         "data": null
                                                     }
                                                     """

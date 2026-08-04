@@ -249,21 +249,20 @@ class LocationControllerTest {
         class Context_with_no_last_location {
 
             @Test
-            @DisplayName("It : 404 상태와 NOT_FOUND_LAST_LOCATION을 반환한다")
-            void it_return_404_not_found_and_no_last_location() throws Exception {
-                //given
-                doThrow(new BusinessException(ErrorCode.NOT_FOUND_LAST_LOCATION))
-                        .when(locationService)
-                        .getLastLocation(any(CurrentUser.class));
+            @DisplayName("It : 200 상태와 data가 null인 응답을 반환한다")
+            void it_return_200_ok_and_null_data() throws Exception {
+                //given : 위치가 없는 것은 오류가 아니다
+                given(locationService.getLastLocation(any(CurrentUser.class))).willReturn(null);
 
                 //when-then
                 mockMvc.perform(
                                 get("/api/locations")
                         )
-                        .andExpect(status().isNotFound())
+                        .andExpect(status().isOk())
                         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                        .andExpect(jsonPath("$.code").value(ErrorCode.NOT_FOUND_LAST_LOCATION.name()))
-                        .andExpect(jsonPath("$.message").value(ErrorCode.NOT_FOUND_LAST_LOCATION.getMessage()))
+                        .andExpect(jsonPath("$.code").value(SuccessCode.LOCATION_READ.name()))
+                        .andExpect(jsonPath("$.message").value(SuccessCode.LOCATION_READ.getSuccessMessage()))
+                        .andExpect(jsonPath("$.data").doesNotExist())
                         .andDo(print());
             }
         }

@@ -44,8 +44,10 @@ public class LocationService {
     public LastLocationResponse getLastLocation(CurrentUser currentUser) {
         Long wardId = userService.getWardIdFromGuardianId(currentUser.getId());
         //좌표 구하기
-        String json  = realtimeLocationRepository.getLastLocation(wardId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_LAST_LOCATION));
-        LocationReport report = objectMapper.readValue(json, LocationReport.class);
+        Optional<String> json  = realtimeLocationRepository.getLastLocation(wardId);
+        if (json.isEmpty()) return null;
+
+        LocationReport report = objectMapper.readValue(json.get(), LocationReport.class);
         Double latitude = report.latitude();
         Double longitude = report.longitude();
 

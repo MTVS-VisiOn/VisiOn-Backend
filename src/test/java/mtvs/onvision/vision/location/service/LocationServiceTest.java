@@ -288,16 +288,18 @@ class LocationServiceTest {
         class Context_with_no_last_location {
 
             @Test
-            @DisplayName("It : NOT_FOUND_LAST_LOCATION 오류 발생")
-            void it_throws_not_found_last_location() {
-                //given
+            @DisplayName("It : 예외 없이 null을 반환하고 티맵을 호출하지 않는다")
+            void it_returns_null() {
+                //given : 아직 한 번도 안 보냈거나 TTL로 사라진 경우는 오류가 아니다
                 given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
                 given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.empty());
 
-                //when&then
-                BusinessException exception = assertThrows(BusinessException.class,
-                        () -> locationService.getLastLocation(guardian));
-                assertThat(exception.getMessage()).isEqualTo(ErrorCode.NOT_FOUND_LAST_LOCATION.getMessage());
+                //when
+                LastLocationResponse response = locationService.getLastLocation(guardian);
+
+                //then
+                assertThat(response).isNull();
+                tmapServer.verify();  // 호출된 요청 없음
             }
         }
 
