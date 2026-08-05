@@ -47,6 +47,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PATCH,"/api/navigations/**").hasAuthority("WARD")
                         .requestMatchers(HttpMethod.GET, "/api/ice-servers").hasAnyAuthority("WARD","GUARDIAN")
                         .requestMatchers("/api/alerts/detect/obstacle").hasAuthority("WARD")
+                        .requestMatchers(HttpMethod.GET,"/api/alerts/**").hasAuthority("GUARDIAN")
                         .anyRequest().permitAll()
                 )
                 .exceptionHandling(exp -> exp

@@ -2,6 +2,7 @@ package mtvs.onvision.vision.alert.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import mtvs.onvision.vision.alert.dto.AlertResponse;
 import mtvs.onvision.vision.alert.dto.ObstacleRequest;
 import mtvs.onvision.vision.alert.service.AlertService;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
@@ -25,6 +26,14 @@ public class AlertController implements AlertControllerSupporter {
                                                      @AuthenticationPrincipal CurrentUser currentUser) {
         alertService.detectObstacle(request, image, currentUser);
         return ApiResult.ok(SuccessCode.DETECT_OBSTACLE_CREATED);
+    }
+
+    //상세 알림 보기
+    @GetMapping("/{alertId}")
+    public ResponseEntity<ApiResult<AlertResponse>> getAlertDetail(@PathVariable Long alertId,
+                                                                   @AuthenticationPrincipal CurrentUser currentUser) {
+        AlertResponse response = alertService.getAlertDetail(alertId, currentUser);
+        return ApiResult.ok(SuccessCode.ALERT_READ, response);
     }
 
 }

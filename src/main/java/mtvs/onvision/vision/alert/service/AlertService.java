@@ -4,10 +4,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import mtvs.onvision.vision.alert.domain.Alert;
 import mtvs.onvision.vision.alert.domain.AlertType;
+import mtvs.onvision.vision.alert.dto.AlertResponse;
 import mtvs.onvision.vision.alert.dto.ObstacleRequest;
 import mtvs.onvision.vision.alert.event.ObstacleDetected;
 import mtvs.onvision.vision.alert.repository.AlertRepository;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
+import mtvs.onvision.vision.common.exception.BusinessException;
+import mtvs.onvision.vision.common.exception.ErrorCode;
+import mtvs.onvision.vision.common.util.PreConditions;
 import mtvs.onvision.vision.image.service.ImageService;
 import mtvs.onvision.vision.location.service.LocationService;
 import mtvs.onvision.vision.user.domain.User;
@@ -53,5 +57,14 @@ public class AlertService {
                 address, s3Key, request.occurredAt(), request.action(), sender);
         alertRepository.save(alert);
         eventPublisher.publishEvent(new ObstacleDetected(alert.getId(), currentUser.getId()));
+    }
+
+    @Transactional(readOnly = true)
+    public AlertResponse getAlertDetail(Long alertId, CurrentUser currentUser) {
+        Alert alert = alertRepository.findById(alertId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ALERT));
+        Long wardId = userService.getWardIdFromGuardianId(currentUser.getId());
+        PreConditions.check(!alert.getSender().getId().equals(wardId), ErrorCode.NOT_GUARDIAN);
+        String presignedUrl = imageService.getPresignedUrl(alert.getS3Key());
+        return AlertResponse.from(alert, presignedUrl);
     }
 }
