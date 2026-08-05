@@ -5,6 +5,7 @@ import mtvs.onvision.vision.alert.domain.AlertType;
 import mtvs.onvision.vision.alert.dto.AlertResponse;
 import mtvs.onvision.vision.alert.dto.ObstacleRequest;
 import mtvs.onvision.vision.alert.event.ObstacleDetected;
+import mtvs.onvision.vision.alert.repository.AlertNotificationRepository;
 import mtvs.onvision.vision.alert.repository.AlertRepository;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.exception.BusinessException;
@@ -47,6 +48,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AlertService의")
@@ -57,6 +59,9 @@ class AlertServiceTest {
 
     @Mock
     private AlertRepository alertRepository;
+
+    @Mock
+    private AlertNotificationRepository alertNotificationRepository;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -110,6 +115,7 @@ class AlertServiceTest {
     }
 
     private void givenExternalCallsSucceed() {
+        given(alertNotificationRepository.tryStartCooldown(wardId, AlertType.OBSTACLE)).willReturn(true);
         given(userService.currentUserToUser(wardId)).willReturn(wardEntity);
         given(locationService.getRoadAddress(request.latitude(), request.longitude())).willReturn(address);
         given(imageService.saveImage(image, AlertType.OBSTACLE)).willReturn(s3Key);
@@ -185,6 +191,21 @@ class AlertServiceTest {
                 //then
                 verify(imageService).deleteImage(s3Key);
             }
+
+            @Test
+            @DisplayName("It : 쿨다운도 되돌린다. 저장이 안 됐는데 다음 감지가 막히면 안 된다")
+            void it_clears_cooldown() {
+                //given
+                givenExternalCallsSucceed();
+                givenSaveAssignsId();
+                alertService.detectObstacle(request, image, ward);
+
+                //when
+                triggerAfterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK);
+
+                //then
+                verify(alertNotificationRepository).clearCooldown(wardId, AlertType.OBSTACLE);
+            }
         }
 
         @Nested
@@ -204,6 +225,40 @@ class AlertServiceTest {
 
                 //then
                 verify(imageService, never()).deleteImage(any());
+            }
+
+            @Test
+            @DisplayName("It : 쿨다운을 유지한다")
+            void it_keeps_cooldown() {
+                //given
+                givenExternalCallsSucceed();
+                givenSaveAssignsId();
+                alertService.detectObstacle(request, image, ward);
+
+                //when
+                triggerAfterCompletion(TransactionSynchronization.STATUS_COMMITTED);
+
+                //then
+                verify(alertNotificationRepository, never()).clearCooldown(any(), any());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 쿨다운 중이면")
+        class Context_with_active_cooldown {
+
+            @Test
+            @DisplayName("It : 이미지 업로드도 저장도 이벤트 발행도 하지 않는다")
+            void it_skips_everything() {
+                //given
+                given(alertNotificationRepository.tryStartCooldown(wardId, AlertType.OBSTACLE)).willReturn(false);
+
+                //when
+                alertService.detectObstacle(request, image, ward);
+
+                //then - S3 업로드 전에 막혀야 업로드 비용이 안 든다
+                verifyNoInteractions(imageService, locationService, eventPublisher);
+                verify(alertRepository, never()).save(any());
             }
         }
     }

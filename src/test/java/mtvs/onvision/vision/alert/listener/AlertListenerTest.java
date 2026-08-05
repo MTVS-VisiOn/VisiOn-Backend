@@ -2,6 +2,7 @@ package mtvs.onvision.vision.alert.listener;
 
 import mtvs.onvision.vision.alert.domain.AlertType;
 import mtvs.onvision.vision.alert.event.ObstacleDetected;
+import mtvs.onvision.vision.alert.repository.AlertNotificationRepository;
 import mtvs.onvision.vision.alert.service.FcmService;
 import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
@@ -38,6 +39,9 @@ class AlertListenerTest {
     @Mock
     private UserService userService;
 
+    @Mock
+    private AlertNotificationRepository alertNotificationRepository;
+
     Long alertId = 10L;
     Long wardId = 2L;
     Long guardianId = 1L;
@@ -47,6 +51,11 @@ class AlertListenerTest {
     @SuppressWarnings("unchecked")
     private ArgumentCaptor<List<String>> fidCaptor() {
         return ArgumentCaptor.forClass(List.class);
+    }
+
+    /** 아직 발송되지 않은 알림이라 발송권을 선점한 상황 */
+    private void givenNotNotifiedYet() {
+        given(alertNotificationRepository.markNotified(alertId)).willReturn(true);
     }
 
     @Nested
@@ -63,6 +72,7 @@ class AlertListenerTest {
             @DisplayName("It : 피보호자로 보호자를 찾아 그 기기 목록으로 알림을 보낸다")
             void it_sends_notification_to_guardian_devices() {
                 //given
+                givenNotNotifiedYet();
                 given(userService.getGuardianIdFromWardId(wardId)).willReturn(guardianId);
                 given(userService.getFids(guardianId)).willReturn(fids);
 
@@ -86,6 +96,7 @@ class AlertListenerTest {
             @DisplayName("It : 빈 목록을 그대로 넘긴다 (예외를 던지지 않는다)")
             void it_passes_empty_list() {
                 //given
+                givenNotNotifiedYet();
                 given(userService.getGuardianIdFromWardId(wardId)).willReturn(guardianId);
                 given(userService.getFids(guardianId)).willReturn(List.of());
 
@@ -109,6 +120,7 @@ class AlertListenerTest {
             @DisplayName("It : 알림을 보내지 않고 예외가 전파된다")
             void it_does_not_send() {
                 //given
+                givenNotNotifiedYet();
                 given(userService.getGuardianIdFromWardId(wardId))
                         .willThrow(new BusinessException(ErrorCode.NOT_FOUND_RELATION));
 
@@ -118,6 +130,24 @@ class AlertListenerTest {
                         .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND_RELATION);
 
                 verifyNoInteractions(fcmService);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 이미 발송된 알림이면")
+        class Context_with_already_notified {
+
+            @Test
+            @DisplayName("It : 보호자를 조회하지도, 알림을 보내지도 않는다")
+            void it_skips_duplicate() {
+                //given
+                given(alertNotificationRepository.markNotified(alertId)).willReturn(false);
+
+                //when
+                alertListener.handleAlertEvent(event);
+
+                //then
+                verifyNoInteractions(userService, fcmService);
             }
         }
     }

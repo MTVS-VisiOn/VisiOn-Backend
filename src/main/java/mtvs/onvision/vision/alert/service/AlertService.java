@@ -7,6 +7,7 @@ import mtvs.onvision.vision.alert.domain.AlertType;
 import mtvs.onvision.vision.alert.dto.AlertResponse;
 import mtvs.onvision.vision.alert.dto.ObstacleRequest;
 import mtvs.onvision.vision.alert.event.ObstacleDetected;
+import mtvs.onvision.vision.alert.repository.AlertNotificationRepository;
 import mtvs.onvision.vision.alert.repository.AlertRepository;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.exception.BusinessException;
@@ -37,6 +38,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AlertService {
     private final AlertRepository alertRepository;
+    private final AlertNotificationRepository alertNotificationRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final UserService userService;
     private final LocationService locationService;
@@ -47,9 +49,23 @@ public class AlertService {
 
     @Transactional
     public void detectObstacle(ObstacleRequest request, MultipartFile image, CurrentUser currentUser) {
+        AlertType type = AlertType.OBSTACLE;
+        //쿨다운이면 저장,푸쉬 막음. S3 업로드 전에 막아야 업로드 비용이 안 든다
+        if (!alertNotificationRepository.tryStartCooldown(currentUser.getId(), type)) {
+            log.info("Obstacle detection skipped by cooldown: wardId={}", currentUser.getId());
+            return;
+        }
+        //저장이 롤백되면 쿨다운도 되돌리기
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status == STATUS_ROLLED_BACK) {
+                    alertNotificationRepository.clearCooldown(currentUser.getId(), type);
+                }
+            }
+        });
         User sender = userService.currentUserToUser(currentUser.getId());
         String address = locationService.getRoadAddress(request.latitude(), request.longitude());
-        AlertType type = AlertType.OBSTACLE;
         String s3Key = imageService.saveImage(image, type);
         //알림 저장이 안된다면 s3도 보상삭제
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {

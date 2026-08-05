@@ -32,6 +32,8 @@ redis:
     presence: 180  #초단위
     location: 30  #분단위
     navigation: 30  #분단위
+    alert-cooldown: 60  #초단위
+    alert-notified: 3600  #초단위
 tmap:
   base-url: https://apis.openapi.sk.com
   app-key: ${TMAP_APP_KEY}
