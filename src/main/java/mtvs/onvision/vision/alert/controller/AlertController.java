@@ -15,9 +15,10 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/alerts")
-public class AlertController {
+public class AlertController implements AlertControllerSupporter {
     private final AlertService alertService;
 
+    @Override
     @PostMapping("/detect/obstacle")
     public ResponseEntity<ApiResult<Void>> detectObstacle(@RequestPart(name = "request") @Valid ObstacleRequest request,
                                                      @RequestPart("image") MultipartFile image,

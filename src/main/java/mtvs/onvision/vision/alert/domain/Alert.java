@@ -41,10 +41,13 @@ public class Alert extends BaseEntity {
     @Column(nullable = false)
     private Instant occurredAt;
 
+    @Column(nullable = false)
+    private String action;
+
     @ManyToOne(fetch = FetchType.LAZY)
     private User sender;
 
-    public Alert(AlertType type, String content, Double latitude, Double longitude, String address, String s3Key, Instant occurredAt, User sender) {
+    public Alert(AlertType type, String content, Double latitude, Double longitude, String address, String s3Key, Instant occurredAt, String action, User sender) {
         this.type = type;
         this.content = content;
         this.latitude = latitude;
@@ -52,6 +55,7 @@ public class Alert extends BaseEntity {
         this.address = address;
         this.s3Key = s3Key;
         this.occurredAt = occurredAt;
+        this.action = action;
         this.sender = sender;
     }
 }

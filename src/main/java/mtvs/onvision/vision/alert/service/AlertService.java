@@ -49,7 +49,8 @@ public class AlertService {
                 }
             }
         });
-        Alert alert = new Alert(type, request.message(), request.latitude(), request.longitude(), address, s3Key, request.occurredAt(), sender);
+        Alert alert = new Alert(type, request.message(), request.latitude(), request.longitude(),
+                address, s3Key, request.occurredAt(), request.action(), sender);
         alertRepository.save(alert);
         eventPublisher.publishEvent(new ObstacleDetected(alert.getId(), currentUser.getId()));
     }
