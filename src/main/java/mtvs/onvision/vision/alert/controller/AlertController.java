@@ -13,6 +13,10 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/alerts")
@@ -34,6 +38,13 @@ public class AlertController implements AlertControllerSupporter {
     public ResponseEntity<ApiResult<AlertResponse>> getAlertDetail(@PathVariable Long alertId,
                                                                    @AuthenticationPrincipal CurrentUser currentUser) {
         AlertResponse response = alertService.getAlertDetail(alertId, currentUser);
+        return ApiResult.ok(SuccessCode.ALERT_READ, response);
+    }
+
+    //최근 일주일 이벤트 확인
+    @GetMapping("/lastweek")
+    public ResponseEntity<ApiResult<Map<LocalDate, List<AlertResponse>>>> getAlertsInWeek(@AuthenticationPrincipal CurrentUser currentUser) {
+        Map<LocalDate, List<AlertResponse>> response = alertService.getAlertsInWeek(currentUser);
         return ApiResult.ok(SuccessCode.ALERT_READ, response);
     }
 

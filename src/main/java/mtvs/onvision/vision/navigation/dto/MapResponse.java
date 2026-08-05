@@ -4,9 +4,10 @@ import mtvs.onvision.vision.navigation.domain.TransportMode;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+
+import static mtvs.onvision.vision.alert.service.AlertService.SEOUL;
 
 public record MapResponse(
         String name,
@@ -26,7 +27,7 @@ public record MapResponse(
                 .map(p -> Map.of("latitude", p.get(0), "longitude", p.get(1)))
                 .toList();
         return new MapResponse(summary.destinationName(), summary.destinationRoadAddress(), summary.destinationCoordinate().get(0),summary.destinationCoordinate().get(1),
-                summary.totalDistance(), summary.totalTime()/60, departureTime.atZone(ZoneId.systemDefault()).toInstant(), mode, path);
+                summary.totalDistance(), summary.totalTime()/60, departureTime.atZone(SEOUL).toInstant(), mode, path);
     }
 
     public static MapResponse from (TransitRoute report, LocalDateTime departureTime) {
@@ -38,6 +39,6 @@ public record MapResponse(
                 .map(p -> Map.of("latitude", p.get(0), "longitude", p.get(1)))
                 .toList();
         return new MapResponse(summary.destinationName(), summary.destinationRoadAddress(), summary.destinationCoordinate().get(0),summary.destinationCoordinate().get(1),
-                summary.totalDistance(), summary.totalTime()/60, departureTime.atZone(ZoneId.systemDefault()).toInstant(), TransportMode.TRANSIT, path);
+                summary.totalDistance(), summary.totalTime()/60, departureTime.atZone(SEOUL).toInstant(), TransportMode.TRANSIT, path);
     }
 }

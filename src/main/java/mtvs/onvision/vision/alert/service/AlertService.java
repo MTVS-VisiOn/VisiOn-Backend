@@ -23,6 +23,16 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -32,6 +42,8 @@ public class AlertService {
     private final UserService userService;
     private final LocationService locationService;
     private final ImageService imageService;
+
+    public static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
 
 
     @Transactional
@@ -66,5 +78,18 @@ public class AlertService {
         PreConditions.check(!alert.getSender().getId().equals(wardId), ErrorCode.NOT_GUARDIAN);
         String presignedUrl = imageService.getPresignedUrl(alert.getS3Key());
         return AlertResponse.from(alert, presignedUrl);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<LocalDate, List<AlertResponse>> getAlertsInWeek(CurrentUser currentUser) {
+        Long wardId = userService.getWardIdFromGuardianId(currentUser.getId());
+        Instant sevenDaysAgo = Instant.now().minus(7, ChronoUnit.DAYS);
+        List<Alert> alerts = alertRepository.findAllBySenderIdAndOccurredAtAfterOrderByOccurredAtDesc(wardId, sevenDaysAgo);
+        return alerts.stream()
+                .collect(Collectors.groupingBy(
+                        alert -> alert.getOccurredAt().atZone(SEOUL).toLocalDate(),
+                        () -> new TreeMap<LocalDate, List<AlertResponse>>(Comparator.reverseOrder()),   // 최신 날짜부터
+                        Collectors.mapping(alert -> AlertResponse.from(alert, imageService.getPresignedUrl(alert.getS3Key())), Collectors.toList())
+                ));
     }
 }
