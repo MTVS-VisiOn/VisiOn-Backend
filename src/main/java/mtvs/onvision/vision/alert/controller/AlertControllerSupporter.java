@@ -45,6 +45,10 @@ public interface AlertControllerSupporter {
                     알림 발송 실패는 이 API의 응답에 영향을 주지 않는다(저장은 성공으로 응답한다).
 
                     `occurredAt`은 ISO-8601 UTC(`Z`)로 보낸다. 예) `2026-08-05T09:12:33.512Z`
+
+                    **쿨다운이 있다.** 같은 피보호자의 같은 타입 감지는 60초에 한 건만 처리한다.
+                    그 안에 들어온 감지는 저장도 푸시도 하지 않고 버려진다(이미지 업로드도 하지 않는다).
+                    재전송할 필요가 없으므로 응답은 성공과 동일한 200이고, **응답만으로는 구분할 수 없다.**
                     """,
             extensions = @Extension(properties = @ExtensionProperty(name = "x-order", value = "1"))
     )
