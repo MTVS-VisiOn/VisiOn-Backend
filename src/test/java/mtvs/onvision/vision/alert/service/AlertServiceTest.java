@@ -2,10 +2,13 @@ package mtvs.onvision.vision.alert.service;
 
 import mtvs.onvision.vision.alert.domain.Alert;
 import mtvs.onvision.vision.alert.domain.AlertType;
+import mtvs.onvision.vision.alert.dto.AlertResponse;
 import mtvs.onvision.vision.alert.dto.ObstacleRequest;
 import mtvs.onvision.vision.alert.event.ObstacleDetected;
 import mtvs.onvision.vision.alert.repository.AlertRepository;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
+import mtvs.onvision.vision.common.exception.BusinessException;
+import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.image.service.ImageService;
 import mtvs.onvision.vision.location.service.LocationService;
 import mtvs.onvision.vision.user.domain.User;
@@ -29,8 +32,10 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
@@ -59,12 +64,14 @@ class AlertServiceTest {
     private ImageService imageService;
 
     Long wardId = 2L;
+    Long guardianId = 1L;
     Long alertId = 10L;
     String address = "서울특별시 강남구 테헤란로 152";
     String s3Key = "alerts/OBSTACLE/2026/08/05/uuid/obstacle.jpg";
     Instant occurredAt = Instant.parse("2026-08-05T09:12:33.512Z");
 
     CurrentUser ward = new CurrentUser(wardId, "ward@test.com", UserRole.WARD);
+    CurrentUser guardian = new CurrentUser(guardianId, "guardian@test.com", UserRole.GUARDIAN);
     User wardEntity = new User("ward@test.com", "password", "피보호자", "01012345678", UserRole.WARD);
 
     MultipartFile image = new MockMultipartFile("image", "obstacle.jpg", "image/jpeg", "dummy".getBytes());
@@ -190,6 +197,93 @@ class AlertServiceTest {
 
                 //then
                 verify(imageService, never()).deleteImage(any());
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Describe: getAlertDetail 메서드는")
+    class Describe_with_getAlertDetail {
+
+        String presignedUrl = "https://bucket.s3.ap-northeast-2.amazonaws.com/" + s3Key + "?X-Amz-Signature=abc";
+
+        private Alert alertOf(User sender) {
+            Alert alert = new Alert(AlertType.OBSTACLE, "전방 2m에 자전거가 세워져 있습니다",
+                    37.4979, 127.0276, address, s3Key, occurredAt, "위험 음성 재생", sender);
+            ReflectionTestUtils.setField(alert, "id", alertId);
+            return alert;
+        }
+
+        private User userWithId(Long id) {
+            User user = new User("ward@test.com", "password", "피보호자", "01012345678", UserRole.WARD);
+            ReflectionTestUtils.setField(user, "id", id);
+            return user;
+        }
+
+        @Nested
+        @DisplayName("Context: 보호자가 자기 피보호자의 알림을 조회하면")
+        class Context_with_own_ward_alert {
+
+            @Test
+            @DisplayName("It : presigned URL을 채운 상세 정보를 반환한다")
+            void it_returns_detail() {
+                //given
+                Alert alert = alertOf(userWithId(wardId));
+                given(alertRepository.findById(alertId)).willReturn(Optional.of(alert));
+                given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
+                given(imageService.getPresignedUrl(s3Key)).willReturn(presignedUrl);
+
+                //when
+                AlertResponse response = alertService.getAlertDetail(alertId, guardian);
+
+                //then
+                assertThat(response.type()).isEqualTo(AlertType.OBSTACLE);
+                assertThat(response.occurredAt()).isEqualTo(occurredAt);
+                assertThat(response.occurredPlace()).isEqualTo(address);
+                assertThat(response.content()).isEqualTo("전방 2m에 자전거가 세워져 있습니다");
+                assertThat(response.action()).isEqualTo("위험 음성 재생");
+                // s3Key가 아니라 조회 시점에 만든 presigned URL을 내려준다
+                assertThat(response.presignedUrl()).isEqualTo(presignedUrl);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 없는 알림 id가 주어지면")
+        class Context_with_unknown_alert {
+
+            @Test
+            @DisplayName("It : NOT_FOUND_ALERT 예외를 던진다")
+            void it_throws_not_found() {
+                //given
+                given(alertRepository.findById(alertId)).willReturn(Optional.empty());
+
+                //when-then
+                assertThatThrownBy(() -> alertService.getAlertDetail(alertId, guardian))
+                        .isInstanceOf(BusinessException.class)
+                        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND_ALERT);
+
+                verify(imageService, never()).getPresignedUrl(any());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 다른 피보호자의 알림을 조회하면")
+        class Context_with_others_alert {
+
+            @Test
+            @DisplayName("It : NOT_GUARDIAN 예외를 던지고 presigned URL을 만들지 않는다")
+            void it_throws_not_guardian() {
+                //given - 알림의 주인은 999번 피보호자인데, 이 보호자에게 연결된 피보호자는 2번이다
+                Alert alert = alertOf(userWithId(999L));
+                given(alertRepository.findById(alertId)).willReturn(Optional.of(alert));
+                given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
+
+                //when-then
+                assertThatThrownBy(() -> alertService.getAlertDetail(alertId, guardian))
+                        .isInstanceOf(BusinessException.class)
+                        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_GUARDIAN);
+
+                verify(imageService, never()).getPresignedUrl(any());
             }
         }
     }
