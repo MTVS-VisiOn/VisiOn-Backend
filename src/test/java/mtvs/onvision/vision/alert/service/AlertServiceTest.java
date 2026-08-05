@@ -32,11 +32,18 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -238,7 +245,9 @@ class AlertServiceTest {
 
                 //then
                 assertThat(response.type()).isEqualTo(AlertType.OBSTACLE);
-                assertThat(response.occurredAt()).isEqualTo(occurredAt);
+                // 저장은 Instant, 응답은 KST LocalDateTime. UTC 09:12:33.512 = KST 18:12:33.512
+                assertThat(response.occurredAt())
+                        .isEqualTo(occurredAt.atZone(ZoneId.of("Asia/Seoul")).toLocalDateTime());
                 assertThat(response.occurredPlace()).isEqualTo(address);
                 assertThat(response.content()).isEqualTo("전방 2m에 자전거가 세워져 있습니다");
                 assertThat(response.action()).isEqualTo("위험 음성 재생");
@@ -283,6 +292,121 @@ class AlertServiceTest {
                         .isInstanceOf(BusinessException.class)
                         .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_GUARDIAN);
 
+                verify(imageService, never()).getPresignedUrl(any());
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Describe: getAlertsInWeek 메서드는")
+    class Describe_with_getAlertsInWeek {
+
+        ZoneId SEOUL = ZoneId.of("Asia/Seoul");
+
+        private User wardWithId() {
+            User user = new User("ward@test.com", "password", "피보호자", "01012345678", UserRole.WARD);
+            ReflectionTestUtils.setField(user, "id", wardId);
+            return user;
+        }
+
+        /** KST 기준 시각으로 알림을 만든다. 내부 저장은 Instant다 */
+        private Alert alertAtKst(String kstDateTime, String content) {
+            Instant instant = LocalDateTime.parse(kstDateTime).atZone(SEOUL).toInstant();
+            return new Alert(AlertType.OBSTACLE, content, 37.4979, 127.0276,
+                    address, s3Key, instant, "위험 음성 재생", wardWithId());
+        }
+
+        @Nested
+        @DisplayName("Context: 최근 7일 내 알림이 여러 날짜에 걸쳐 있으면")
+        class Context_with_alerts_across_dates {
+
+            @Test
+            @DisplayName("It : KST 날짜별로 묶어 최신 날짜부터 반환한다")
+            void it_groups_by_kst_date() {
+                //given - 리포지토리는 최신순으로 내려준다
+                List<Alert> alerts = List.of(
+                        alertAtKst("2026-08-05T18:55:00", "보행로에 배달 오토바이가 정차해 있습니다"),
+                        alertAtKst("2026-08-05T07:05:00", "전방 2m에 자전거가 세워져 있습니다"),
+                        alertAtKst("2026-08-03T08:45:00", "횡단보도 앞에 화분이 놓여 있습니다")
+                );
+                given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
+                given(alertRepository.findAllBySenderIdAndOccurredAtAfterOrderByOccurredAtDesc(eq(wardId), any(Instant.class)))
+                        .willReturn(alerts);
+                given(imageService.getPresignedUrl(s3Key)).willReturn("https://example.com/presigned");
+
+                //when
+                Map<LocalDate, List<AlertResponse>> result = alertService.getAlertsInWeek(guardian);
+
+                //then - 최신 날짜가 먼저
+                assertThat(result.keySet())
+                        .containsExactly(LocalDate.of(2026, 8, 5), LocalDate.of(2026, 8, 3));
+                assertThat(result.get(LocalDate.of(2026, 8, 5))).hasSize(2);
+                assertThat(result.get(LocalDate.of(2026, 8, 3))).hasSize(1);
+                // 그룹 안에서도 최신순이 유지된다
+                assertThat(result.get(LocalDate.of(2026, 8, 5)))
+                        .extracting(AlertResponse::content)
+                        .containsExactly("보행로에 배달 오토바이가 정차해 있습니다", "전방 2m에 자전거가 세워져 있습니다");
+            }
+
+            @Test
+            @DisplayName("It : UTC 기준으로는 전날인 새벽 알림도 KST 날짜로 묶는다")
+            void it_groups_by_kst_not_utc() {
+                //given - KST 08-05 07:05 = UTC 08-04 22:05
+                Alert earlyMorning = alertAtKst("2026-08-05T07:05:00", "전방 2m에 자전거가 세워져 있습니다");
+                given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
+                given(alertRepository.findAllBySenderIdAndOccurredAtAfterOrderByOccurredAtDesc(eq(wardId), any(Instant.class)))
+                        .willReturn(List.of(earlyMorning));
+                given(imageService.getPresignedUrl(s3Key)).willReturn("https://example.com/presigned");
+
+                //when
+                Map<LocalDate, List<AlertResponse>> result = alertService.getAlertsInWeek(guardian);
+
+                //then - UTC로 묶었다면 08-04가 됐을 것이다
+                assertThat(result).containsOnlyKeys(LocalDate.of(2026, 8, 5));
+                assertThat(result.get(LocalDate.of(2026, 8, 5)).get(0).occurredAt())
+                        .isEqualTo(LocalDateTime.of(2026, 8, 5, 7, 5));
+            }
+
+            @Test
+            @DisplayName("It : 조회 기준 시각을 7일 전으로 넘긴다")
+            void it_queries_last_seven_days() {
+                //given
+                given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
+                given(alertRepository.findAllBySenderIdAndOccurredAtAfterOrderByOccurredAtDesc(eq(wardId), any(Instant.class)))
+                        .willReturn(List.of());
+
+                //when
+                Instant before = Instant.now();
+                alertService.getAlertsInWeek(guardian);
+                Instant after = Instant.now();
+
+                //then
+                ArgumentCaptor<Instant> captor = ArgumentCaptor.forClass(Instant.class);
+                verify(alertRepository)
+                        .findAllBySenderIdAndOccurredAtAfterOrderByOccurredAtDesc(eq(wardId), captor.capture());
+
+                assertThat(captor.getValue())
+                        .isBetween(before.minus(7, ChronoUnit.DAYS), after.minus(7, ChronoUnit.DAYS));
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 최근 7일 내 알림이 없으면")
+        class Context_without_alerts {
+
+            @Test
+            @DisplayName("It : 빈 맵을 반환한다")
+            void it_returns_empty_map() {
+                //given
+                given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
+                given(alertRepository.findAllBySenderIdAndOccurredAtAfterOrderByOccurredAtDesc(eq(wardId), any(Instant.class)))
+                        .willReturn(List.of());
+
+                //when
+                Map<LocalDate, List<AlertResponse>> result = alertService.getAlertsInWeek(guardian);
+
+                //then
+                assertThat(result).isEmpty();
                 verify(imageService, never()).getPresignedUrl(any());
             }
         }

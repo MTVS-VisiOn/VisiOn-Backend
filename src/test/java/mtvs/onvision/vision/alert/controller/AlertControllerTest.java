@@ -29,6 +29,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -201,9 +206,10 @@ class AlertControllerTest {
             authenticate(guardian);
         }
 
+        // 응답의 시각은 KST LocalDateTime이다. 요청의 occurredAt(UTC)과 타입이 다르다
         AlertResponse response = new AlertResponse(
                 AlertType.OBSTACLE,
-                occurredAt,
+                LocalDateTime.of(2026, 8, 5, 18, 55),
                 "서울특별시 강남구 테헤란로 152",
                 "https://onvision.s3.ap-northeast-2.amazonaws.com/alerts/obstacle.jpg?X-Amz-Signature=abc",
                 "전방 2m에 자전거가 세워져 있습니다",
@@ -272,6 +278,93 @@ class AlertControllerTest {
                         .andExpect(jsonPath("$.code").value(ErrorCode.NOT_GUARDIAN.name()))
                         .andDo(print());
             }
+        }
+    }
+
+    @Nested
+    @DisplayName("Describe: GET /api/alerts/lastweek 엔드포인트는")
+    class getAlertsInWeek {
+
+        @BeforeEach
+        void setUpAuthentication() {
+            authenticate(guardian);
+        }
+
+        @Nested
+        @DisplayName("Context: 최근 7일 내 알림이 있으면")
+        class Context_with_alerts {
+
+            @Test
+            @DisplayName("It : 200 상태와 날짜별로 묶인 목록을 반환한다")
+            void it_return_200_ok_and_grouped_alerts() throws Exception {
+                //given
+                Map<LocalDate, List<AlertResponse>> grouped = new LinkedHashMap<>();
+                grouped.put(LocalDate.of(2026, 8, 5), List.of(
+                        alertResponse(LocalDateTime.of(2026, 8, 5, 18, 55), "보행로에 배달 오토바이가 정차해 있습니다"),
+                        alertResponse(LocalDateTime.of(2026, 8, 5, 7, 5), "전방 2m에 자전거가 세워져 있습니다")
+                ));
+                grouped.put(LocalDate.of(2026, 8, 3), List.of(
+                        alertResponse(LocalDateTime.of(2026, 8, 3, 8, 45), "횡단보도 앞에 화분이 놓여 있습니다")
+                ));
+                given(alertService.getAlertsInWeek(any(CurrentUser.class))).willReturn(grouped);
+
+                //when-then
+                mockMvc.perform(get("/api/alerts/lastweek"))
+                        .andExpect(status().isOk())
+                        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                        .andExpect(jsonPath("$.code").value(SuccessCode.ALERT_READ.name()))
+                        .andExpect(jsonPath("$.data['2026-08-05']").isArray())
+                        .andExpect(jsonPath("$.data['2026-08-05'].length()").value(2))
+                        .andExpect(jsonPath("$.data['2026-08-05'][0].occurredAt").value("2026-08-05T18:55:00"))
+                        .andExpect(jsonPath("$.data['2026-08-05'][0].content").value("보행로에 배달 오토바이가 정차해 있습니다"))
+                        .andExpect(jsonPath("$.data['2026-08-03'].length()").value(1))
+                        .andDo(print());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 최근 7일 내 알림이 없으면")
+        class Context_without_alerts {
+
+            @Test
+            @DisplayName("It : 200 상태와 빈 객체를 반환한다")
+            void it_return_200_ok_and_empty_data() throws Exception {
+                //given
+                given(alertService.getAlertsInWeek(any(CurrentUser.class))).willReturn(Map.of());
+
+                //when-then
+                mockMvc.perform(get("/api/alerts/lastweek"))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.code").value(SuccessCode.ALERT_READ.name()))
+                        .andExpect(jsonPath("$.data").isEmpty())
+                        .andDo(print());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 연결된 피보호자가 없으면")
+        class Context_without_relation {
+
+            @Test
+            @DisplayName("It : 404 상태와 NOT_FOUND_RELATION을 반환한다")
+            void it_return_404_not_found() throws Exception {
+                //given
+                doThrow(new BusinessException(ErrorCode.NOT_FOUND_RELATION))
+                        .when(alertService).getAlertsInWeek(any(CurrentUser.class));
+
+                //when-then
+                mockMvc.perform(get("/api/alerts/lastweek"))
+                        .andExpect(status().isNotFound())
+                        .andExpect(jsonPath("$.success").value(false))
+                        .andExpect(jsonPath("$.code").value(ErrorCode.NOT_FOUND_RELATION.name()))
+                        .andDo(print());
+            }
+        }
+
+        private AlertResponse alertResponse(LocalDateTime occurredAt, String content) {
+            return new AlertResponse(AlertType.OBSTACLE, occurredAt, "서울특별시 강남구 테헤란로 152",
+                    "https://onvision-dev.s3.ap-northeast-2.amazonaws.com/alerts/x.jpg?X-Amz-Signature=abc",
+                    content, "위험 음성 재생");
         }
     }
 }
