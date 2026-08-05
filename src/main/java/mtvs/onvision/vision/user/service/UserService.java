@@ -7,12 +7,15 @@ import mtvs.onvision.vision.auth.service.JwtTokenProvider;
 import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.common.util.PreConditions;
+import mtvs.onvision.vision.user.domain.Fid;
 import mtvs.onvision.vision.user.domain.Relation;
 import mtvs.onvision.vision.user.domain.User;
 import mtvs.onvision.vision.user.domain.UserRole;
+import mtvs.onvision.vision.user.dto.FidRequest;
 import mtvs.onvision.vision.user.dto.RegisterGuardianResponse;
 import mtvs.onvision.vision.user.dto.SignupRequest;
 import mtvs.onvision.vision.user.dto.UserResponse;
+import mtvs.onvision.vision.user.repository.FidRepository;
 import mtvs.onvision.vision.user.repository.RegisterTokenRepository;
 import mtvs.onvision.vision.user.repository.RelationRepository;
 import mtvs.onvision.vision.user.repository.UserRepository;
@@ -23,6 +26,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class UserService implements UserDetailsService {
@@ -32,6 +37,7 @@ public class UserService implements UserDetailsService {
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenRepository refreshTokenRepository;
     private final RegisterTokenRepository registerTokenRepository;
+    private final FidRepository fidRepository;
 
     @Transactional
     public void signup(SignupRequest request) {
@@ -92,8 +98,30 @@ public class UserService implements UserDetailsService {
         return new CurrentUser(user.getId(), user.getEmail(), user.getRole());
     }
 
-    public void logout(CurrentUser currentUser) {
+    @Transactional
+    public void logout(LogoutRequest request, CurrentUser currentUser) {
         refreshTokenRepository.delete(currentUser.getId());
+
+        // fid는 선택값이다. 없으면 refreshToken만 지우고 끝낸다
+        if (request == null || request.fid() == null || request.fid().isBlank()) {
+            return;
+        }
+        // 이미 지워졌거나 등록된 적 없는 fid는 무시한다. 로그아웃 자체는 성공해야 한다
+        fidRepository.findByFid(request.fid()).ifPresent(target -> {
+            PreConditions.check(!target.getUser().getId().equals(currentUser.getId()), ErrorCode.NOT_OWNER);
+            fidRepository.delete(target);
+        });
+    }
+
+    @Transactional
+    public void checkDeviceFid(FidRequest request, CurrentUser currentUser) {
+        User user = userRepository.findById(currentUser.getId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
+
+        fidRepository.findByFid(request.fid()).ifPresentOrElse(
+                fid -> fid.refresh(user),
+                () -> fidRepository.save(new Fid(request.fid(), user))
+        );
     }
 
     @Transactional(readOnly = true)
@@ -102,10 +130,18 @@ public class UserService implements UserDetailsService {
 //        return userRepository.findById(currentUser.getId()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
     }
 
+    //보호자 -> 피보호자
     @Transactional(readOnly = true)
     public Long getWardIdFromGuardianId(Long guardianId) {
         Relation relation = relationRepository.findByGuardianId(guardianId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_RELATION));
         return relation.getWard().getId();
+    }
+
+    //피보호자 -> 보호자
+    @Transactional(readOnly = true)
+    public Long getGuardianIdFromWardId(Long wardId) {
+        Relation relation = relationRepository.findByWardId(wardId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_RELATION));
+        return relation.getGuardian().getId();
     }
 
 
@@ -120,5 +156,16 @@ public class UserService implements UserDetailsService {
             User ward = userRepository.findByIdAndDeletedAtIsNull(currentUser.getId()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
             return UserResponse.from(ward);
         }
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> getFids(Long userId) {
+        List<Fid> fids = fidRepository.findByUserId(userId);
+        return fids.stream().map(Fid::getFid).toList();
+    }
+
+    @Transactional
+    public void deleteFid(String fid) {
+        fidRepository.deleteByFid(fid);
     }
 }

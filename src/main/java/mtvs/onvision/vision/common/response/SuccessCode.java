@@ -10,6 +10,7 @@ public enum SuccessCode {
     USER_CREATED("계정이 정상적으로 생성되었습니다."),
     USER_READ("계정정보가 정상적으로 조회되었습니다."),
     REGISTER_TOKEN_CREATED("보호자 등록 토큰이 정상적으로 생성되었습니다."),
+    CHECK_FID("기기 등록번호(fid)가 정상적으로 확인되었습니다."),
 
 
     /*Auth*/
@@ -41,6 +42,10 @@ public enum SuccessCode {
 
     /*Signalling*/
     ICE_SERVERS_READ("ICE 서버 정보가 정상적으로 조회되었습니다."),
+
+    /*Alert*/
+    DETECT_OBSTACLE_CREATED("장애물 감지가 정상적으로 저장되었습니다."),
+
 
 
     /*common*/

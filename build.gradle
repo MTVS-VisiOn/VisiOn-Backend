@@ -39,6 +39,13 @@ dependencies {
     //swagger
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
 
+    //S3
+    implementation 'software.amazon.awssdk:s3:2.45.1'
+    implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3:4.0.2'
+
+    //firebase
+    implementation 'com.google.firebase:firebase-admin:9.10.0'
+
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'com.h2database:h2'
     runtimeOnly 'org.postgresql:postgresql'

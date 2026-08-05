@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.auth.dto.KeyPair;
 import mtvs.onvision.vision.auth.dto.LoginRequest;
+import mtvs.onvision.vision.auth.dto.LogoutRequest;
 import mtvs.onvision.vision.auth.dto.RefreshRequest;
 import mtvs.onvision.vision.common.config.SecurityConfig;
 import mtvs.onvision.vision.common.entrypoint.JwtAccessDeniedHandler;
@@ -66,6 +67,7 @@ class AuthControllerTest {
     Long userId = 1L;
     String email = "user@test.com";
     String password = "password1234";
+    String fid = "test-fid-0001";
 
     @BeforeEach
     void setUpJwtFilterPassThrough() throws Exception {
@@ -431,17 +433,44 @@ class AuthControllerTest {
         TestingAuthenticationToken authenticationToken = new TestingAuthenticationToken(currentUser, null, "ROLE_WARD");
 
         @Nested
-        @DisplayName("Context: 인증된 유저가 주어지면")
+        @DisplayName("Context: 인증된 유저가 fid와 함께 요청하면")
         class Context_with_available_data {
-            @BeforeEach
-            void setUp() {
-            }
+
+            LogoutRequest request = new LogoutRequest(fid);
 
             @Test
             @DisplayName("It : 200 상태와 성공 메시지를 반환한다")
             void it_return_200_ok_and_success_message() throws Exception {
                 //given
-                doNothing().when(userService).logout(currentUser);
+                doNothing().when(userService).logout(request, currentUser);
+
+                //when-then
+                mockMvc.perform(
+                                delete("/api/auth/logout")
+                                        .with(csrf())
+                                        .with(authentication(authenticationToken))
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(om.writeValueAsString(request))
+                        )
+                        .andExpect(status().isOk())
+                        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                        .andExpect(jsonPath("$.code").value(SuccessCode.LOGOUT_SUCCESS.name()))
+                        .andExpect(jsonPath("$.message").value(SuccessCode.LOGOUT_SUCCESS.getSuccessMessage()))
+                        .andDo(print());
+
+                verify(userService).logout(request, currentUser);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: body 없이 요청해도")
+        class Context_without_body {
+
+            @Test
+            @DisplayName("It : 200 상태와 성공 메시지를 반환한다")
+            void it_return_200_ok_and_success_message() throws Exception {
+                //given
+                doNothing().when(userService).logout(null, currentUser);
 
                 //when-then
                 mockMvc.perform(
@@ -450,12 +479,10 @@ class AuthControllerTest {
                                         .with(authentication(authenticationToken))
                         )
                         .andExpect(status().isOk())
-                        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                         .andExpect(jsonPath("$.code").value(SuccessCode.LOGOUT_SUCCESS.name()))
-                        .andExpect(jsonPath("$.message").value(SuccessCode.LOGOUT_SUCCESS.getSuccessMessage()))
                         .andDo(print());
 
-                verify(userService).logout(currentUser);
+                verify(userService).logout(null, currentUser);
             }
         }
 

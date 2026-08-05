@@ -51,24 +51,27 @@ public class LocationService {
         Double latitude = report.latitude();
         Double longitude = report.longitude();
 
-        //티맵 API로 주소 찾기
-        TmapReverseGeoCodingResponse res = tmapRestClient.get()
-                .uri(
-                uriBuilder -> uriBuilder
-                        .path(REVERSE_GEOCODING)
-                        .queryParam("version",1)
-                        .queryParam("lat",latitude)
-                        .queryParam("lon",longitude)
-                        .queryParam("addressType","A10")
-                        .build())
-                .retrieve()  //응답 받아오기
-                .body(TmapReverseGeoCodingResponse.class);
-        String presentAddress = res.addressInfo().fullAddress();
-        String roadAddress = presentAddress.substring(presentAddress.lastIndexOf(",") + 1);
+        String roadAddress = getRoadAddress(latitude, longitude);
 
         return new LastLocationResponse(latitude, longitude, roadAddress, report.status().getMessage() ,report.recordedAt());
     }
 
+    public String getRoadAddress(Double latitude, Double longitude) {
+        //티맵 API로 주소 찾기
+        TmapReverseGeoCodingResponse res = tmapRestClient.get()
+                .uri(
+                        uriBuilder -> uriBuilder
+                                .path(REVERSE_GEOCODING)
+                                .queryParam("version",1)
+                                .queryParam("lat", latitude)
+                                .queryParam("lon", longitude)
+                                .queryParam("addressType","A10")
+                                .build())
+                .retrieve()  //응답 받아오기
+                .body(TmapReverseGeoCodingResponse.class);
+        String presentAddress = res.addressInfo().fullAddress();
+        return presentAddress.substring(presentAddress.lastIndexOf(",") + 1);
+    }
 
     //주소검색 - 티맵 api 사용
     public LocationSearchResponse searchLocation(String keyword) {

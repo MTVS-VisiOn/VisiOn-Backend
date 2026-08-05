@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.auth.dto.KeyPair;
 import mtvs.onvision.vision.auth.dto.LoginRequest;
+import mtvs.onvision.vision.auth.dto.LogoutRequest;
 import mtvs.onvision.vision.auth.dto.RefreshRequest;
 import mtvs.onvision.vision.common.response.ApiResult;
 import mtvs.onvision.vision.common.response.SuccessCode;
@@ -148,8 +149,27 @@ public interface AuthControllerSupporter {
 
     @Operation(
             summary = "로그아웃",
-            description = "로그아웃 API",
+            description = """
+                    로그아웃 API. refreshToken을 삭제한다.
+
+                    body에 해당 기기의 fid를 함께 보내면 그 기기의 푸시 등록도 함께 해제한다.
+                    fid는 선택값이며, 생략하거나 body 자체를 보내지 않아도 로그아웃은 정상 처리된다.
+                    (다중 기기를 등록한 사용자의 다른 기기는 영향받지 않는다.)
+                    """,
             extensions = @Extension(properties = @ExtensionProperty(name = "x-order", value = "3"))
+    )
+    @RequestBody(
+            required = false,
+            content = @Content(
+                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    examples = @ExampleObject(
+                            value = """
+                                    {
+                                        "fid": "dEXAMPLEfid1234567890"
+                                    }
+                                    """
+                    )
+            )
     )
     @ApiResponses(value = {
             @ApiResponse(
@@ -172,5 +192,5 @@ public interface AuthControllerSupporter {
             )
     })
     @SecurityRequirement(name = "Bearer Authentication")
-    ResponseEntity<ApiResult<SuccessCode>> logout(CurrentUser currentUser);
+    ResponseEntity<ApiResult<SuccessCode>> logout(LogoutRequest request, CurrentUser currentUser);
 }
