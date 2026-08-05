@@ -7,5 +7,5 @@ import java.time.Instant;
 import java.util.List;
 
 public interface AlertRepository extends JpaRepository<Alert, Long> {
-    List<Alert> findAllBySenderIdAndOccurredAtAfterOrderByOccurredAtDesc(Long senderId, Instant occurredAt);
+    List<Alert> findAllBySenderIdAndOccurredAtGreaterThanEqualOrderByOccurredAtDesc(Long senderId, Instant occurredAt);
 }

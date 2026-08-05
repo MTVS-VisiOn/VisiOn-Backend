@@ -26,7 +26,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -83,8 +82,9 @@ public class AlertService {
     @Transactional(readOnly = true)
     public Map<LocalDate, List<AlertResponse>> getAlertsInWeek(CurrentUser currentUser) {
         Long wardId = userService.getWardIdFromGuardianId(currentUser.getId());
-        Instant sevenDaysAgo = Instant.now().minus(7, ChronoUnit.DAYS);
-        List<Alert> alerts = alertRepository.findAllBySenderIdAndOccurredAtAfterOrderByOccurredAtDesc(wardId, sevenDaysAgo);
+        // 오늘 포함 7일치 → 6일 전 KST 00:00부터
+        Instant from = LocalDate.now(SEOUL).minusDays(6).atStartOfDay(SEOUL).toInstant();
+        List<Alert> alerts = alertRepository.findAllBySenderIdAndOccurredAtGreaterThanEqualOrderByOccurredAtDesc(wardId, from);
         return alerts.stream()
                 .collect(Collectors.groupingBy(
                         alert -> alert.getOccurredAt().atZone(SEOUL).toLocalDate(),

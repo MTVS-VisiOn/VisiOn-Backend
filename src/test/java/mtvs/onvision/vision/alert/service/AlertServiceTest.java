@@ -34,8 +34,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -330,7 +330,7 @@ class AlertServiceTest {
                         alertAtKst("2026-08-03T08:45:00", "횡단보도 앞에 화분이 놓여 있습니다")
                 );
                 given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
-                given(alertRepository.findAllBySenderIdAndOccurredAtAfterOrderByOccurredAtDesc(eq(wardId), any(Instant.class)))
+                given(alertRepository.findAllBySenderIdAndOccurredAtGreaterThanEqualOrderByOccurredAtDesc(eq(wardId), any(Instant.class)))
                         .willReturn(alerts);
                 given(imageService.getPresignedUrl(s3Key)).willReturn("https://example.com/presigned");
 
@@ -354,7 +354,7 @@ class AlertServiceTest {
                 //given - KST 08-05 07:05 = UTC 08-04 22:05
                 Alert earlyMorning = alertAtKst("2026-08-05T07:05:00", "전방 2m에 자전거가 세워져 있습니다");
                 given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
-                given(alertRepository.findAllBySenderIdAndOccurredAtAfterOrderByOccurredAtDesc(eq(wardId), any(Instant.class)))
+                given(alertRepository.findAllBySenderIdAndOccurredAtGreaterThanEqualOrderByOccurredAtDesc(eq(wardId), any(Instant.class)))
                         .willReturn(List.of(earlyMorning));
                 given(imageService.getPresignedUrl(s3Key)).willReturn("https://example.com/presigned");
 
@@ -368,25 +368,24 @@ class AlertServiceTest {
             }
 
             @Test
-            @DisplayName("It : 조회 기준 시각을 7일 전으로 넘긴다")
-            void it_queries_last_seven_days() {
+            @DisplayName("It : 조회 기준 시각을 오늘 포함 7일치의 시작(6일 전 KST 자정)으로 넘긴다")
+            void it_queries_from_kst_midnight() {
                 //given
                 given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
-                given(alertRepository.findAllBySenderIdAndOccurredAtAfterOrderByOccurredAtDesc(eq(wardId), any(Instant.class)))
+                given(alertRepository.findAllBySenderIdAndOccurredAtGreaterThanEqualOrderByOccurredAtDesc(eq(wardId), any(Instant.class)))
                         .willReturn(List.of());
 
                 //when
-                Instant before = Instant.now();
                 alertService.getAlertsInWeek(guardian);
-                Instant after = Instant.now();
 
                 //then
                 ArgumentCaptor<Instant> captor = ArgumentCaptor.forClass(Instant.class);
                 verify(alertRepository)
-                        .findAllBySenderIdAndOccurredAtAfterOrderByOccurredAtDesc(eq(wardId), captor.capture());
+                        .findAllBySenderIdAndOccurredAtGreaterThanEqualOrderByOccurredAtDesc(eq(wardId), captor.capture());
 
-                assertThat(captor.getValue())
-                        .isBetween(before.minus(7, ChronoUnit.DAYS), after.minus(7, ChronoUnit.DAYS));
+                LocalDateTime kst = LocalDateTime.ofInstant(captor.getValue(), SEOUL);
+                assertThat(kst.toLocalTime()).isEqualTo(LocalTime.MIDNIGHT);
+                assertThat(kst.toLocalDate()).isEqualTo(LocalDate.now(SEOUL).minusDays(6));
             }
         }
 
@@ -399,7 +398,7 @@ class AlertServiceTest {
             void it_returns_empty_map() {
                 //given
                 given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
-                given(alertRepository.findAllBySenderIdAndOccurredAtAfterOrderByOccurredAtDesc(eq(wardId), any(Instant.class)))
+                given(alertRepository.findAllBySenderIdAndOccurredAtGreaterThanEqualOrderByOccurredAtDesc(eq(wardId), any(Instant.class)))
                         .willReturn(List.of());
 
                 //when
