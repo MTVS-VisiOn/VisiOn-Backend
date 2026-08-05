@@ -7,11 +7,13 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Encoding;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import mtvs.onvision.vision.alert.dto.AlertResponse;
 import mtvs.onvision.vision.alert.dto.ObstacleRequest;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.response.ApiResult;
@@ -133,6 +135,122 @@ public interface AlertControllerSupporter {
     ResponseEntity<ApiResult<Void>> detectObstacle(ObstacleRequest request,
                                                    MultipartFile image,
                                                    CurrentUser currentUser);
+
+    @Operation(
+            summary = "알림 상세 조회",
+            description = """
+                    푸시 알림을 탭했을 때 여는 상세 화면용. 보호자만 가능.
+
+                    푸시 payload의 `data.alertId`를 그대로 경로에 넣는다.
+                    자기 피보호자의 알림만 조회할 수 있고, 다른 피보호자의 알림이면 403이 난다.
+
+                    `presignedUrl`은 **조회 시점에 발급되는 임시 URL**이다. 만료되므로 저장해 두지 말고
+                    화면을 열 때마다 이 API로 다시 받는다.
+                    """,
+            extensions = @Extension(properties = @ExtensionProperty(name = "x-order", value = "2"))
+    )
+    @Parameter(name = "alertId", description = "알림 id. 푸시 payload의 data.alertId", example = "10", required = true)
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "조회 성공",
+                    content = {
+                            @Content(
+                                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                                    examples = @ExampleObject(
+                                            value = """
+                                                    {
+                                                        "success": true,
+                                                        "code": "ALERT_READ",
+                                                        "message": "알림 내용이 정상적으로 조회되었습니다.",
+                                                        "data": {
+                                                            "type": "OBSTACLE",
+                                                            "occurredAt": "2026-08-05T09:12:33.512Z",
+                                                            "occurredPlace": "서울특별시 강남구 테헤란로 152",
+                                                            "presignedUrl": "https://onvision.s3.ap-northeast-2.amazonaws.com/alerts/OBSTACLE/2026/08/05/.../obstacle.jpg?X-Amz-Signature=...",
+                                                            "content": "전방 2m에 자전거가 세워져 있습니다",
+                                                            "action": "위험 음성 재생"
+                                                        }
+                                                    }
+                                                    """
+                                    )
+                            )
+                    }
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "피보호자 권한으로 실행했을 때(ACCESS_DENIED) / 다른 피보호자의 알림을 조회했을 때(NOT_GUARDIAN)",
+                    content = {
+                            @Content(
+                                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                                    examples = {
+                                            @ExampleObject(
+                                                    name = "ACCESS_DENIED",
+                                                    description = "보호자 권한이 아님",
+                                                    value = """
+                                                            {
+                                                                "success": false,
+                                                                "code": "ACCESS_DENIED",
+                                                                "message": "권한이 없습니다.",
+                                                                "data": null
+                                                            }
+                                                            """
+                                            ),
+                                            @ExampleObject(
+                                                    name = "NOT_GUARDIAN",
+                                                    description = "보호자이지만 해당 알림의 피보호자와 연결돼 있지 않음",
+                                                    value = """
+                                                            {
+                                                                "success": false,
+                                                                "code": "NOT_GUARDIAN",
+                                                                "message": "해당 피보호자의 보호자가 아닙니다.",
+                                                                "data": null
+                                                            }
+                                                            """
+                                            )
+                                    }
+                            )
+                    }
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "알림이 없거나(NOT_FOUND_ALERT) 연결된 피보호자가 없을 때(NOT_FOUND_RELATION)",
+                    content = {
+                            @Content(
+                                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                                    examples = {
+                                            @ExampleObject(
+                                                    name = "NOT_FOUND_ALERT",
+                                                    description = "해당 id의 알림이 없음",
+                                                    value = """
+                                                            {
+                                                                "success": false,
+                                                                "code": "NOT_FOUND_ALERT",
+                                                                "message": "알림를 찾을 수 없습니다.",
+                                                                "data": null
+                                                            }
+                                                            """
+                                            ),
+                                            @ExampleObject(
+                                                    name = "NOT_FOUND_RELATION",
+                                                    description = "이 보호자에게 연결된 피보호자가 없음",
+                                                    value = """
+                                                            {
+                                                                "success": false,
+                                                                "code": "NOT_FOUND_RELATION",
+                                                                "message": "보호자와 피보호자의 관계를 찾을 수 없습니다.",
+                                                                "data": null
+                                                            }
+                                                            """
+                                            )
+                                    }
+                            )
+                    }
+            )
+    })
+    @ApiUnauthorized
+    @SecurityRequirement(name = "Bearer Authentication")
+    ResponseEntity<ApiResult<AlertResponse>> getAlertDetail(Long alertId, CurrentUser currentUser);
 
     /** Swagger UI가 멀티파트 두 파트를 각각 렌더링하도록 하기 위한 문서 전용 스키마 */
     @Schema(name = "ObstacleDetectMultipart")

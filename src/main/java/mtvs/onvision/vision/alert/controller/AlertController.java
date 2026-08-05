@@ -29,6 +29,7 @@ public class AlertController implements AlertControllerSupporter {
     }
 
     //상세 알림 보기
+    @Override
     @GetMapping("/{alertId}")
     public ResponseEntity<ApiResult<AlertResponse>> getAlertDetail(@PathVariable Long alertId,
                                                                    @AuthenticationPrincipal CurrentUser currentUser) {
