@@ -42,6 +42,7 @@ public class AlertController implements AlertControllerSupporter {
     }
 
     //최근 일주일 이벤트 확인
+    @Override
     @GetMapping("/lastweek")
     public ResponseEntity<ApiResult<Map<LocalDate, List<AlertResponse>>>> getAlertsInWeek(@AuthenticationPrincipal CurrentUser currentUser) {
         Map<LocalDate, List<AlertResponse>> response = alertService.getAlertsInWeek(currentUser);
