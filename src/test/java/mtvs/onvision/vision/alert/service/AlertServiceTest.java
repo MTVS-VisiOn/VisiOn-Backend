@@ -266,6 +266,128 @@ class AlertServiceTest {
     }
 
     @Nested
+    @DisplayName("Describe: detectBatteryLow 메서드는")
+    class Describe_with_detectBatteryLow {
+
+        int battery = 18;
+
+        private void givenCooldownAvailable() {
+            given(alertNotificationRepository.tryStartCooldown(wardId, AlertType.LOW_BATTERY)).willReturn(true);
+            given(userService.currentUserToUser(wardId)).willReturn(wardEntity);
+        }
+
+        private Alert captureSaved() {
+            ArgumentCaptor<Alert> captor = ArgumentCaptor.forClass(Alert.class);
+            verify(alertRepository).save(captor.capture());
+            return captor.getValue();
+        }
+
+        @Nested
+        @DisplayName("Context: 쿨다운 중이 아니면")
+        class Context_without_cooldown {
+
+            @Test
+            @DisplayName("It : 배터리 잔량을 문구로 만들어 Alert를 저장하고 id를 돌려준다")
+            void it_saves_alert() {
+                //given
+                givenCooldownAvailable();
+                givenSaveAssignsId();
+
+                //when
+                Optional<Long> saved = alertService.detectBatteryLow(battery, occurredAt, wardId);
+
+                //then
+                assertThat(saved).contains(alertId);
+
+                Alert alert = captureSaved();
+                assertThat(alert.getType()).isEqualTo(AlertType.LOW_BATTERY);
+                assertThat(alert.getContent()).isEqualTo("배터리 잔량이 18%남았습니다.");
+                assertThat(alert.getOccurredAt()).isEqualTo(occurredAt);
+                assertThat(alert.getSender()).isEqualTo(wardEntity);
+            }
+
+            @Test
+            @DisplayName("It : 이미지·좌표·주소·조치는 비워 둔다")
+            void it_leaves_obstacle_only_fields_null() {
+                //given - 이 컬럼들이 NOT NULL이면 여기서 저장이 터진다. nullable 완화가 필요했던 이유다
+                givenCooldownAvailable();
+                givenSaveAssignsId();
+
+                //when
+                alertService.detectBatteryLow(battery, occurredAt, wardId);
+
+                //then
+                Alert alert = captureSaved();
+                assertThat(alert.getS3Key()).isNull();
+                assertThat(alert.getLatitude()).isNull();
+                assertThat(alert.getLongitude()).isNull();
+                assertThat(alert.getAddress()).isNull();
+                assertThat(alert.getAction()).isNull();
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 쿨다운 중이면")
+        class Context_with_active_cooldown {
+
+            @Test
+            @DisplayName("It : 빈 값을 돌려주고 저장하지 않는다")
+            void it_skips_everything() {
+                //given
+                given(alertNotificationRepository.tryStartCooldown(wardId, AlertType.LOW_BATTERY)).willReturn(false);
+
+                //when
+                Optional<Long> saved = alertService.detectBatteryLow(battery, occurredAt, wardId);
+
+                //then
+                assertThat(saved).isEmpty();
+                verifyNoInteractions(userService);
+                verify(alertRepository, never()).save(any());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 트랜잭션이 롤백되면")
+        class Context_with_rollback {
+
+            @Test
+            @DisplayName("It : 쿨다운을 되돌린다. 저장이 안 됐는데 다음 감지가 막히면 안 된다")
+            void it_clears_cooldown() {
+                //given
+                givenCooldownAvailable();
+                givenSaveAssignsId();
+                alertService.detectBatteryLow(battery, occurredAt, wardId);
+
+                //when
+                triggerAfterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK);
+
+                //then
+                verify(alertNotificationRepository).clearCooldown(wardId, AlertType.LOW_BATTERY);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 트랜잭션이 정상 커밋되면")
+        class Context_with_commit {
+
+            @Test
+            @DisplayName("It : 쿨다운을 유지한다")
+            void it_keeps_cooldown() {
+                //given
+                givenCooldownAvailable();
+                givenSaveAssignsId();
+                alertService.detectBatteryLow(battery, occurredAt, wardId);
+
+                //when
+                triggerAfterCompletion(TransactionSynchronization.STATUS_COMMITTED);
+
+                //then
+                verify(alertNotificationRepository, never()).clearCooldown(any(), any());
+            }
+        }
+    }
+
+    @Nested
     @DisplayName("Describe: getAlertDetail 메서드는")
     class Describe_with_getAlertDetail {
 

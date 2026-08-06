@@ -5,24 +5,33 @@ import mtvs.onvision.vision.presence.domain.NetworkType;
 import mtvs.onvision.vision.presence.domain.PresenceType;
 import mtvs.onvision.vision.presence.dto.HeartbeatRequest;
 import mtvs.onvision.vision.presence.dto.PresenceResponse;
+import mtvs.onvision.vision.presence.event.LowBatteryDetected;
 import mtvs.onvision.vision.presence.repository.PresenceRepository;
 import mtvs.onvision.vision.user.domain.UserRole;
 import mtvs.onvision.vision.user.service.UserService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("PresenceService의")
@@ -40,12 +49,24 @@ class PresenceServiceTest {
     @Mock
     private ObjectMapper objectMapper;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     Long guardianId = 1L;
     Long wardId = 2L;
     String heartbeatJson = "{\"battery\":80}";
 
+    /** 배터리 판정에 쓰이는 시각. 이벤트의 occurredAt으로 그대로 실린다 */
+    Instant lastHeartbeat = Instant.parse("2026-08-06T06:12:00Z");
+
     CurrentUser guardian = new CurrentUser(guardianId, "guardian@test.com", UserRole.GUARDIAN);
     CurrentUser ward = new CurrentUser(wardId, "ward@test.com", UserRole.WARD);
+
+    /** @Value 필드는 단위 테스트에서 주입되지 않는다. yml과 같은 값을 넣는다 */
+    @BeforeEach
+    void injectThresholds() {
+        ReflectionTestUtils.setField(presenceService, "thresholds", List.of(20, 10, 5));
+    }
 
     /** lastSync가 2분 이내면 최근(isRecent=true)으로 판정된다 */
     private HeartbeatRequest heartbeat(boolean deviceConnected, Integer battery,
@@ -57,6 +78,24 @@ class PresenceServiceTest {
                 Instant.now(),
                 lastSync
         );
+    }
+
+    /** 배터리 판정에는 battery와 lastHeartbeat만 쓰이므로 나머지는 고정한다 */
+    private HeartbeatRequest batteryHeartbeat(int battery) {
+        return new HeartbeatRequest(
+                true,
+                battery,
+                new HeartbeatRequest.NetworkRequest(NetworkType.LTE, true),
+                lastHeartbeat,
+                Instant.now()
+        );
+    }
+
+    /** Redis에 남아 있는 직전 heartbeat. 덮어쓰기 전에 읽힌다 */
+    private void givenPreviousBattery(int battery) {
+        given(presenceRepository.getLastHeartbeat(wardId)).willReturn(Optional.of(heartbeatJson));
+        given(objectMapper.readValue(heartbeatJson, HeartbeatRequest.class))
+                .willReturn(batteryHeartbeat(battery));
     }
 
     @Nested
@@ -79,6 +118,134 @@ class PresenceServiceTest {
 
                 //then
                 verify(presenceRepository).saveHeartbeat(wardId, heartbeatJson);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 배터리가 임계값을 새로 내려가면")
+        class Context_with_battery_crossing_threshold {
+
+            @Test
+            @DisplayName("It : 현재 배터리와 lastHeartbeat를 담아 LowBatteryDetected를 발행한다")
+            void it_publishes_event() {
+                //given - 22에서 18로 떨어져 임계값 20을 지났다. 정확히 20을 밟지 않아도 잡힌다
+                givenPreviousBattery(22);
+
+                //when
+                presenceService.saveHeartBeat(batteryHeartbeat(18), ward);
+
+                //then
+                ArgumentCaptor<LowBatteryDetected> captor = ArgumentCaptor.forClass(LowBatteryDetected.class);
+                verify(eventPublisher).publishEvent(captor.capture());
+
+                assertThat(captor.getValue()).isEqualTo(new LowBatteryDetected(wardId, 18, lastHeartbeat));
+            }
+
+            @Test
+            @DisplayName("It : 발행 여부와 무관하게 heartbeat는 저장한다")
+            void it_still_saves_heartbeat() {
+                //given
+                givenPreviousBattery(22);
+
+                //when
+                presenceService.saveHeartBeat(batteryHeartbeat(18), ward);
+
+                //then
+                verify(presenceRepository).saveHeartbeat(eq(wardId), any());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 한 번에 임계값 여러 개를 지나가면")
+        class Context_with_battery_crossing_multiple_thresholds {
+
+            @Test
+            @DisplayName("It : 한 번만 발행하고 가장 급한 현재값을 싣는다")
+            void it_publishes_once() {
+                //given - 15에서 4로 떨어져 10과 5를 함께 지났다
+                givenPreviousBattery(15);
+
+                //when
+                presenceService.saveHeartBeat(batteryHeartbeat(4), ward);
+
+                //then - 임계값마다 보내면 푸시가 동시에 두 개 뜬다
+                ArgumentCaptor<LowBatteryDetected> captor = ArgumentCaptor.forClass(LowBatteryDetected.class);
+                verify(eventPublisher).publishEvent(captor.capture());
+
+                assertThat(captor.getValue()).isEqualTo(new LowBatteryDetected(wardId, 4, lastHeartbeat));
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 배터리가 줄었지만 임계값을 넘지 않으면")
+        class Context_with_battery_above_threshold {
+
+            @Test
+            @DisplayName("It : 발행하지 않는다")
+            void it_does_not_publish() {
+                //given
+                givenPreviousBattery(18);
+
+                //when
+                presenceService.saveHeartBeat(batteryHeartbeat(17), ward);
+
+                //then
+                verifyNoInteractions(eventPublisher);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 배터리가 임계값에 머무르면")
+        class Context_with_battery_staying_on_threshold {
+
+            @Test
+            @DisplayName("It : 발행하지 않는다 (heartbeat마다 반복 발송되지 않는다)")
+            void it_does_not_publish() {
+                //given - 이미 20에서 알림이 나갔고 여전히 20이다
+                givenPreviousBattery(20);
+
+                //when
+                presenceService.saveHeartBeat(batteryHeartbeat(20), ward);
+
+                //then
+                verifyNoInteractions(eventPublisher);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 충전으로 배터리가 올라가면")
+        class Context_with_battery_charging {
+
+            @Test
+            @DisplayName("It : 발행하지 않는다")
+            void it_does_not_publish() {
+                //given - 15에서 20이 됐다. 하강이 아니므로 사건이 아니다
+                givenPreviousBattery(15);
+
+                //when
+                presenceService.saveHeartBeat(batteryHeartbeat(20), ward);
+
+                //then
+                verifyNoInteractions(eventPublisher);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 직전 heartbeat가 없으면")
+        class Context_without_previous_heartbeat {
+
+            @Test
+            @DisplayName("It : 배터리가 낮아도 발행하지 않는다")
+            void it_does_not_publish() {
+                //given - 첫 heartbeat이거나 presence TTL(180초)이 지나 키가 사라진 상태다.
+                // 비교 대상이 없으면 '내려갔다'를 판정할 수 없다
+                given(presenceRepository.getLastHeartbeat(wardId)).willReturn(Optional.empty());
+
+                //when
+                presenceService.saveHeartBeat(batteryHeartbeat(8), ward);
+
+                //then
+                verifyNoInteractions(eventPublisher);
             }
         }
     }
