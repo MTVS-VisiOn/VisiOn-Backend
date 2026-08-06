@@ -1,8 +1,10 @@
 package mtvs.onvision.vision.alert.listener;
 
 import mtvs.onvision.vision.alert.domain.AlertType;
+import mtvs.onvision.vision.alert.domain.NotifyStatus;
 import mtvs.onvision.vision.alert.event.ObstacleDetected;
 import mtvs.onvision.vision.alert.repository.AlertNotificationRepository;
+import mtvs.onvision.vision.alert.service.AlertDeliveryService;
 import mtvs.onvision.vision.alert.service.FcmService;
 import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
@@ -12,17 +14,19 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -38,6 +42,9 @@ class AlertListenerTest {
 
     @Mock
     private UserService userService;
+
+    @Mock
+    private AlertDeliveryService alertDeliveryService;
 
     @Mock
     private AlertNotificationRepository alertNotificationRepository;
@@ -81,10 +88,31 @@ class AlertListenerTest {
 
                 //then
                 ArgumentCaptor<List<String>> captor = fidCaptor();
-                verify(fcmService).sendNotification(
-                        eq(alertId), eq(AlertType.OBSTACLE), anyString(), anyString(), captor.capture());
+                verify(fcmService).sendNotification(eq(alertId), eq(AlertType.OBSTACLE), captor.capture());
 
                 assertThat(captor.getValue()).containsExactlyElementsOf(fids);
+            }
+
+            @Test
+            @DisplayName("It : 발송 전에 PENDING을 남기고 발송 후 결과를 반영한다")
+            void it_records_delivery_around_sending() {
+                //given
+                givenNotNotifiedYet();
+                given(userService.getGuardianIdFromWardId(wardId)).willReturn(guardianId);
+                given(userService.getFids(guardianId)).willReturn(fids);
+                Map<String, NotifyStatus> results = Map.of(
+                        "fid-phone", NotifyStatus.SENT,
+                        "fid-tablet", NotifyStatus.FAILED);
+                given(fcmService.sendNotification(alertId, AlertType.OBSTACLE, fids)).willReturn(results);
+
+                //when
+                alertListener.handleAlertEvent(event);
+
+                //then - 순서가 뒤집히면 프로세스가 죽었을 때 스케줄러가 찾을 행이 없다
+                InOrder order = inOrder(alertDeliveryService, fcmService);
+                order.verify(alertDeliveryService).createPending(alertId, fids);
+                order.verify(fcmService).sendNotification(alertId, AlertType.OBSTACLE, fids);
+                order.verify(alertDeliveryService).applyResults(alertId, results);
             }
         }
 
@@ -105,8 +133,7 @@ class AlertListenerTest {
 
                 //then
                 ArgumentCaptor<List<String>> captor = fidCaptor();
-                verify(fcmService).sendNotification(
-                        eq(alertId), eq(AlertType.OBSTACLE), anyString(), anyString(), captor.capture());
+                verify(fcmService).sendNotification(eq(alertId), eq(AlertType.OBSTACLE), captor.capture());
 
                 assertThat(captor.getValue()).isEmpty();
             }
@@ -129,7 +156,7 @@ class AlertListenerTest {
                         .isInstanceOf(BusinessException.class)
                         .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND_RELATION);
 
-                verifyNoInteractions(fcmService);
+                verifyNoInteractions(fcmService, alertDeliveryService);
             }
         }
 
@@ -147,7 +174,7 @@ class AlertListenerTest {
                 alertListener.handleAlertEvent(event);
 
                 //then
-                verifyNoInteractions(userService, fcmService);
+                verifyNoInteractions(userService, fcmService, alertDeliveryService);
             }
         }
     }
