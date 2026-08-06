@@ -20,7 +20,7 @@ public class Alert extends BaseEntity {
     private Long id;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 10)
+    @Column(nullable = false, length = 20)
     private AlertType type;
 
     @Column(nullable = false)

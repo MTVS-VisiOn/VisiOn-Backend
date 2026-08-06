@@ -1,6 +1,7 @@
 package mtvs.onvision.vision.user.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import mtvs.onvision.vision.auth.dto.*;
 import mtvs.onvision.vision.auth.repository.RefreshTokenRepository;
 import mtvs.onvision.vision.auth.service.JwtTokenProvider;
@@ -28,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserService implements UserDetailsService {
@@ -110,6 +112,8 @@ public class UserService implements UserDetailsService {
         fidRepository.findByFid(request.fid()).ifPresent(target -> {
             PreConditions.check(!target.getUser().getId().equals(currentUser.getId()), ErrorCode.NOT_OWNER);
             fidRepository.delete(target);
+            // 하드 삭제라 행이 남지 않는다. 등록 해제 이력은 이 로그가 유일하다
+            log.info("Fid removed by logout: fid={}, userId={}", request.fid(), currentUser.getId());
         });
     }
 
@@ -119,8 +123,19 @@ public class UserService implements UserDetailsService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
 
         fidRepository.findByFid(request.fid()).ifPresentOrElse(
-                fid -> fid.refresh(user),
-                () -> fidRepository.save(new Fid(request.fid(), user))
+                fid -> {
+                    // 앱이 콜백마다 같은 값을 보낸다. 소유자가 실제로 바뀔 때만 남긴다
+                    Long previousOwnerId = fid.getUser().getId();
+                    if (!previousOwnerId.equals(user.getId())) {
+                        fid.refresh(user);
+                        log.info("Fid owner changed: fid={}, from userId={}, to userId={}",
+                                request.fid(), previousOwnerId, user.getId());
+                    }
+                },
+                () -> {
+                    fidRepository.save(new Fid(request.fid(), user));
+                    log.info("Fid registered: fid={}, userId={}", request.fid(), user.getId());
+                }
         );
     }
 
@@ -167,5 +182,7 @@ public class UserService implements UserDetailsService {
     @Transactional
     public void deleteFid(String fid) {
         fidRepository.deleteByFid(fid);
+        // FCM이 UNREGISTERED를 돌려준 죽은 기기. 중복 푸시 추적의 근거가 된다
+        log.info("Fid removed by FCM UNREGISTERED: fid={}", fid);
     }
 }

@@ -34,6 +34,11 @@ redis:
     navigation: 30  #분단위
     alert-cooldown: 60  #초단위
     alert-notified: 3600  #초단위
+alert:
+  retry:
+    max-attempts: 3        # FcmService 즉시 재시도 횟수
+    expire-minutes: 5      # 이 시간을 넘긴 미발송 건은 포기. FCM ttl도 같은 값
+    interval: 1m # 재전송 스케줄러 주기, 1분
 tmap:
   base-url: https://apis.openapi.sk.com
   app-key: ${TMAP_APP_KEY}

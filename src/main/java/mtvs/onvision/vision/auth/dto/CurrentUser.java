@@ -2,7 +2,6 @@ package mtvs.onvision.vision.auth.dto;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import mtvs.onvision.vision.user.domain.User;
 import mtvs.onvision.vision.user.domain.UserRole;
 import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.GrantedAuthority;
