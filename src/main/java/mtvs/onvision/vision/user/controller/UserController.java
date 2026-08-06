@@ -9,6 +9,7 @@ import mtvs.onvision.vision.common.response.ApiResult;
 import mtvs.onvision.vision.common.response.SuccessCode;
 import mtvs.onvision.vision.common.swagger.ApiUnauthorized;
 import mtvs.onvision.vision.user.domain.UserRole;
+import mtvs.onvision.vision.user.dto.FidRequest;
 import mtvs.onvision.vision.user.dto.RegisterGuardianResponse;
 import mtvs.onvision.vision.user.dto.SignupRequest;
 import mtvs.onvision.vision.user.dto.UserResponse;
@@ -40,6 +41,13 @@ public class UserController implements UserControllerSupporter {
     public ResponseEntity<ApiResult<RegisterGuardianResponse>> getGuardianRegisterToken(@AuthenticationPrincipal CurrentUser currentUser) {
         RegisterGuardianResponse response = userService.getGuardianRegisterToken(currentUser);
         return ApiResult.ok(SuccessCode.REGISTER_TOKEN_CREATED, response);
+    }
+
+    @PostMapping("/device-fid")
+    public ResponseEntity<ApiResult<Void>> checkDeviceFid(@RequestBody @Valid FidRequest request,
+                                                          @AuthenticationPrincipal CurrentUser currentUser) {
+        userService.checkDeviceFid(request, currentUser);
+        return ApiResult.ok(SuccessCode.CHECK_FID);
     }
 
     //보호자 계정 정보 조회

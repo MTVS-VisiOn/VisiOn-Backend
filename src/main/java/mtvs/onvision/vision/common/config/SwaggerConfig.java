@@ -77,4 +77,9 @@ public class SwaggerConfig {
     public GroupedOpenApi navigationApi() {
         return GroupedOpenApi.builder().group("navigation API").pathsToMatch("/api/navigations/**").build();
     }
+
+    @Bean
+    public GroupedOpenApi alertApi() {
+        return GroupedOpenApi.builder().group("alert API").pathsToMatch("/api/alerts/**").build();
+    }
 }

@@ -2,10 +2,7 @@ package mtvs.onvision.vision.auth.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import mtvs.onvision.vision.auth.dto.CurrentUser;
-import mtvs.onvision.vision.auth.dto.KeyPair;
-import mtvs.onvision.vision.auth.dto.LoginRequest;
-import mtvs.onvision.vision.auth.dto.RefreshRequest;
+import mtvs.onvision.vision.auth.dto.*;
 import mtvs.onvision.vision.common.response.ApiResult;
 import mtvs.onvision.vision.common.response.SuccessCode;
 import mtvs.onvision.vision.common.swagger.ApiUnauthorized;
@@ -37,8 +34,9 @@ public class AuthController implements AuthControllerSupporter {
     @Override
     @DeleteMapping("/logout")
     @ApiUnauthorized
-    public ResponseEntity<ApiResult<SuccessCode>> logout(@AuthenticationPrincipal CurrentUser currentUser) {
-        userService.logout(currentUser);
+    public ResponseEntity<ApiResult<SuccessCode>> logout(@RequestBody(required = false) LogoutRequest request,
+                                                         @AuthenticationPrincipal CurrentUser currentUser) {
+        userService.logout(request, currentUser);
         return ApiResult.ok(SuccessCode.LOGOUT_SUCCESS);
     }
 }

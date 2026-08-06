@@ -12,6 +12,10 @@ spring:
     web:
       pageable:
         serialization-mode: via_dto
+  cloud:
+    aws:
+      region:
+        static: ${S3_REGION}
 
 
 
@@ -28,6 +32,17 @@ redis:
     presence: 180  #초단위
     location: 30  #분단위
     navigation: 30  #분단위
+    alert-cooldown: 60  #초단위
+    alert-notified: 3600  #초단위
+alert:
+  retry:
+    max-attempts: 3        # FcmService 즉시 재시도 횟수
+    expire-minutes: 5      # 이 시간을 넘긴 미발송 건은 서버가 재전송을 포기한다
+    interval: 1m # 재전송 스케줄러 주기, 1분
+  push:
+    # FCM이 오프라인 기기용으로 쌓아두는 기간. 서버 재시도와 다른 층이다.
+    # 미설정 시 기본이 4주라 길고, 하루 넘게 꺼져 있었으면 알림 목록으로 보면 된다
+    ttl: 24h
 tmap:
   base-url: https://apis.openapi.sk.com
   app-key: ${TMAP_APP_KEY}
@@ -41,3 +56,10 @@ ice:
       - turn:${TURN_HOST}:3478?transport=tcp
     secret: ${TURN_SECRET}
     ttl: 3600  #초단위
+s3:
+  bucket-name: ${S3_BUCKET_NAME}
+  access-key: ${S3_ACCESS_KEY}
+  secret-key: ${S3_SECRET_KEY}
+firebase:
+  service-account:
+    path: classpath:firebase/onvision-4cdc3-firebase-adminsdk-fbsvc-65c38117ac.json

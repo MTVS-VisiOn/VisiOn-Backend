@@ -15,6 +15,10 @@ spring:
     redis:
       host: localhost
       port: 6379
+  cloud:
+    aws:
+      region:
+        static: ap-northeast-2
 jwt:
   validations:
     access: 900000   #밀리초 단위
@@ -25,7 +29,23 @@ redis:
     presence: 180  #초단위
     location: 30  #분단위
     navigation: 30  #분단위
-
+    alert-cooldown: 60  #초단위
+    alert-notified: 3600  #초단위
+alert:
+  retry:
+    max-attempts: 3        # FcmService 즉시 재시도 횟수
+    expire-minutes: 5      # 이 시간을 넘긴 미발송 건은 서버가 재전송을 포기한다
+    interval: 1m # 재전송 스케줄러 주기, 1분
+    enabled: false
+  push:
+    ttl: 24h
 tmap:
   base-url: https://apis.openapi.sk.com
   app-key: test
+s3:
+  bucket-name: test
+  access-key: test
+  secret-key: test
+firebase:
+  # 테스트에서는 실제 Firebase를 띄우지 않는다. FirebaseMessaging은 @MockitoBean으로 대체한다
+  enabled: false

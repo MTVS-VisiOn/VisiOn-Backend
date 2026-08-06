@@ -29,6 +29,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/users/signup", "/api/auth/login").anonymous()
                         .requestMatchers("/api/users/refresh").permitAll()
                         .requestMatchers("/api/users/guardian/register-token").hasAuthority("WARD")
+                        .requestMatchers("/api/users/device-fid").hasAnyAuthority("WARD","GUARDIAN")
                         .requestMatchers("/api/users/me").hasAnyAuthority("WARD","GUARDIAN")
                         .requestMatchers("/api/common", "/api/auth/logout").authenticated()
                         .requestMatchers(HttpMethod.POST,"/api/presence").hasAuthority("WARD")
@@ -45,6 +46,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET,"/api/navigations/**").hasAnyAuthority("WARD","GUARDIAN")
                         .requestMatchers(HttpMethod.PATCH,"/api/navigations/**").hasAuthority("WARD")
                         .requestMatchers(HttpMethod.GET, "/api/ice-servers").hasAnyAuthority("WARD","GUARDIAN")
+                        .requestMatchers("/api/alerts/detect/obstacle").hasAuthority("WARD")
+                        .requestMatchers(HttpMethod.GET,"/api/alerts/**").hasAuthority("GUARDIAN")
                         .anyRequest().permitAll()
                 )
                 .exceptionHandling(exp -> exp

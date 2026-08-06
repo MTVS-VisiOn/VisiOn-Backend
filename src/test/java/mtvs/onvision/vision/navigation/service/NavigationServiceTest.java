@@ -27,10 +27,10 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
+import static mtvs.onvision.vision.alert.service.AlertService.SEOUL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -702,14 +702,15 @@ class NavigationServiceTest {
             }
 
             @Test
-            @DisplayName("It : createdAt을 시스템 시간대로 해석해 Instant로 내보낸다")
+            @DisplayName("It : createdAt을 KST로 해석해 Instant로 내보낸다")
             void it_converts_created_at_to_instant() {
-                //when : LocalDateTime을 UTC로 단정하면 개발 PC(KST)에서 9시간 어긋난다
+                //when : createdAt은 시간대 정보가 없는 LocalDateTime이고, 서버가 KST로 기록한 값이다.
+                // 시스템 시간대로 해석하면 CI(UTC)에서 9시간 어긋난다
                 MapResponse response = call();
 
-                //then
+                //then - KST 16:08 = UTC 07:08
                 assertThat(response.departureTime())
-                        .isEqualTo(departedAt.atZone(ZoneId.systemDefault()).toInstant());
+                        .isEqualTo(departedAt.atZone(SEOUL).toInstant());
             }
         }
 
