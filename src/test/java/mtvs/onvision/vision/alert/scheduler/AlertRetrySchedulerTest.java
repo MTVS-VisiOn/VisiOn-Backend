@@ -14,6 +14,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.List;
 
 import static org.mockito.BDDMockito.given;
@@ -34,8 +35,10 @@ class AlertRetrySchedulerTest {
     @Mock
     private FcmService fcmService;
 
-    RetryTarget phone = new RetryTarget(100L, 10L, AlertType.OBSTACLE, "fid-phone");
-    RetryTarget tablet = new RetryTarget(101L, 10L, AlertType.OBSTACLE, "fid-tablet");
+    Instant occurredAt = Instant.parse("2026-08-06T06:12:00Z");
+
+    RetryTarget phone = new RetryTarget(100L, 10L, AlertType.OBSTACLE, occurredAt, "fid-phone");
+    RetryTarget tablet = new RetryTarget(101L, 10L, AlertType.OBSTACLE, occurredAt, "fid-tablet");
 
     @Nested
     @DisplayName("Describe: retryFailedDeliveries 메서드는")
@@ -69,9 +72,9 @@ class AlertRetrySchedulerTest {
             void it_sends_and_applies_each() {
                 //given
                 given(alertDeliveryService.findRetryTargets()).willReturn(List.of(phone, tablet));
-                given(fcmService.sendToDevice(10L, AlertType.OBSTACLE, "fid-phone"))
+                given(fcmService.sendToDevice(10L, AlertType.OBSTACLE, occurredAt, "fid-phone"))
                         .willReturn(NotifyStatus.SENT);
-                given(fcmService.sendToDevice(10L, AlertType.OBSTACLE, "fid-tablet"))
+                given(fcmService.sendToDevice(10L, AlertType.OBSTACLE, occurredAt, "fid-tablet"))
                         .willReturn(NotifyStatus.FAILED);
 
                 //when
@@ -107,9 +110,9 @@ class AlertRetrySchedulerTest {
             void it_continues() {
                 //given
                 given(alertDeliveryService.findRetryTargets()).willReturn(List.of(phone, tablet));
-                given(fcmService.sendToDevice(10L, AlertType.OBSTACLE, "fid-phone"))
+                given(fcmService.sendToDevice(10L, AlertType.OBSTACLE, occurredAt, "fid-phone"))
                         .willReturn(NotifyStatus.UNREGISTERED);
-                given(fcmService.sendToDevice(10L, AlertType.OBSTACLE, "fid-tablet"))
+                given(fcmService.sendToDevice(10L, AlertType.OBSTACLE, occurredAt, "fid-tablet"))
                         .willReturn(NotifyStatus.SENT);
 
                 //when

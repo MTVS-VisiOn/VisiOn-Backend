@@ -35,7 +35,8 @@ public class AlertRetryScheduler {
         if (targets.isEmpty()) return;
         log.info("Found {} retry targets", targets.size());
         for (RetryTarget target : targets) {
-            NotifyStatus status = fcmService.sendToDevice(target.alertId(), target.type(), target.fid());
+            NotifyStatus status = fcmService.sendToDevice(
+                    target.alertId(), target.type(), target.occurredAt(), target.fid());
             alertDeliveryService.applyResult(target.deliveryId(), status);
         }
     }

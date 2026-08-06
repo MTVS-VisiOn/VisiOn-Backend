@@ -39,7 +39,7 @@ public class AlertListener {
         List<String> fids = userService.getFids(guardianId);
         alertDeliveryService.createPending(event.alertId(), fids);
         Map<String, NotifyStatus> results =
-                        fcmService.sendNotification(event.alertId(), AlertType.OBSTACLE, fids);
+                        fcmService.sendNotification(event.alertId(), AlertType.OBSTACLE, event.occurredAt(), fids);
         alertDeliveryService.applyResults(event.alertId(), results);
     }
 }

@@ -243,9 +243,11 @@ class AlertDeliveryServiceTest {
             @DisplayName("It : 엔티티가 아니라 값으로 뽑아 돌려준다")
             void it_maps_to_value() {
                 //given
+                Instant occurredAt = Instant.parse("2026-08-06T06:12:00Z");
                 Alert alert = mock(Alert.class);
                 given(alert.getId()).willReturn(alertId);
                 given(alert.getType()).willReturn(AlertType.OBSTACLE);
+                given(alert.getOccurredAt()).willReturn(occurredAt);
 
                 AlertDelivery delivery = mock(AlertDelivery.class);
                 given(delivery.getId()).willReturn(100L);
@@ -258,9 +260,9 @@ class AlertDeliveryServiceTest {
                 //when
                 List<RetryTarget> targets = alertDeliveryService.findRetryTargets();
 
-                //then
+                //then - 재전송도 원래 발생 시각으로 문구를 만들어야 한다
                 assertThat(targets).containsExactly(
-                        new RetryTarget(100L, alertId, AlertType.OBSTACLE, "fid-phone"));
+                        new RetryTarget(100L, alertId, AlertType.OBSTACLE, occurredAt, "fid-phone"));
             }
 
             @Test

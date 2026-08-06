@@ -155,7 +155,7 @@ class AlertServiceTest {
             }
 
             @Test
-            @DisplayName("It : 저장된 alertId와 wardId를 담아 ObstacleDetected를 발행한다")
+            @DisplayName("It : 저장된 alertId·wardId·occurredAt을 담아 ObstacleDetected를 발행한다")
             void it_publishes_event() {
                 //given
                 givenExternalCallsSucceed();
@@ -170,6 +170,8 @@ class AlertServiceTest {
 
                 assertThat(captor.getValue().alertId()).isEqualTo(alertId);
                 assertThat(captor.getValue().wardId()).isEqualTo(wardId);
+                // 푸시 문구의 시각이 여기서 온다. 빠지면 리스너가 알 방법이 없다
+                assertThat(captor.getValue().occurredAt()).isEqualTo(occurredAt);
             }
         }
 

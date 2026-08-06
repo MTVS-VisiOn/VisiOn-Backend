@@ -17,6 +17,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -45,12 +47,13 @@ class FcmServiceTest {
 
     Long alertId = 10L;
     int maxAttempts = 3;
+    Instant occurredAt = Instant.parse("2026-08-06T06:12:00Z");   // KST 오후 3:12
 
     /** @Value 필드는 단위 테스트에서 주입되지 않는다. yml과 같은 값을 넣는다 */
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(fcmService, "maxAttempts", maxAttempts);
-        ReflectionTestUtils.setField(fcmService, "expireMinutes", 5L);
+        ReflectionTestUtils.setField(fcmService, "pushTtl", Duration.ofHours(24));
     }
 
     /** 생성자가 막혀 있어 직접 만들 수 없다. Mockito가 생성자를 우회해 만든다 */
@@ -61,7 +64,7 @@ class FcmServiceTest {
     }
 
     private Map<String, NotifyStatus> send(List<String> fids) {
-        return fcmService.sendNotification(alertId, AlertType.OBSTACLE, fids);
+        return fcmService.sendNotification(alertId, AlertType.OBSTACLE, occurredAt, fids);
     }
 
     @Nested
@@ -128,11 +131,42 @@ class FcmServiceTest {
     }
 
     @Nested
+    @DisplayName("Describe: titleOf 메서드는")
+    class Describe_with_titleOf {
+
+        @Nested
+        @DisplayName("Context: 발생 시각과 타입이 주어지면")
+        class Context_with_occurred_at {
+
+            @Test
+            @DisplayName("It : KST 시각과 타입 라벨을 붙여 만든다")
+            void it_formats_in_kst() {
+                //given - UTC 06:12는 KST 15:12다
+                //when
+                String title = fcmService.titleOf(AlertType.OBSTACLE, occurredAt);
+
+                //then - UTC로 새면 "오전 6:12"가 된다
+                assertThat(title).isEqualTo("오후 3:12 · 장애물 감지");
+            }
+
+            @Test
+            @DisplayName("It : 타입마다 다른 라벨을 쓴다")
+            void it_uses_type_label() {
+                //when-then
+                assertThat(fcmService.titleOf(AlertType.DISCONNECTED, occurredAt))
+                        .isEqualTo("오후 3:12 · 연결 끊김");
+                assertThat(fcmService.titleOf(AlertType.LOW_BATTERY, occurredAt))
+                        .isEqualTo("오후 3:12 · 배터리 부족");
+            }
+        }
+    }
+
+    @Nested
     @DisplayName("Describe: sendToDevice 메서드는")
     class Describe_with_sendToDevice {
 
         private NotifyStatus sendTo(String fid) {
-            return fcmService.sendToDevice(alertId, AlertType.OBSTACLE, fid);
+            return fcmService.sendToDevice(alertId, AlertType.OBSTACLE, occurredAt, fid);
         }
 
         @Nested

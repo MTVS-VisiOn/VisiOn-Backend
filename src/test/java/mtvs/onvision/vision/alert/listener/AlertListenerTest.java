@@ -19,6 +19,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -53,7 +54,9 @@ class AlertListenerTest {
     Long wardId = 2L;
     Long guardianId = 1L;
 
-    ObstacleDetected event = new ObstacleDetected(alertId, wardId);
+    Instant occurredAt = Instant.parse("2026-08-06T06:12:00Z");
+
+    ObstacleDetected event = new ObstacleDetected(alertId, wardId, occurredAt);
 
     @SuppressWarnings("unchecked")
     private ArgumentCaptor<List<String>> fidCaptor() {
@@ -88,7 +91,8 @@ class AlertListenerTest {
 
                 //then
                 ArgumentCaptor<List<String>> captor = fidCaptor();
-                verify(fcmService).sendNotification(eq(alertId), eq(AlertType.OBSTACLE), captor.capture());
+                verify(fcmService).sendNotification(
+                        eq(alertId), eq(AlertType.OBSTACLE), eq(occurredAt), captor.capture());
 
                 assertThat(captor.getValue()).containsExactlyElementsOf(fids);
             }
@@ -103,7 +107,8 @@ class AlertListenerTest {
                 Map<String, NotifyStatus> results = Map.of(
                         "fid-phone", NotifyStatus.SENT,
                         "fid-tablet", NotifyStatus.FAILED);
-                given(fcmService.sendNotification(alertId, AlertType.OBSTACLE, fids)).willReturn(results);
+                given(fcmService.sendNotification(alertId, AlertType.OBSTACLE, occurredAt, fids))
+                        .willReturn(results);
 
                 //when
                 alertListener.handleAlertEvent(event);
@@ -111,7 +116,7 @@ class AlertListenerTest {
                 //then - 순서가 뒤집히면 프로세스가 죽었을 때 스케줄러가 찾을 행이 없다
                 InOrder order = inOrder(alertDeliveryService, fcmService);
                 order.verify(alertDeliveryService).createPending(alertId, fids);
-                order.verify(fcmService).sendNotification(alertId, AlertType.OBSTACLE, fids);
+                order.verify(fcmService).sendNotification(alertId, AlertType.OBSTACLE, occurredAt, fids);
                 order.verify(alertDeliveryService).applyResults(alertId, results);
             }
         }
@@ -133,7 +138,8 @@ class AlertListenerTest {
 
                 //then
                 ArgumentCaptor<List<String>> captor = fidCaptor();
-                verify(fcmService).sendNotification(eq(alertId), eq(AlertType.OBSTACLE), captor.capture());
+                verify(fcmService).sendNotification(
+                        eq(alertId), eq(AlertType.OBSTACLE), eq(occurredAt), captor.capture());
 
                 assertThat(captor.getValue()).isEmpty();
             }

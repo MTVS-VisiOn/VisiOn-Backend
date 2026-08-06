@@ -83,7 +83,7 @@ public class AlertService {
         Alert alert = new Alert(type, request.message(), request.latitude(), request.longitude(),
                 address, s3Key, request.occurredAt(), request.action(), sender);
         alertRepository.save(alert);
-        eventPublisher.publishEvent(new ObstacleDetected(alert.getId(), currentUser.getId()));
+        eventPublisher.publishEvent(new ObstacleDetected(alert.getId(), currentUser.getId(), alert.getOccurredAt()));
     }
 
     @Transactional(readOnly = true)
