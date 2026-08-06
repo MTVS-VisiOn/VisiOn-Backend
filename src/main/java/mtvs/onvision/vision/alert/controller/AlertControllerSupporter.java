@@ -43,6 +43,11 @@ public interface AlertControllerSupporter {
 
                     저장이 끝나면 보호자에게 푸시 알림이 비동기로 발송된다.
                     알림 발송 실패는 이 API의 응답에 영향을 주지 않는다(저장은 성공으로 응답한다).
+                    **보호자가 연결돼 있지 않거나 등록된 기기가 없어도 이 API는 200을 돌려준다.**
+                    발송은 응답 이후 별도 스레드에서 일어나므로 그 실패가 응답에 반영될 수 없다.
+
+                    발송에 실패하면 즉시 3회까지 재시도하고, 그래도 안 되면 1분 간격으로 다시 보낸다.
+                    감지 시각 기준 5분이 지나면 포기한다. 따라서 **푸시가 감지 시각보다 최대 5분 늦게 도착할 수 있다.**
 
                     `occurredAt`은 ISO-8601 UTC(`Z`)로 보낸다. 예) `2026-08-05T09:12:33.512Z`
 
@@ -114,25 +119,6 @@ public interface AlertControllerSupporter {
                                                         "success": false,
                                                         "code": "ACCESS_DENIED",
                                                         "message": "권한이 없습니다.",
-                                                        "data": null
-                                                    }
-                                                    """
-                                    )
-                            )
-                    }
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "피보호자에게 연결된 보호자가 없을 때",
-                    content = {
-                            @Content(
-                                    mediaType = MediaType.APPLICATION_JSON_VALUE,
-                                    examples = @ExampleObject(
-                                            value = """
-                                                    {
-                                                        "success": false,
-                                                        "code": "NOT_FOUND_RELATION",
-                                                        "message": "보호자와 피보호자의 관계를 찾을 수 없습니다.",
                                                         "data": null
                                                     }
                                                     """
