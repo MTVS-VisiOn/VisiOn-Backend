@@ -23,7 +23,8 @@ public interface PresenceControllerSupporter {
             description = """
                     피보호자만 가능.
 
-                    생존신호를 저장하는 것 외에 **배터리 부족 알림**이라는 부수효과가 있다.
+                    생존신호를 저장하는 것 외에 **배터리 부족 알림**과 **연결 끊김 알림**이라는 부수효과가 있다.
+                    둘 다 보호자에게 푸시로 나가고, 이 API의 응답에는 반영되지 않는다.
 
                     ## 배터리 부족 알림
                     직전 heartbeat의 `battery`와 비교해 임계값(`20`, `10`, `5`)을 **새로 내려간 순간**에만
@@ -41,11 +42,28 @@ public interface PresenceControllerSupporter {
                     넘게 끊겼다 돌아온 경우가 여기 해당한다. 비교 대상이 없으면 '내려갔다'를 알 수 없기 때문이며,
                     이 구간에 지나간 임계값은 건너뛴다.
 
+                    ## 연결 끊김 알림
+                    **`network.connected`가 `true`인 heartbeat가 도착할 때만** 감시 목록의 시각이
+                    `lastSync`로 갱신된다. 신호는 왔지만 네트워크가 끊겼다고 보고한 heartbeat는 갱신하지 않는다.
+                    조회 API(`GET /api/presence`)의 연결 판정과 같은 기준을 쓰기 위해서다.
+
+                    서버가 주기적으로 감시 목록을 훑어, 마지막 갱신이 **120초**를 넘긴 피보호자를 찾으면
+                    보호자에게 푸시를 보내고 그 피보호자를 목록에서 지운다. 그래서 **끊겨 있는 동안 반복 발송되지 않고,
+                    재연결해서 heartbeat가 다시 오면 그때부터 다시 감시 대상이 된다.**
+
+                    감지는 주기적으로 돌기 때문에 **끊긴 시각과 푸시가 나가는 시각 사이에 최대 한 주기만큼 지연**이 있다.
+                    푸시 제목의 시각은 감지한 시각이 아니라 **마지막으로 정상 연결이었던 시각**이다.
+
+                    피보호자가 로그아웃하거나 앱을 종료해도 heartbeat가 끊기므로 같은 알림이 나간다.
+                    고장과 구분되지 않는다.
+
+                    ## 공통
                     **발송은 비동기다.** 201을 받았다고 알림이 갔다는 뜻이 아니고, 발송 실패도 이 응답에
                     반영되지 않는다.
 
-                    알림 이력은 `GET /api/alerts/lastweek`과 `GET /api/alerts/{alertId}`에 `LOW_BATTERY`
-                    타입으로 남는다. 이미지와 위치가 없는 알림이라 **`presignedUrl`과 `occurredPlace`가 null**이다.
+                    알림 이력은 `GET /api/alerts/lastweek`과 `GET /api/alerts/{alertId}`에 각각
+                    `LOW_BATTERY`·`DISCONNECTED` 타입으로 남는다. 둘 다 이미지와 위치가 없는 알림이라
+                    **`presignedUrl`과 `occurredPlace`가 null**이다.
                     """,
             extensions = @Extension(properties = @ExtensionProperty(name = "x-order", value = "1"))
     )

@@ -37,6 +37,7 @@ presence:
   battery:
     thresholds: 20,10,5
   disconnect:
+    threshold-seconds: 120
     enabled: false
 alert:
   retry:

@@ -29,8 +29,9 @@ public class PresenceService {
     @Value("${presence.battery.thresholds}")
     private List<Integer> thresholds;
 
+    // static이면 @Value가 주입되지 않아 0으로 남는다. getIsRecent가 항상 false가 된다
     @Value("${presence.disconnect.threshold-seconds}")
-    private static long thresholdSeconds;
+    private long thresholdSeconds;
 
     //heartbeat 저장, 배터리 부족시 경고 알림 보내기
     public void saveHeartBeat(HeartbeatRequest request, CurrentUser currentUser) {
@@ -80,7 +81,7 @@ public class PresenceService {
         return isRecent && networkConnected;
     }
 
-    private static boolean getIsRecent(Instant lastSync) {
+    private boolean getIsRecent(Instant lastSync) {
         return lastSync.isAfter(Instant.now().minusSeconds(thresholdSeconds));
     }
 

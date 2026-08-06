@@ -388,6 +388,110 @@ class AlertServiceTest {
     }
 
     @Nested
+    @DisplayName("Describe: detectDisconnect 메서드는")
+    class Describe_with_detectDisconnect {
+
+        private void givenCooldownAvailable() {
+            given(alertNotificationRepository.tryStartCooldown(wardId, AlertType.DISCONNECTED)).willReturn(true);
+            given(userService.currentUserToUser(wardId)).willReturn(wardEntity);
+        }
+
+        @Nested
+        @DisplayName("Context: 쿨다운 중이 아니면")
+        class Context_without_cooldown {
+
+            @Test
+            @DisplayName("It : 마지막 정상 연결 시각을 occurredAt으로 Alert를 저장하고 id를 돌려준다")
+            void it_saves_alert() {
+                //given - occurredAt은 감지한 시각이 아니라 끊긴 시각이다. 스케줄러가 값으로 넘겨준다
+                givenCooldownAvailable();
+                givenSaveAssignsId();
+
+                //when
+                Optional<Long> saved = alertService.detectDisconnect(occurredAt, wardId);
+
+                //then
+                assertThat(saved).contains(alertId);
+
+                ArgumentCaptor<Alert> captor = ArgumentCaptor.forClass(Alert.class);
+                verify(alertRepository).save(captor.capture());
+
+                Alert alert = captor.getValue();
+                assertThat(alert.getType()).isEqualTo(AlertType.DISCONNECTED);
+                assertThat(alert.getContent()).isEqualTo("기기의 연결이 끊어졌습니다.");
+                assertThat(alert.getOccurredAt()).isEqualTo(occurredAt);
+                assertThat(alert.getSender()).isEqualTo(wardEntity);
+                // 이미지도 위치도 없는 알림이다
+                assertThat(alert.getS3Key()).isNull();
+                assertThat(alert.getLatitude()).isNull();
+                assertThat(alert.getLongitude()).isNull();
+                assertThat(alert.getAddress()).isNull();
+                assertThat(alert.getAction()).isNull();
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 쿨다운 중이면")
+        class Context_with_active_cooldown {
+
+            @Test
+            @DisplayName("It : 빈 값을 돌려주고 저장하지 않는다")
+            void it_skips_everything() {
+                //given - 스케줄러가 중복 실행됐을 때의 방어다. 정상 경로에서는 unwatch가 먼저 막는다
+                given(alertNotificationRepository.tryStartCooldown(wardId, AlertType.DISCONNECTED)).willReturn(false);
+
+                //when
+                Optional<Long> saved = alertService.detectDisconnect(occurredAt, wardId);
+
+                //then
+                assertThat(saved).isEmpty();
+                verifyNoInteractions(userService);
+                verify(alertRepository, never()).save(any());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 트랜잭션이 롤백되면")
+        class Context_with_rollback {
+
+            @Test
+            @DisplayName("It : 쿨다운을 되돌린다")
+            void it_clears_cooldown() {
+                //given
+                givenCooldownAvailable();
+                givenSaveAssignsId();
+                alertService.detectDisconnect(occurredAt, wardId);
+
+                //when
+                triggerAfterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK);
+
+                //then
+                verify(alertNotificationRepository).clearCooldown(wardId, AlertType.DISCONNECTED);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 트랜잭션이 정상 커밋되면")
+        class Context_with_commit {
+
+            @Test
+            @DisplayName("It : 쿨다운을 유지한다")
+            void it_keeps_cooldown() {
+                //given
+                givenCooldownAvailable();
+                givenSaveAssignsId();
+                alertService.detectDisconnect(occurredAt, wardId);
+
+                //when
+                triggerAfterCompletion(TransactionSynchronization.STATUS_COMMITTED);
+
+                //then
+                verify(alertNotificationRepository, never()).clearCooldown(any(), any());
+            }
+        }
+    }
+
+    @Nested
     @DisplayName("Describe: getAlertDetail 메서드는")
     class Describe_with_getAlertDetail {
 

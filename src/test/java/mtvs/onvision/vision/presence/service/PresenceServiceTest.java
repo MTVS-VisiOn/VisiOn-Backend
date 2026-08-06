@@ -30,6 +30,7 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -66,6 +67,7 @@ class PresenceServiceTest {
     @BeforeEach
     void injectThresholds() {
         ReflectionTestUtils.setField(presenceService, "thresholds", List.of(20, 10, 5));
+        ReflectionTestUtils.setField(presenceService, "thresholdSeconds", 120L);
     }
 
     /** lastSync가 2분 이내면 최근(isRecent=true)으로 판정된다 */
@@ -115,6 +117,56 @@ class PresenceServiceTest {
 
                 //when
                 presenceService.saveHeartBeat(request, ward);
+
+                //then
+                verify(presenceRepository).saveHeartbeat(wardId, heartbeatJson);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 네트워크가 연결된 heartbeat면")
+        class Context_with_connected_network {
+
+            @Test
+            @DisplayName("It : lastSync를 점수로 감시 목록을 갱신한다")
+            void it_marks_connected() {
+                //given - 갱신된 시각이 곧 '마지막으로 정상 연결이었던 시각'이 된다
+                Instant lastSync = Instant.parse("2026-08-06T06:12:00Z");
+
+                //when
+                presenceService.saveHeartBeat(heartbeat(true, 80, true, lastSync), ward);
+
+                //then
+                verify(presenceRepository).markConnected(wardId, lastSync);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 네트워크가 끊긴 채 도착한 heartbeat면")
+        class Context_with_disconnected_network {
+
+            @Test
+            @DisplayName("It : 감시 목록을 갱신하지 않는다")
+            void it_does_not_mark_connected() {
+                //given - 신호는 왔지만 getIsConnected 기준으로는 연결이 아니다.
+                // 여기서 갱신해 버리면 늙지 않아 연결 끊김이 영영 감지되지 않는다
+                Instant lastSync = Instant.parse("2026-08-06T06:12:00Z");
+
+                //when
+                presenceService.saveHeartBeat(heartbeat(true, 80, false, lastSync), ward);
+
+                //then
+                verify(presenceRepository, never()).markConnected(any(), any());
+            }
+
+            @Test
+            @DisplayName("It : heartbeat 저장은 그대로 한다")
+            void it_still_saves_heartbeat() {
+                //given - 조회(GET /api/presence)는 이 값으로 상태를 판정하므로 저장은 막지 않는다
+                given(objectMapper.writeValueAsString(any(HeartbeatRequest.class))).willReturn(heartbeatJson);
+
+                //when
+                presenceService.saveHeartBeat(heartbeat(true, 80, false, Instant.now()), ward);
 
                 //then
                 verify(presenceRepository).saveHeartbeat(wardId, heartbeatJson);
