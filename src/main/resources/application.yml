@@ -38,7 +38,10 @@ redis:
 presence: #배터리 부족 기준
   battery:
     thresholds: 20,10,5
-
+  disconnect:
+    threshold-seconds: 120
+    interval: 30s
+    enabled: true
 alert:
   retry:
     max-attempts: 3        # FcmService 즉시 재시도 횟수

@@ -36,6 +36,8 @@ redis:
 presence:
   battery:
     thresholds: 20,10,5
+  disconnect:
+    enabled: false
 alert:
   retry:
     max-attempts: 3        # FcmService 즉시 재시도 횟수

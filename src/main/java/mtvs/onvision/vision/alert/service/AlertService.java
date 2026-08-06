@@ -131,4 +131,27 @@ public class AlertService {
         alertRepository.save(alert);
         return Optional.of(alert.getId());
     }
+
+    @Transactional
+    public Optional<Long> detectDisconnect(Instant occurredAt, Long userId) {
+        AlertType type = AlertType.DISCONNECTED;
+        //쿨다운이면 저장,푸쉬 막음
+        if (!alertNotificationRepository.tryStartCooldown(userId, type)) {
+            log.info("Disconnect detection skipped by cooldown: wardId={}", userId);
+            return Optional.empty();
+        }
+        //저장이 롤백되면 쿨다운도 되돌리기
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status == STATUS_ROLLED_BACK) {
+                    alertNotificationRepository.clearCooldown(userId, type);
+                }
+            }
+        });
+        Alert alert = new Alert(type,"기기의 연결이 끊어졌습니다.", occurredAt, userService.currentUserToUser(userId));
+        log.info("disconnect alert detected: {}",userId);
+        alertRepository.save(alert);
+        return Optional.of(alert.getId());
+    }
 }

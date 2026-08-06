@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import mtvs.onvision.vision.alert.domain.AlertType;
 import mtvs.onvision.vision.alert.domain.NotifyStatus;
+import mtvs.onvision.vision.presence.event.DisconnectDetected;
 import mtvs.onvision.vision.presence.event.LowBatteryDetected;
 import mtvs.onvision.vision.alert.event.ObstacleDetected;
 import mtvs.onvision.vision.alert.repository.AlertNotificationRepository;
@@ -49,6 +50,13 @@ public class AlertListener {
         log.info("Received battery alert event {}", event);
         alertService.detectBatteryLow(event.battery(), event.occurredAt(), event.wardId()).ifPresent(
                 alertId -> deliver(alertId,AlertType.LOW_BATTERY, event.occurredAt(), event.wardId()));
+    }
+
+    @Async
+    @EventListener
+    public void handleDisconnectEvent(DisconnectDetected event) {
+        alertService.detectDisconnect(event.occurredAt(), event.wardId())
+                .ifPresent(alertId -> deliver(alertId, AlertType.DISCONNECTED, event.occurredAt(), event.wardId()));
     }
 
     private void deliver(Long alertId, AlertType type, Instant occurredAt, Long wardId) {

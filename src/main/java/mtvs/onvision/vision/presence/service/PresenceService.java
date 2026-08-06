@@ -1,11 +1,11 @@
 package mtvs.onvision.vision.presence.service;
 
 import lombok.RequiredArgsConstructor;
-import mtvs.onvision.vision.presence.event.LowBatteryDetected;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.presence.domain.PresenceType;
 import mtvs.onvision.vision.presence.dto.HeartbeatRequest;
 import mtvs.onvision.vision.presence.dto.PresenceResponse;
+import mtvs.onvision.vision.presence.event.LowBatteryDetected;
 import mtvs.onvision.vision.presence.repository.PresenceRepository;
 import mtvs.onvision.vision.user.service.UserService;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,10 +29,16 @@ public class PresenceService {
     @Value("${presence.battery.thresholds}")
     private List<Integer> thresholds;
 
+    @Value("${presence.disconnect.threshold-seconds}")
+    private static long thresholdSeconds;
+
     //heartbeat 저장, 배터리 부족시 경고 알림 보내기
     public void saveHeartBeat(HeartbeatRequest request, CurrentUser currentUser) {
         Integer previous = getPreviousBattery(currentUser.getId());   // 덮어쓰기 전에
         presenceRepository.saveHeartbeat(currentUser.getId(), objectMapper.writeValueAsString(request));
+        if (request.network().connected()) {
+            presenceRepository.markConnected(currentUser.getId(), request.lastSync());
+        }
 
         if (hasCrossed(previous, request.battery())) {
             eventPublisher.publishEvent(new LowBatteryDetected(
@@ -75,7 +81,7 @@ public class PresenceService {
     }
 
     private static boolean getIsRecent(Instant lastSync) {
-        return lastSync.isAfter(Instant.now().minusSeconds(120));
+        return lastSync.isAfter(Instant.now().minusSeconds(thresholdSeconds));
     }
 
     /** 이번 heartbeat에서 임계값을 새로 내려갔는가 */
