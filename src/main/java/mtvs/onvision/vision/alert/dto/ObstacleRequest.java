@@ -10,7 +10,7 @@ public record ObstacleRequest(
         @NotNull(message = "감지 시각은 필수값입니다.")
         @Schema(
                 examples = "2026-08-05T09:12:33.512Z",
-                description = "장애물을 감지한 시각. ISO-8601 UTC(Instant 형식). 기기 시계 기준이며 서버 수신 시각과 별도로 저장된다",
+                description = "장애물을 감지한 시각. ISO-8601 UTC(Instant 형식). 기기 시계 기준이며 서버 수신 시각과 별도로 저장된다. 푸시 제목의 시각(예: '오후 3:12 · 장애물 감지')도 이 값으로 만든다",
                 requiredMode = Schema.RequiredMode.REQUIRED
         )
         Instant occurredAt,
