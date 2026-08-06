@@ -27,10 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -91,7 +88,7 @@ public class AlertService {
         Alert alert = alertRepository.findById(alertId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ALERT));
         Long wardId = userService.getWardIdFromGuardianId(currentUser.getId());
         PreConditions.check(!alert.getSender().getId().equals(wardId), ErrorCode.NOT_GUARDIAN);
-        String presignedUrl = imageService.getPresignedUrl(alert.getS3Key());
+        String presignedUrl = alert.getS3Key() == null ? null : imageService.getPresignedUrl(alert.getS3Key());
         return AlertResponse.from(alert, presignedUrl);
     }
 
@@ -105,7 +102,33 @@ public class AlertService {
                 .collect(Collectors.groupingBy(
                         alert -> alert.getOccurredAt().atZone(SEOUL).toLocalDate(),
                         () -> new TreeMap<LocalDate, List<AlertResponse>>(Comparator.reverseOrder()),   // 최신 날짜부터
-                        Collectors.mapping(alert -> AlertResponse.from(alert, imageService.getPresignedUrl(alert.getS3Key())), Collectors.toList())
+                        Collectors.mapping(alert ->
+                            AlertResponse.from(alert, alert.getS3Key() == null ? null : imageService.getPresignedUrl(alert.getS3Key()))
+                        , Collectors.toList())
                 ));
+    }
+
+    @Transactional
+    public Optional<Long> detectBatteryLow(Integer battery, Instant occurredAt, Long userId) {
+        AlertType type = AlertType.LOW_BATTERY;
+        //쿨다운이면 저장,푸쉬 막음
+        if (!alertNotificationRepository.tryStartCooldown(userId, type)) {
+            log.info("Battery detection skipped by cooldown: wardId={}", userId);
+            return Optional.empty();
+        }
+        //저장이 롤백되면 쿨다운도 되돌리기
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status == STATUS_ROLLED_BACK) {
+                    alertNotificationRepository.clearCooldown(userId, type);
+                }
+            }
+        });
+        String message = "배터리 잔량이 %d%%남았습니다.".formatted(battery);
+        Alert alert = new Alert(type, message, occurredAt, userService.currentUserToUser(userId));
+        log.info("low battery alert detected: {}", message);
+        alertRepository.save(alert);
+        return Optional.of(alert.getId());
     }
 }

@@ -1,17 +1,21 @@
 package mtvs.onvision.vision.presence.service;
 
 import lombok.RequiredArgsConstructor;
+import mtvs.onvision.vision.presence.event.LowBatteryDetected;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.presence.domain.PresenceType;
 import mtvs.onvision.vision.presence.dto.HeartbeatRequest;
 import mtvs.onvision.vision.presence.dto.PresenceResponse;
 import mtvs.onvision.vision.presence.repository.PresenceRepository;
 import mtvs.onvision.vision.user.service.UserService;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -20,10 +24,20 @@ public class PresenceService {
     private final PresenceRepository presenceRepository;
     private final UserService userService;
     private final ObjectMapper objectMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
+    @Value("${presence.battery.thresholds}")
+    private List<Integer> thresholds;
+
+    //heartbeat 저장, 배터리 부족시 경고 알림 보내기
     public void saveHeartBeat(HeartbeatRequest request, CurrentUser currentUser) {
-        String json = objectMapper.writeValueAsString(request);
-        presenceRepository.saveHeartbeat(currentUser.getId(), json);
+        Integer previous = getPreviousBattery(currentUser.getId());   // 덮어쓰기 전에
+        presenceRepository.saveHeartbeat(currentUser.getId(), objectMapper.writeValueAsString(request));
+
+        if (hasCrossed(previous, request.battery())) {
+            eventPublisher.publishEvent(new LowBatteryDetected(
+                    currentUser.getId(), request.battery(), request.lastHeartbeat()));
+        }
     }
 
     @Transactional
@@ -62,5 +76,17 @@ public class PresenceService {
 
     private static boolean getIsRecent(Instant lastSync) {
         return lastSync.isAfter(Instant.now().minusSeconds(120));
+    }
+
+    /** 이번 heartbeat에서 임계값을 새로 내려갔는가 */
+    private boolean hasCrossed(Integer previous, int current) {
+        if (previous == null) return false;
+        return thresholds.stream().anyMatch(t -> previous > t && current <= t);
+    }
+
+    private Integer getPreviousBattery(Long userId) {
+        return presenceRepository.getLastHeartbeat(userId)
+                .map(json -> objectMapper.readValue(json, HeartbeatRequest.class).battery())
+                .orElse(null);
     }
 }

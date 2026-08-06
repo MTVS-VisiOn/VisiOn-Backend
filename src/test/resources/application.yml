@@ -19,6 +19,8 @@ spring:
     aws:
       region:
         static: ap-northeast-2
+
+
 jwt:
   validations:
     access: 900000   #밀리초 단위
@@ -31,6 +33,9 @@ redis:
     navigation: 30  #분단위
     alert-cooldown: 60  #초단위
     alert-notified: 3600  #초단위
+presence:
+  battery:
+    thresholds: 20,10,5
 alert:
   retry:
     max-attempts: 3        # FcmService 즉시 재시도 횟수

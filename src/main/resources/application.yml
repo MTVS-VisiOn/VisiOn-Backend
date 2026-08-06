@@ -34,6 +34,11 @@ redis:
     navigation: 30  #분단위
     alert-cooldown: 60  #초단위
     alert-notified: 3600  #초단위
+
+presence: #배터리 부족 기준
+  battery:
+    thresholds: 20,10,5
+
 alert:
   retry:
     max-attempts: 3        # FcmService 즉시 재시도 횟수
@@ -43,6 +48,7 @@ alert:
     # FCM이 오프라인 기기용으로 쌓아두는 기간. 서버 재시도와 다른 층이다.
     # 미설정 시 기본이 4주라 길고, 하루 넘게 꺼져 있었으면 알림 목록으로 보면 된다
     ttl: 24h
+
 tmap:
   base-url: https://apis.openapi.sk.com
   app-key: ${TMAP_APP_KEY}

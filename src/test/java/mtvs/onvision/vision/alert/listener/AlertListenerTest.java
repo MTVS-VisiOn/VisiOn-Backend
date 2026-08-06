@@ -87,7 +87,7 @@ class AlertListenerTest {
                 given(userService.getFids(guardianId)).willReturn(fids);
 
                 //when
-                alertListener.handleAlertEvent(event);
+                alertListener.handleObstacleEvent(event);
 
                 //then
                 ArgumentCaptor<List<String>> captor = fidCaptor();
@@ -111,7 +111,7 @@ class AlertListenerTest {
                         .willReturn(results);
 
                 //when
-                alertListener.handleAlertEvent(event);
+                alertListener.handleObstacleEvent(event);
 
                 //then - 순서가 뒤집히면 프로세스가 죽었을 때 스케줄러가 찾을 행이 없다
                 InOrder order = inOrder(alertDeliveryService, fcmService);
@@ -134,7 +134,7 @@ class AlertListenerTest {
                 given(userService.getFids(guardianId)).willReturn(List.of());
 
                 //when
-                alertListener.handleAlertEvent(event);
+                alertListener.handleObstacleEvent(event);
 
                 //then
                 ArgumentCaptor<List<String>> captor = fidCaptor();
@@ -158,7 +158,7 @@ class AlertListenerTest {
                         .willThrow(new BusinessException(ErrorCode.NOT_FOUND_RELATION));
 
                 //when-then
-                assertThatThrownBy(() -> alertListener.handleAlertEvent(event))
+                assertThatThrownBy(() -> alertListener.handleObstacleEvent(event))
                         .isInstanceOf(BusinessException.class)
                         .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND_RELATION);
 
@@ -177,7 +177,7 @@ class AlertListenerTest {
                 given(alertNotificationRepository.markNotified(alertId)).willReturn(false);
 
                 //when
-                alertListener.handleAlertEvent(event);
+                alertListener.handleObstacleEvent(event);
 
                 //then
                 verifyNoInteractions(userService, fcmService, alertDeliveryService);
