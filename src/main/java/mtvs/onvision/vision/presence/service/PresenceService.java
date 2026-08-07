@@ -66,7 +66,7 @@ public class PresenceService {
             if (networkConnected) status = PresenceType.NORMAL;
             else status = PresenceType.NOT_NETWORK;
         } else {
-            if (networkConnected) status = PresenceType.NOT_NETWORK;
+            if (networkConnected) status = PresenceType.DELAY_SYNC;
             else status = PresenceType.NOT_FOUND;
         }
         return new PresenceResponse(heartbeat.battery(),  heartbeat.deviceConnected(), networkConnected, status.getDescription());

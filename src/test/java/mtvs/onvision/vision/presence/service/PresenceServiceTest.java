@@ -380,8 +380,8 @@ class PresenceServiceTest {
         class Context_with_stale_sync_and_network {
 
             @Test
-            @DisplayName("It : NOT_NETWORK 상태를 반환한다")
-            void it_return_not_network() {
+            @DisplayName("It : DELAY_SYNC 상태를 반환한다")
+            void it_return_delay_sync() {
                 //given
                 HeartbeatRequest heartbeat = heartbeat(true, 50, true, Instant.now().minusSeconds(200));
                 given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
@@ -392,7 +392,7 @@ class PresenceServiceTest {
                 PresenceResponse response = presenceService.getWardPresence(guardian);
 
                 //then
-                assertThat(response.status()).isEqualTo(PresenceType.NOT_NETWORK.getDescription());
+                assertThat(response.status()).isEqualTo(PresenceType.DELAY_SYNC.getDescription());
             }
         }
 
