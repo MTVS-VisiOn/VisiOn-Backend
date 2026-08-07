@@ -5,13 +5,17 @@ import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.presence.domain.PresenceType;
 import mtvs.onvision.vision.presence.dto.HeartbeatRequest;
 import mtvs.onvision.vision.presence.dto.PresenceResponse;
+import mtvs.onvision.vision.presence.event.LowBatteryDetected;
 import mtvs.onvision.vision.presence.repository.PresenceRepository;
 import mtvs.onvision.vision.user.service.UserService;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -20,10 +24,27 @@ public class PresenceService {
     private final PresenceRepository presenceRepository;
     private final UserService userService;
     private final ObjectMapper objectMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
+    @Value("${presence.battery.thresholds}")
+    private List<Integer> thresholds;
+
+    // static이면 @Value가 주입되지 않아 0으로 남는다. getIsRecent가 항상 false가 된다
+    @Value("${presence.disconnect.threshold-seconds}")
+    private long thresholdSeconds;
+
+    //heartbeat 저장, 배터리 부족시 경고 알림 보내기
     public void saveHeartBeat(HeartbeatRequest request, CurrentUser currentUser) {
-        String json = objectMapper.writeValueAsString(request);
-        presenceRepository.saveHeartbeat(currentUser.getId(), json);
+        Integer previous = getPreviousBattery(currentUser.getId());   // 덮어쓰기 전에
+        presenceRepository.saveHeartbeat(currentUser.getId(), objectMapper.writeValueAsString(request));
+        if (request.network().connected()) {
+            presenceRepository.markConnected(currentUser.getId(), request.lastSync());
+        }
+
+        if (hasCrossed(previous, request.battery())) {
+            eventPublisher.publishEvent(new LowBatteryDetected(
+                    currentUser.getId(), request.battery(), request.lastHeartbeat()));
+        }
     }
 
     @Transactional
@@ -45,7 +66,7 @@ public class PresenceService {
             if (networkConnected) status = PresenceType.NORMAL;
             else status = PresenceType.NOT_NETWORK;
         } else {
-            if (networkConnected) status = PresenceType.NOT_NETWORK;
+            if (networkConnected) status = PresenceType.DELAY_SYNC;
             else status = PresenceType.NOT_FOUND;
         }
         return new PresenceResponse(heartbeat.battery(),  heartbeat.deviceConnected(), networkConnected, status.getDescription());
@@ -60,7 +81,19 @@ public class PresenceService {
         return isRecent && networkConnected;
     }
 
-    private static boolean getIsRecent(Instant lastSync) {
-        return lastSync.isAfter(Instant.now().minusSeconds(120));
+    private boolean getIsRecent(Instant lastSync) {
+        return lastSync.isAfter(Instant.now().minusSeconds(thresholdSeconds));
+    }
+
+    /** 이번 heartbeat에서 임계값을 새로 내려갔는가 */
+    private boolean hasCrossed(Integer previous, int current) {
+        if (previous == null) return false;
+        return thresholds.stream().anyMatch(t -> previous > t && current <= t);
+    }
+
+    private Integer getPreviousBattery(Long userId) {
+        return presenceRepository.getLastHeartbeat(userId)
+                .map(json -> objectMapper.readValue(json, HeartbeatRequest.class).battery())
+                .orElse(null);
     }
 }
