@@ -50,6 +50,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET,"/api/alerts/**").hasAuthority("GUARDIAN")
                         .requestMatchers("/api/commands/instruction").hasAuthority("GUARDIAN")
                         .requestMatchers(HttpMethod.GET,"/api/commands").hasAuthority("GUARDIAN")
+                        .requestMatchers("/api/instructions").hasAuthority("GUARDIAN")
                         .anyRequest().permitAll()
                 )
                 .exceptionHandling(exp -> exp
