@@ -6,6 +6,9 @@ import mtvs.onvision.vision.command.domain.Instruction;
 import mtvs.onvision.vision.command.dto.InstructionRequest;
 import mtvs.onvision.vision.command.dto.InstructionResponse;
 import mtvs.onvision.vision.command.repository.InstructionRepository;
+import mtvs.onvision.vision.common.exception.BusinessException;
+import mtvs.onvision.vision.common.exception.ErrorCode;
+import mtvs.onvision.vision.common.util.PreConditions;
 import mtvs.onvision.vision.user.domain.User;
 import mtvs.onvision.vision.user.service.UserService;
 import org.springframework.stereotype.Service;
@@ -32,4 +35,10 @@ public class InstructionService {
                 .stream().map(InstructionResponse::from).toList();
     }
 
+    @Transactional
+    public void updateInstruction(Long instructionId, InstructionRequest request, CurrentUser currentUser) {
+        Instruction instruction = instructionRepository.findById(instructionId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_INSTRUCTION));
+        PreConditions.check(!instruction.getGuardian().getId().equals(currentUser.getId()), ErrorCode.NOT_OWNER);
+        instruction.update(request.content());
+    }
 }

@@ -27,4 +27,8 @@ public class Instruction {
         this.instruction = instruction;
         this.guardian = guardian;
     }
+
+    public void update(String instruction) {
+        this.instruction = instruction;
+    }
 }

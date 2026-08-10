@@ -1,5 +1,6 @@
 package mtvs.onvision.vision.command.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.command.dto.InstructionRequest;
@@ -20,7 +21,7 @@ public class InstructionController {
     private final InstructionService instructionService;
 
     @PostMapping
-    public ResponseEntity<ApiResult<Void>> saveInstruction(@RequestBody InstructionRequest request,
+    public ResponseEntity<ApiResult<Void>> saveInstruction(@RequestBody @Valid InstructionRequest request,
                                                            @AuthenticationPrincipal CurrentUser currentUser) {
 
         instructionService.saveInstruction(request, currentUser);
@@ -31,5 +32,13 @@ public class InstructionController {
     public ResponseEntity<ApiResult<List<InstructionResponse>>> getInstructions(@AuthenticationPrincipal CurrentUser currentUser) {
         List<InstructionResponse> response = instructionService.getInstructions(currentUser);
         return ApiResult.ok(SuccessCode.INSTRUCTION_READ, response);
+    }
+
+    @PutMapping("/{instructionId}")
+    public ResponseEntity<ApiResult<Void>> updateInstruction(@PathVariable Long instructionId,
+                                                             @RequestBody @Valid InstructionRequest request,
+                                                             @AuthenticationPrincipal CurrentUser currentUser) {
+        instructionService.updateInstruction(instructionId, request, currentUser);
+        return ApiResult.ok(SuccessCode.INSTRUCTION_UPDATED);
     }
 }

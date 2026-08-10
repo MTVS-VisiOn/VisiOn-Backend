@@ -23,7 +23,7 @@ public enum ErrorCode {
     INVALID_REFRESH_TOKEN(HttpStatus.BAD_REQUEST, "refresh 토큰이 맞지 않습니다."),
     INVALID_REGISTER_TOKEN(HttpStatus.BAD_REQUEST, "register 토큰이 맞지 않습니다."),
     NOT_FOUND_FID(HttpStatus.NOT_FOUND, "사용자의 동록된 기기를 찾을 수 없습니다."),
-    NOT_OWNER(HttpStatus.FORBIDDEN, "해당 기기의 주인이 아닙니다."),
+    NOT_OWNER_FID(HttpStatus.FORBIDDEN, "해당 기기의 주인이 아닙니다."),
     NOT_GUARDIAN(HttpStatus.FORBIDDEN, "해당 피보호자의 보호자가 아닙니다."),
 
     /*signalling*/
@@ -56,9 +56,13 @@ public enum ErrorCode {
     /*Image*/
     STORAGE_WRITE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 저장에 실패했습니다."),
     STORAGE_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 삭제에 실패했습니다."),
-    
+
     /*Alert*/
-    NOT_FOUND_ALERT(HttpStatus.NOT_FOUND, "알림를 찾을 수 없습니다."),
+    NOT_FOUND_ALERT(HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다."),
+
+    /*Command*/
+    NOT_FOUND_INSTRUCTION(HttpStatus.NOT_FOUND, "빠른 지시어를 찾을 수 없습니다."),
+    NOT_OWNER(HttpStatus.FORBIDDEN, "주인이 아닙니다."),
 
     /*common*/
     REQUESTPARAM_REQUIRED(HttpStatus.BAD_REQUEST, "해당 파라미터는 필수값입니다. :::"),
