@@ -10,7 +10,6 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-import java.time.Instant;
 import java.util.List;
 
 @Slf4j
@@ -29,6 +28,6 @@ public class CommandListener {
             log.info("No device for ward: wardId={}", event.receiverId());
             return;
         }
-        fids.forEach(fid -> fcmService.sendToDevice(event.commandId(), event.content(), CommandType.GUARDIAN_INSTRUCTION, Instant.now(), fid));
+        fids.forEach(fid -> fcmService.sendToDevice(event.commandId(), event.content(), CommandType.GUARDIAN_INSTRUCTION, event.occurredAt(), fid));
     }
 }

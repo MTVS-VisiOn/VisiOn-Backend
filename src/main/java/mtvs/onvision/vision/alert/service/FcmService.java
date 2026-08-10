@@ -15,6 +15,8 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
+import static mtvs.onvision.vision.alert.service.AlertService.SEOUL;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -116,8 +118,7 @@ public class FcmService {
                 .putData("alertId", commandId.toString())
                 .putData("type", type.name())
                 .putData("content", content)
-                .putData("occurredAt", occurredAt.toString())
-
+                .putData("occurredAt", occurredAt.atZone(SEOUL).toLocalDateTime().toString())
                 .setAndroidConfig(AndroidConfig.builder()
                         .setPriority(AndroidConfig.Priority.HIGH)
                         // 기기가 오프라인인 건 장애가 아니다. 켜지면 그때라도 배달되게 둔다.
@@ -133,7 +134,7 @@ public class FcmService {
      * Firebase {@code Message}는 만든 내용을 되읽을 수 없어 package-private으로 열어 직접 검증한다.
      */
     String titleOf(AlertType type, Instant occurredAt) {
-        return TIME.format(occurredAt.atZone(AlertService.SEOUL)) + " · " + type.getLabel();
+        return TIME.format(occurredAt.atZone(SEOUL)) + " · " + type.getLabel();
     }
 
     private void sleep(long millis) {

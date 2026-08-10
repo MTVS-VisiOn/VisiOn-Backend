@@ -7,6 +7,8 @@ import lombok.NoArgsConstructor;
 import mtvs.onvision.vision.common.domain.HistoryEntity;
 import mtvs.onvision.vision.user.domain.User;
 
+import java.time.Instant;
+
 @Entity
 @Getter
 @Table(name = "commands")
@@ -24,6 +26,9 @@ public class Command extends HistoryEntity {
     @Enumerated(EnumType.STRING)
     private CommandType type;
 
+    @Column(nullable = false)
+    private Instant occurredAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(nullable = false)
     private User receiver;
@@ -31,6 +36,7 @@ public class Command extends HistoryEntity {
     public Command(String content, CommandType type, User receiver) {
         this.content = content;
         this.type = type;
+        this.occurredAt = Instant.now();
         this.receiver = receiver;
     }
 }

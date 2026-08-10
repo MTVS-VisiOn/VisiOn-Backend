@@ -49,6 +49,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/alerts/detect/obstacle").hasAuthority("WARD")
                         .requestMatchers(HttpMethod.GET,"/api/alerts/**").hasAuthority("GUARDIAN")
                         .requestMatchers("/api/commands/instruction").hasAuthority("GUARDIAN")
+                        .requestMatchers(HttpMethod.GET,"/api/commands").hasAuthority("GUARDIAN")
                         .anyRequest().permitAll()
                 )
                 .exceptionHandling(exp -> exp

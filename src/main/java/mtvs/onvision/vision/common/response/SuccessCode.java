@@ -48,7 +48,8 @@ public enum SuccessCode {
     ALERT_READ("알림 내용이 정상적으로 조회되었습니다."),
 
     /*Command*/
-    COMMAND_CREATED("명령어가 정상적으로 저장되었습니다."),
+    COMMAND_CREATED("지시어가 정상적으로 저장되었습니다."),
+    COMMAND_READ("지시어가 정상적으로 조회되었습니다."),
 
 
     /*common*/
