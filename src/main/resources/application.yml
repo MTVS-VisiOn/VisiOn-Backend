@@ -5,6 +5,20 @@ spring:
     import:
       - optional:file:.env[.properties]
       - optional:file:.env.${spring.profiles.active}[.properties]
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true  #flyway 설정
+    locations: classpath:db/migration    #flyway가 참조할 migration파일의 디렉토리 경로
+    baseline-on-migrate: false    #현재 DB상태를 기준선 버전으로 등록하고 그 이전 migration을 이미 적용된 것처럼 간주하여 적용x
+    validate-on-migrate: true     #적용된 migration의 체크섬이 파일과 일치하는지 검증
   data:
     redis:
       host: ${REDIS_HOST}

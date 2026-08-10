@@ -6,11 +6,12 @@ spring:
   sql:
     init:
       mode: never
-  datasource:
-    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    username: sa
-    password:
-    driver-class-name: org.h2.Driver
+  # DB를 쓰는 테스트는 PostgresContainerSupport를 상속해 Testcontainers로 실제 PostgreSQL을 띄운다.
+  # datasource 접속 정보는 그쪽에서 @DynamicPropertySource로 주입한다.
+  # 스키마는 Flyway가 만들고 Hibernate는 엔티티와 일치하는지 검증만 한다
+  jpa:
+    hibernate:
+      ddl-auto: validate
   data:
     redis:
       host: localhost

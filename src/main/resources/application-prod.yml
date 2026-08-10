@@ -4,16 +4,7 @@ springdoc:
   swagger-ui:
     enabled: false
 spring:
-  datasource:
-    url: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
-    username: ${POSTGRES_USER}
-    password: ${POSTGRES_PASSWORD}
-    driver-class-name: org.postgresql.Driver
-
   jpa:
-    hibernate:
-      ddl-auto: update
-
     show-sql: true
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     properties:

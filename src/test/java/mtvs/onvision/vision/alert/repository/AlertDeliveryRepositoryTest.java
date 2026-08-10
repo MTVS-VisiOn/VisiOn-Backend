@@ -5,12 +5,14 @@ import mtvs.onvision.vision.alert.domain.AlertDelivery;
 import mtvs.onvision.vision.alert.domain.AlertType;
 import mtvs.onvision.vision.alert.domain.NotifyStatus;
 import mtvs.onvision.vision.common.config.JpaConfig;
+import mtvs.onvision.vision.support.PostgresContainerSupport;
 import org.hibernate.Hibernate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.context.annotation.Import;
 
@@ -28,7 +30,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DataJpaTest
 @Import(JpaConfig.class)   // BaseEntity의 createdAt/updatedAt이 nullable = false다. 감사 설정이 필요하다
 @DisplayName("AlertDeliveryRepository의")
-class AlertDeliveryRepositoryTest {
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+class AlertDeliveryRepositoryTest extends PostgresContainerSupport {
 
     @Autowired
     private AlertDeliveryRepository alertDeliveryRepository;
