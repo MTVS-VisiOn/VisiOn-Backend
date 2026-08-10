@@ -12,13 +12,17 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
-
+      ddl-auto: none
     show-sql: true
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     properties:
       hibernate:
         format_sql: true
+  flyway:
+    enabled: true  #flyway 설정
+    locations: classpath:db/migration    #flyway가 참조할 migration파일의 디렉토리 경로
+    baseline-on-migrate: false    #현재 DB상태를 기준선 버전으로 등록하고 그 이전 migration을 이미 적용된 것처럼 간주하여 적용x
+    validate-on-migrate: true     #적용된 migration의 체크섬이 파일과 일치하는지 검증
 logging:
   level:
     root: info
