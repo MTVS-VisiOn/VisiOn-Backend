@@ -22,6 +22,9 @@ public enum ErrorCode {
     NOT_MATCH_PASSWORD(HttpStatus.BAD_REQUEST, "비밀번호가 일치하지 않습니다."),
     INVALID_REFRESH_TOKEN(HttpStatus.BAD_REQUEST, "refresh 토큰이 맞지 않습니다."),
     INVALID_REGISTER_TOKEN(HttpStatus.BAD_REQUEST, "register 토큰이 맞지 않습니다."),
+    NOT_FOUND_FID(HttpStatus.NOT_FOUND, "사용자의 동록된 기기를 찾을 수 없습니다."),
+    NOT_OWNER(HttpStatus.FORBIDDEN, "해당 기기의 주인이 아닙니다."),
+    NOT_GUARDIAN(HttpStatus.FORBIDDEN, "해당 피보호자의 보호자가 아닙니다."),
 
     /*signalling*/
     MAX_CONNECT(HttpStatus.CONFLICT, "이미 연결 중인 세션이 있어 참여할 수 없습니다."),
@@ -50,6 +53,12 @@ public enum ErrorCode {
     INVALID_TRANSIT_INDEX(HttpStatus.BAD_REQUEST, "대중교통 경로의 인덱스가 없습니다."),
     NOT_FOUND_ROUTE(HttpStatus.NOT_FOUND, "경로를 찾을 수 없습니다."),
 
+    /*Image*/
+    STORAGE_WRITE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 저장에 실패했습니다."),
+    STORAGE_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 삭제에 실패했습니다."),
+    
+    /*Alert*/
+    NOT_FOUND_ALERT(HttpStatus.NOT_FOUND, "알림를 찾을 수 없습니다."),
 
     /*common*/
     REQUESTPARAM_REQUIRED(HttpStatus.BAD_REQUEST, "해당 파라미터는 필수값입니다. :::"),
@@ -57,6 +66,8 @@ public enum ErrorCode {
     ALREADY_DELETED(HttpStatus.CONFLICT, "이미 삭제된 상태입니다."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류입니다."),
     BUSINESS_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "알 수 없는 오류입니다. ::: ");
+
+
 
     private final HttpStatus status;
     private final String message;

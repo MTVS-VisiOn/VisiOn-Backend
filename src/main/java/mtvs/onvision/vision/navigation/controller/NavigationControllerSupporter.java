@@ -11,11 +11,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.response.ApiResult;
-import mtvs.onvision.vision.navigation.dto.MapResponse;
-import mtvs.onvision.vision.navigation.dto.NavigationPreRequest;
-import mtvs.onvision.vision.navigation.dto.NavigationResponse;
-import mtvs.onvision.vision.navigation.dto.NavigationSummary;
-import mtvs.onvision.vision.navigation.dto.RouteRequest;
+import mtvs.onvision.vision.navigation.dto.*;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 

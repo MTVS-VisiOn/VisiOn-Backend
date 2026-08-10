@@ -1,0 +1,117 @@
+package mtvs.onvision.vision.alert.service;
+
+import com.google.firebase.messaging.*;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import mtvs.onvision.vision.alert.domain.AlertType;
+import mtvs.onvision.vision.alert.domain.NotifyStatus;
+import mtvs.onvision.vision.user.service.UserService;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class FcmService {
+    private final FirebaseMessaging firebaseMessaging;
+    private final UserService userService;
+
+    @Value("${alert.retry.max-attempts}")
+    private int maxAttempts;
+
+    @Value("${alert.push.ttl}")
+    private Duration pushTtl;
+
+    private static final long BACKOFF_MILLIS = 200L;
+
+    /** 푸시 제목의 발생 시각. 응답과 같은 KST 기준이다 */
+    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("a h:mm", Locale.KOREAN);
+
+    /** FCM 쪽 일시 장애. 다시 보내면 성공할 수 있다 */
+    private static final Set<MessagingErrorCode> RETRIABLE = EnumSet.of(
+            MessagingErrorCode.UNAVAILABLE,
+            MessagingErrorCode.INTERNAL,
+            MessagingErrorCode.QUOTA_EXCEEDED
+    );
+
+    /**
+     * 기기별 발송 결과를 돌려준다.
+     * SENT는 성공, FAILED는 재전송 대상, EXPIRED는 다시 보내도 같은 실패다.
+     */
+    public Map<String, NotifyStatus> sendNotification(Long alertId, AlertType type, Instant occurredAt, List<String> fids) {
+        Map<String, NotifyStatus> results = new LinkedHashMap<>();
+        for (String fid : fids) {
+            results.put(fid, sendToDevice(alertId, type, occurredAt, fid));
+        }
+        return results;
+    }
+
+    /** 기기 한 대에 보낸다. 일시 장애면 maxAttempts까지 즉시 재시도한다 */
+    public NotifyStatus sendToDevice(Long alertId, AlertType type, Instant occurredAt, String fid) {
+        Message message = buildMessage(alertId, type, occurredAt, fid);
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                String response = firebaseMessaging.send(message);
+                log.info("Successfully send Notification: {}", response);
+                return NotifyStatus.SENT;
+            } catch (FirebaseMessagingException e) {
+                MessagingErrorCode code = e.getMessagingErrorCode();
+                log.error("Fail to send Notification (fid={}, attempt={}/{}, code={}): {}",
+                        fid, attempt, maxAttempts, code, e.getMessage());
+
+                if (code == MessagingErrorCode.UNREGISTERED) {
+                    userService.deleteFid(fid);
+                    log.error("deleted unregistered fid: {}", fid);
+                    return NotifyStatus.UNREGISTERED;   // 만료가 아닌 연결된 기기가 사라진 상태
+                }
+                if (!RETRIABLE.contains(code)) {
+                    return NotifyStatus.EXPIRED;   // 요청 자체가 잘못됐다. 재전송해도 같다
+                }
+                if (attempt < maxAttempts) {
+                    sleep(BACKOFF_MILLIS * attempt);
+                }
+            }
+        }
+        return NotifyStatus.FAILED;   // 즉시 재시도로 못 넘겼다. 스케줄러가 다시 본다
+    }
+
+    private Message buildMessage(Long alertId, AlertType type, Instant occurredAt, String fid) {
+        return Message.builder()
+                .setFid(fid)
+                .setNotification(Notification.builder()
+                        .setTitle(titleOf(type, occurredAt))
+                        .setBody(type.getMessage())
+                        .build())
+                .putData("alertId", alertId.toString())
+                .putData("type", type.name())
+                .setAndroidConfig(AndroidConfig.builder()
+                        .setPriority(AndroidConfig.Priority.HIGH)
+                        // 기기가 오프라인인 건 장애가 아니다. 켜지면 그때라도 배달되게 둔다.
+                        // 서버 재시도 만료(alert.retry.expire-minutes)와는 다른 층이다
+                        .setTtl(pushTtl.toMillis())
+                        .build())
+                .build();
+    }
+
+    /**
+     * 예) "오후 3:12 · 장애물 감지". 늦게 도착해도 언제 일어난 일인지 알 수 있어야 한다.
+     * <p>
+     * Firebase {@code Message}는 만든 내용을 되읽을 수 없어 package-private으로 열어 직접 검증한다.
+     */
+    String titleOf(AlertType type, Instant occurredAt) {
+        return TIME.format(occurredAt.atZone(AlertService.SEOUL)) + " · " + type.getLabel();
+    }
+
+    private void sleep(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+}

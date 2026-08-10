@@ -6,15 +6,22 @@ spring:
   sql:
     init:
       mode: never
-  datasource:
-    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    username: sa
-    password:
-    driver-class-name: org.h2.Driver
+  # DB를 쓰는 테스트는 PostgresContainerSupport를 상속해 Testcontainers로 실제 PostgreSQL을 띄운다.
+  # datasource 접속 정보는 그쪽에서 @DynamicPropertySource로 주입한다.
+  # 스키마는 Flyway가 만들고 Hibernate는 엔티티와 일치하는지 검증만 한다
+  jpa:
+    hibernate:
+      ddl-auto: validate
   data:
     redis:
       host: localhost
       port: 6379
+  cloud:
+    aws:
+      region:
+        static: ap-northeast-2
+
+
 jwt:
   validations:
     access: 900000   #밀리초 단위
@@ -25,7 +32,29 @@ redis:
     presence: 180  #초단위
     location: 30  #분단위
     navigation: 30  #분단위
-
+    alert-cooldown: 60  #초단위
+    alert-notified: 3600  #초단위
+presence:
+  battery:
+    thresholds: 20,10,5
+  disconnect:
+    threshold-seconds: 120
+    enabled: false
+alert:
+  retry:
+    max-attempts: 3        # FcmService 즉시 재시도 횟수
+    expire-minutes: 5      # 이 시간을 넘긴 미발송 건은 서버가 재전송을 포기한다
+    interval: 1m # 재전송 스케줄러 주기, 1분
+    enabled: false
+  push:
+    ttl: 24h
 tmap:
   base-url: https://apis.openapi.sk.com
   app-key: test
+s3:
+  bucket-name: test
+  access-key: test
+  secret-key: test
+firebase:
+  # 테스트에서는 실제 Firebase를 띄우지 않는다. FirebaseMessaging은 @MockitoBean으로 대체한다
+  enabled: false

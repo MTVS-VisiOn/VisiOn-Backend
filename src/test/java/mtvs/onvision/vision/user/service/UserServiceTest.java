@@ -12,30 +12,37 @@ import org.springframework.test.util.ReflectionTestUtils;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.auth.dto.KeyPair;
 import mtvs.onvision.vision.auth.dto.LoginRequest;
+import mtvs.onvision.vision.auth.dto.LogoutRequest;
 import mtvs.onvision.vision.auth.dto.RefreshRequest;
 import mtvs.onvision.vision.auth.dto.TokenBody;
 import mtvs.onvision.vision.auth.repository.RefreshTokenRepository;
 import mtvs.onvision.vision.auth.service.JwtTokenProvider;
 import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
+import mtvs.onvision.vision.user.domain.Fid;
 import mtvs.onvision.vision.user.domain.Relation;
 import mtvs.onvision.vision.user.domain.User;
 import mtvs.onvision.vision.user.domain.UserRole;
 import mtvs.onvision.vision.user.dto.UserResponse;
 import mtvs.onvision.vision.user.dto.RegisterGuardianResponse;
 import mtvs.onvision.vision.user.dto.SignupRequest;
+import mtvs.onvision.vision.user.repository.FidRepository;
 import mtvs.onvision.vision.user.repository.RegisterTokenRepository;
 import mtvs.onvision.vision.user.repository.RelationRepository;
 import mtvs.onvision.vision.user.repository.UserRepository;
 
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("UserService의")
@@ -62,8 +69,12 @@ class UserServiceTest {
     @Mock
     private RegisterTokenRepository registerTokenRepository;
 
+    @Mock
+    private FidRepository fidRepository;
+
     Long userId = 1L;
     Long wardId = 2L;
+    String fid = "test-fid-0001";
     String email = "user@test.com";
     String password = "password1234";
     String encodedPassword = "encodedPassword1234";
@@ -485,20 +496,86 @@ class UserServiceTest {
     @DisplayName("Describe: logout 메서드는")
     class Describe_with_logout {
 
-        @Nested
-        @DisplayName("Context: 기본적으로")
-        class Context_with_available_data {
+        CurrentUser currentUser = new CurrentUser(userId, email, UserRole.WARD);
 
-            CurrentUser currentUser = new CurrentUser(userId, email, UserRole.WARD);
+        @Nested
+        @DisplayName("Context: 본인 소유의 fid가 함께 주어지면")
+        class Context_with_own_fid {
 
             @Test
-            @DisplayName("It : refreshToken 삭제 성공")
+            @DisplayName("It : refreshToken과 해당 fid를 삭제한다")
             void it_success_logout() {
+                //given
+                User owner = mock(User.class);
+                given(owner.getId()).willReturn(userId);
+                Fid target = mock(Fid.class);
+                given(target.getUser()).willReturn(owner);
+                given(fidRepository.findByFid(fid)).willReturn(Optional.of(target));
+
                 //when
-                userService.logout(currentUser);
+                userService.logout(new LogoutRequest(fid), currentUser);
 
                 //then
                 verify(refreshTokenRepository).delete(userId);
+                verify(fidRepository).delete(target);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: fid 없이 주어지면")
+        class Context_without_fid {
+
+            @Test
+            @DisplayName("It : refreshToken만 삭제하고 fid는 건드리지 않는다")
+            void it_success_logout_without_fid() {
+                //when
+                userService.logout(null, currentUser);
+
+                //then
+                verify(refreshTokenRepository).delete(userId);
+                verifyNoInteractions(fidRepository);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 등록되지 않은 fid가 주어지면")
+        class Context_with_unknown_fid {
+
+            @Test
+            @DisplayName("It : 예외 없이 refreshToken만 삭제한다")
+            void it_ignores_unknown_fid() {
+                //given
+                given(fidRepository.findByFid(fid)).willReturn(Optional.empty());
+
+                //when
+                userService.logout(new LogoutRequest(fid), currentUser);
+
+                //then
+                verify(refreshTokenRepository).delete(userId);
+                verify(fidRepository, never()).delete(any(Fid.class));
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 남의 fid가 주어지면")
+        class Context_with_others_fid {
+
+            @Test
+            @DisplayName("It : NOT_OWNER 예외를 던진다")
+            void it_throws_not_owner() {
+                //given
+                User other = mock(User.class);
+                given(other.getId()).willReturn(wardId);
+                Fid target = mock(Fid.class);
+                given(target.getUser()).willReturn(other);
+                given(fidRepository.findByFid(fid)).willReturn(Optional.of(target));
+
+                //when-then
+                assertThatThrownBy(() -> userService.logout(new LogoutRequest(fid), currentUser))
+                        .isInstanceOf(BusinessException.class)
+                        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_OWNER);
+
+                verify(fidRepository, never()).delete(any(Fid.class));
             }
         }
     }
