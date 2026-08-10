@@ -41,4 +41,11 @@ public class InstructionService {
         PreConditions.check(!instruction.getGuardian().getId().equals(currentUser.getId()), ErrorCode.NOT_OWNER);
         instruction.update(request.content());
     }
+
+    @Transactional
+    public void deleteInstruction(Long instructionId, CurrentUser currentUser) {
+        Instruction instruction = instructionRepository.findById(instructionId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_INSTRUCTION));
+        PreConditions.check(!instruction.getGuardian().getId().equals(currentUser.getId()), ErrorCode.NOT_OWNER);
+        instructionRepository.delete(instruction);
+    }
 }

@@ -41,4 +41,11 @@ public class InstructionController {
         instructionService.updateInstruction(instructionId, request, currentUser);
         return ApiResult.ok(SuccessCode.INSTRUCTION_UPDATED);
     }
+
+    @DeleteMapping("/{instructionId}")
+    public ResponseEntity<ApiResult<Void>> deleteInstruction(@PathVariable Long instructionId,
+                                                             @AuthenticationPrincipal CurrentUser currentUser) {
+        instructionService.deleteInstruction(instructionId, currentUser);
+        return ApiResult.ok(SuccessCode.INSTRUCTION_DELETED);
+    }
 }
