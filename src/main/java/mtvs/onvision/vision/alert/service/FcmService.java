@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import mtvs.onvision.vision.alert.domain.AlertType;
 import mtvs.onvision.vision.alert.domain.NotifyStatus;
+import mtvs.onvision.vision.command.domain.CommandType;
 import mtvs.onvision.vision.user.service.UserService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -52,8 +53,19 @@ public class FcmService {
     }
 
     /** 기기 한 대에 보낸다. 일시 장애면 maxAttempts까지 즉시 재시도한다 */
+    // 알림사항
     public NotifyStatus sendToDevice(Long alertId, AlertType type, Instant occurredAt, String fid) {
         Message message = buildMessage(alertId, type, occurredAt, fid);
+        return send(fid, message);
+    }
+
+    //앱으로 보내는 지시사항
+    public void sendToDevice(Long commandId, String content, CommandType type, Instant occurredAt, String fid) {
+        Message message = buildMessage(commandId, type, content, occurredAt, fid);
+        send(fid, message);
+    }
+
+    private NotifyStatus send(String fid, Message message) {
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 String response = firebaseMessaging.send(message);
@@ -67,17 +79,17 @@ public class FcmService {
                 if (code == MessagingErrorCode.UNREGISTERED) {
                     userService.deleteFid(fid);
                     log.error("deleted unregistered fid: {}", fid);
-                    return NotifyStatus.UNREGISTERED;   // 만료가 아닌 연결된 기기가 사라진 상태
+                    return NotifyStatus.UNREGISTERED;
                 }
                 if (!RETRIABLE.contains(code)) {
-                    return NotifyStatus.EXPIRED;   // 요청 자체가 잘못됐다. 재전송해도 같다
+                    return NotifyStatus.EXPIRED;
                 }
                 if (attempt < maxAttempts) {
                     sleep(BACKOFF_MILLIS * attempt);
                 }
             }
         }
-        return NotifyStatus.FAILED;   // 즉시 재시도로 못 넘겼다. 스케줄러가 다시 본다
+        return NotifyStatus.FAILED;
     }
 
     private Message buildMessage(Long alertId, AlertType type, Instant occurredAt, String fid) {
@@ -89,6 +101,23 @@ public class FcmService {
                         .build())
                 .putData("alertId", alertId.toString())
                 .putData("type", type.name())
+                .setAndroidConfig(AndroidConfig.builder()
+                        .setPriority(AndroidConfig.Priority.HIGH)
+                        // 기기가 오프라인인 건 장애가 아니다. 켜지면 그때라도 배달되게 둔다.
+                        // 서버 재시도 만료(alert.retry.expire-minutes)와는 다른 층이다
+                        .setTtl(pushTtl.toMillis())
+                        .build())
+                .build();
+    }
+
+    private Message buildMessage(Long commandId, CommandType type, String content, Instant occurredAt, String fid) {
+        return Message.builder()
+                .setFid(fid)
+                .putData("alertId", commandId.toString())
+                .putData("type", type.name())
+                .putData("content", content)
+                .putData("occurredAt", occurredAt.toString())
+
                 .setAndroidConfig(AndroidConfig.builder()
                         .setPriority(AndroidConfig.Priority.HIGH)
                         // 기기가 오프라인인 건 장애가 아니다. 켜지면 그때라도 배달되게 둔다.

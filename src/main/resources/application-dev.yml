@@ -6,7 +6,7 @@ spring:
       hibernate:
         format_sql: true
   flyway:
-    clean-disabled: false          # clean 허용
+    clean-disabled: false          # 수동 clean. 자동 재시도 전략은 채택하지 않음
 
 springdoc:
   api-docs:

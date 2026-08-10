@@ -47,6 +47,8 @@ public enum SuccessCode {
     DETECT_OBSTACLE_CREATED("장애물 감지가 정상적으로 저장되었습니다."),
     ALERT_READ("알림 내용이 정상적으로 조회되었습니다."),
 
+    /*Command*/
+    COMMAND_CREATED("명령어가 정상적으로 저장되었습니다."),
 
 
     /*common*/

@@ -58,3 +58,7 @@ s3:
 firebase:
   # 테스트에서는 실제 Firebase를 띄우지 않는다. FirebaseMessaging은 @MockitoBean으로 대체한다
   enabled: false
+init-data:
+  password:
+    ward: test
+    guardian: test

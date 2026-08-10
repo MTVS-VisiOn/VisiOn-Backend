@@ -151,6 +151,12 @@ public class UserService implements UserDetailsService {
         Relation relation = relationRepository.findByGuardianId(guardianId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_RELATION));
         return relation.getWard().getId();
     }
+    //보호자 -> 피보호자 객체
+    @Transactional(readOnly = true)
+    public User getWardFromGuardianId(Long guardianId) {
+        Relation relation = relationRepository.findByGuardianId(guardianId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_RELATION));
+        return relation.getWard();
+    }
 
     //피보호자 -> 보호자
     @Transactional(readOnly = true)

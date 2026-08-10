@@ -49,3 +49,6 @@ src/main/resources/static/signal-test.html
 
 ### firebase의 json파일 ###
 **/firebase/*.json
+
+### DB snapshot ###
+db-snapshot/
