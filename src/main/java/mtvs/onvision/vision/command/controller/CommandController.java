@@ -8,6 +8,7 @@ import mtvs.onvision.vision.command.dto.InstructionRequest;
 import mtvs.onvision.vision.command.service.CommandService;
 import mtvs.onvision.vision.common.response.ApiResult;
 import mtvs.onvision.vision.common.response.SuccessCode;
+import mtvs.onvision.vision.common.swagger.ApiUnauthorized;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -17,17 +18,21 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/commands")
-public class CommandController {
+public class CommandController implements CommandControllerSupporter {
     private final CommandService commandService;
 
+    @Override
     @PostMapping("/instruction")
+    @ApiUnauthorized
     public ResponseEntity<ApiResult<Void>> guardianInstruct(@RequestBody @Valid InstructionRequest request,
                                                                @AuthenticationPrincipal CurrentUser currentUser) {
         commandService.guardianInstruct(request, currentUser);
         return ApiResult.created(SuccessCode.COMMAND_CREATED);
     }
 
+    @Override
     @GetMapping
+    @ApiUnauthorized
     public ResponseEntity<ApiResult<List<CommandResponse>>> getInstructs(@AuthenticationPrincipal CurrentUser currentUser) {
         List<CommandResponse> response = commandService.getInstructs(currentUser);
         return ApiResult.ok(SuccessCode.COMMAND_READ, response);
