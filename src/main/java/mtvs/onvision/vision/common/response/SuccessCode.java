@@ -51,6 +51,9 @@ public enum SuccessCode {
     COMMAND_CREATED("지시어가 정상적으로 저장되었습니다."),
     COMMAND_READ("지시어가 정상적으로 조회되었습니다."),
     INSTRUCTION_CREATED("빠른 지시어가 정상적으로 저장되었습니다."),
+    INSTRUCTION_READ("빠른 지시어가 정상적으로 조회되었습니다."),
+    INSTRUCTION_UPDATED("빠른 지시어가 정상적으로 수정되었습니다."),
+    INSTRUCTION_DELETED("빠른 지시어가 정상적으로 삭제되었습니다."),
 
 
     /*common*/
