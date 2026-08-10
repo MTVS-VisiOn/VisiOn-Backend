@@ -24,7 +24,7 @@ CREATE TABLE alerts
     latitude    DOUBLE PRECISION,
     longitude   DOUBLE PRECISION,
     address     VARCHAR(100),
-    s3key       VARCHAR(100),
+    s3_key      VARCHAR(100),
     occurred_at TIMESTAMP WITHOUT TIME ZONE             NOT NULL,
     action      VARCHAR(255),
     sender_id   BIGINT,
@@ -138,11 +138,11 @@ ALTER TABLE relations
 ALTER TABLE relations
     ADD CONSTRAINT uc_relations_ward UNIQUE (ward_id);
 
-ALTER TABLE users
-    ADD CONSTRAINT uc_users_email UNIQUE (email);
-
-ALTER TABLE users
-    ADD CONSTRAINT uc_users_phonenumber UNIQUE (phone_number);
+-- soft 삭제
+CREATE UNIQUE INDEX uix_users_email_active
+    ON users (email) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX uix_users_phone_active
+    ON users (phone_number) WHERE deleted_at IS NULL;
 
 ALTER TABLE alert_deliveries
     ADD CONSTRAINT uk_alert_delivery UNIQUE (alert_id, fid);
