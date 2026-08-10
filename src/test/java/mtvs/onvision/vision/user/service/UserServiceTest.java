@@ -573,7 +573,7 @@ class UserServiceTest {
                 //when-then
                 assertThatThrownBy(() -> userService.logout(new LogoutRequest(fid), currentUser))
                         .isInstanceOf(BusinessException.class)
-                        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_OWNER);
+                        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_OWNER_FID);
 
                 verify(fidRepository, never()).delete(any(Fid.class));
             }

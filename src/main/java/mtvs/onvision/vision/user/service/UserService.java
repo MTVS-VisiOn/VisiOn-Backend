@@ -110,7 +110,7 @@ public class UserService implements UserDetailsService {
         }
         // 이미 지워졌거나 등록된 적 없는 fid는 무시한다. 로그아웃 자체는 성공해야 한다
         fidRepository.findByFid(request.fid()).ifPresent(target -> {
-            PreConditions.check(!target.getUser().getId().equals(currentUser.getId()), ErrorCode.NOT_OWNER);
+            PreConditions.check(!target.getUser().getId().equals(currentUser.getId()), ErrorCode.NOT_OWNER_FID);
             fidRepository.delete(target);
             // 하드 삭제라 행이 남지 않는다. 등록 해제 이력은 이 로그가 유일하다
             log.info("Fid removed by logout: fid={}, userId={}", request.fid(), currentUser.getId());
@@ -150,6 +150,12 @@ public class UserService implements UserDetailsService {
     public Long getWardIdFromGuardianId(Long guardianId) {
         Relation relation = relationRepository.findByGuardianId(guardianId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_RELATION));
         return relation.getWard().getId();
+    }
+    //보호자 -> 피보호자 객체
+    @Transactional(readOnly = true)
+    public User getWardFromGuardianId(Long guardianId) {
+        Relation relation = relationRepository.findByGuardianId(guardianId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_RELATION));
+        return relation.getWard();
     }
 
     //피보호자 -> 보호자

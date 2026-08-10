@@ -82,4 +82,15 @@ public class SwaggerConfig {
     public GroupedOpenApi alertApi() {
         return GroupedOpenApi.builder().group("alert API").pathsToMatch("/api/alerts/**").build();
     }
+
+    // 지시 전송/조회. 그룹이 없으면 어느 그룹에도 안 잡혀 문서에서 사라진다
+    @Bean
+    public GroupedOpenApi commandApi() {
+        return GroupedOpenApi.builder().group("command API").pathsToMatch("/api/commands/**").build();
+    }
+
+    @Bean
+    public GroupedOpenApi instructionApi() {
+        return GroupedOpenApi.builder().group("instruction API").pathsToMatch("/api/instructions/**").build();
+    }
 }
