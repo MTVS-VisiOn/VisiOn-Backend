@@ -85,4 +85,4 @@ s3:
   secret-key: ${S3_SECRET_KEY}
 firebase:
   service-account:
-    path: classpath:firebase/onvision-4cdc3-firebase-adminsdk-fbsvc-65c38117ac.json
+    path: ${FIREBASE_SERVICE_ACCOUNT_PATH:classpath:firebase/onvision-4cdc3-firebase-adminsdk-fbsvc-65c38117ac.json}
