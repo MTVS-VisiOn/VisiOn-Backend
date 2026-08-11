@@ -1142,4 +1142,95 @@ public interface NavigationControllerSupporter {
             )
     })
     ResponseEntity<ApiResult<MapResponse>> getMapRoute(CurrentUser currentUser);
+
+    @Operation(
+            summary = "최근 일주일 경로 조회",
+            description = """
+                    피보호자가 최근 일주일 동안 만든 경로를 최신순으로 준다. 피보호자·보호자 모두 호출할 수 있고,
+                    보호자가 부르면 연결된 피보호자의 경로가 나온다.
+
+                    기준은 **6일 전 00:00(KST) 이후**이며 오늘을 포함해 7일이다. `GET /api/alerts/lastweek`과 같은 규칙이다.
+                    건수 상한과 페이지 파라미터는 없다.
+
+                    **상태로 거르지 않는다** — 진행 중(`IN_PROGRESS`)·완료(`COMPLETED`)·취소(`CANCELED`)가 모두 섞여 나온다.
+                    구분이 필요하면 `status`를 보고 화면에서 처리한다.
+
+                    `createdAt`은 **경로를 만든 시각**(출발 시각)이지 도착 시각이 아니다. 서버에 완료 시각 컬럼이 없다.
+                    """,
+            extensions = @Extension(properties = @ExtensionProperty(name = "x-order", value = "8"))
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "조회 성공",
+                    content = {
+                            @Content(
+                                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                                    examples = {
+                                            @ExampleObject(
+                                                    name = "경로가 있을때",
+                                                    value = """
+                                                            {
+                                                                "success": true,
+                                                                "code": "ROUTE_READ",
+                                                                "message": "경로가 정상적으로 조회되었습니다.",
+                                                                "data": [
+                                                                    {
+                                                                        "id": 12,
+                                                                        "destinationName": "회사",
+                                                                        "createdAt": "2026-08-11T09:14:03",
+                                                                        "status": "IN_PROGRESS"
+                                                                    },
+                                                                    {
+                                                                        "id": 11,
+                                                                        "destinationName": "신논현역",
+                                                                        "createdAt": "2026-08-10T18:02:41",
+                                                                        "status": "COMPLETED"
+                                                                    },
+                                                                    {
+                                                                        "id": 10,
+                                                                        "destinationName": "말죽거리공원사거리",
+                                                                        "createdAt": "2026-08-09T11:30:12",
+                                                                        "status": "CANCELED"
+                                                                    }
+                                                                ]
+                                                            }
+                                                            """
+                                            ),
+                                            @ExampleObject(
+                                                    name = "경로가 없을때",
+                                                    value = """
+                                                            {
+                                                                "success": true,
+                                                                "code": "ROUTE_READ",
+                                                                "message": "경로가 정상적으로 조회되었습니다.",
+                                                                "data": []
+                                                            }
+                                                            """
+                                            )
+                                    }
+                            )
+                    }
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "보호자가 호출했는데 연결된 피보호자가 없을때",
+                    content = {
+                            @Content(
+                                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                                    examples = @ExampleObject(
+                                            value = """
+                                                    {
+                                                        "success": false,
+                                                        "code": "NOT_FOUND_RELATION",
+                                                        "message": "해당하는 relation 을 찾을 수 없습니다.",
+                                                        "data": null
+                                                    }
+                                                    """
+                                    )
+                            )
+                    }
+            )
+    })
+    ResponseEntity<ApiResult<List<RouteSummary>>> getRoutesInWeek(CurrentUser currentUser);
 }

@@ -26,7 +26,9 @@ import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -35,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -750,6 +753,121 @@ class NavigationServiceTest {
                 assertThat(response.path().getLast())
                         .containsEntry("latitude", 37.479103)
                         .containsEntry("longitude", 127.037476);
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Describe: getRoutesInWeek 메서드는")
+    class Describe_with_getRoutesInWeek {
+
+        private RouteSummary summary(Long id, RouteStatus status) {
+            return new RouteSummary(id, "회사", LocalDateTime.now(SEOUL), status);
+        }
+
+        @Nested
+        @DisplayName("Context: 피보호자가 호출하면")
+        class Context_with_ward {
+
+            @Test
+            @DisplayName("It : 관계를 조회하지 않고 본인 id로 찾는다")
+            void it_uses_own_id() {
+                //given
+                given(routeRepository.findAllByWardIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+                        eq(wardId), any(LocalDateTime.class))).willReturn(List.of());
+
+                //when
+                navigationService.getRoutesInWeek(ward);
+
+                //then
+                verify(userService, never()).getWardIdFromGuardianId(anyLong());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 보호자가 호출하면")
+        class Context_with_guardian {
+
+            @Test
+            @DisplayName("It : 연결된 피보호자 id로 찾는다")
+            void it_resolves_ward_id() {
+                //given
+                given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
+                given(routeRepository.findAllByWardIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+                        eq(wardId), any(LocalDateTime.class))).willReturn(List.of());
+
+                //when
+                navigationService.getRoutesInWeek(guardian);
+
+                //then : 보호자 본인 id로 찾으면 남의 경로가 나오거나 빈 목록이 된다
+                verify(routeRepository).findAllByWardIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+                        eq(wardId), any(LocalDateTime.class));
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 조회 기준 시각은")
+        class Context_with_time_window {
+
+            @Test
+            @DisplayName("It : 6일 전 KST 00:00이다")
+            void it_starts_at_kst_midnight_six_days_ago() {
+                //given
+                given(routeRepository.findAllByWardIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+                        eq(wardId), any(LocalDateTime.class))).willReturn(List.of());
+
+                //when
+                navigationService.getRoutesInWeek(ward);
+
+                //then : createdAt은 DateTimeProvider가 KST 벽시계로 채운다. 여기가 어긋나면 하루가 통째로 빠진다
+                ArgumentCaptor<LocalDateTime> captor = ArgumentCaptor.forClass(LocalDateTime.class);
+                verify(routeRepository)
+                        .findAllByWardIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(eq(wardId), captor.capture());
+
+                LocalDateTime expected = LocalDate.now(SEOUL).minusDays(6).atStartOfDay();
+                assertThat(captor.getValue()).isEqualTo(expected);
+                assertThat(captor.getValue().toLocalTime()).isEqualTo(LocalTime.MIDNIGHT);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 상태가 다른 경로가 섞여 있으면")
+        class Context_with_mixed_status {
+
+            @Test
+            @DisplayName("It : 거르지 않고 조회 순서 그대로 반환한다")
+            void it_returns_all_statuses() {
+                //given : 취소·진행 중도 화면에 보여주기로 했다. 서버는 필터하지 않는다
+                given(routeRepository.findAllByWardIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+                        eq(wardId), any(LocalDateTime.class)))
+                        .willReturn(List.of(
+                                summary(12L, RouteStatus.IN_PROGRESS),
+                                summary(11L, RouteStatus.COMPLETED),
+                                summary(10L, RouteStatus.CANCELED)));
+
+                //when
+                List<RouteSummary> response = navigationService.getRoutesInWeek(ward);
+
+                //then
+                assertThat(response).extracting(RouteSummary::id).containsExactly(12L, 11L, 10L);
+                assertThat(response).extracting(RouteSummary::status)
+                        .containsExactly(RouteStatus.IN_PROGRESS, RouteStatus.COMPLETED, RouteStatus.CANCELED);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 기간 안에 경로가 없으면")
+        class Context_without_route {
+
+            @Test
+            @DisplayName("It : 빈 목록을 반환한다")
+            void it_returns_empty_list() {
+                //given
+                given(routeRepository.findAllByWardIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+                        eq(wardId), any(LocalDateTime.class))).willReturn(List.of());
+
+                //when&then
+                assertThat(navigationService.getRoutesInWeek(ward)).isEmpty();
             }
         }
     }

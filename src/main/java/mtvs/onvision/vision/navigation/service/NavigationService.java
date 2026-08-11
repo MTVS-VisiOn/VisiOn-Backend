@@ -24,9 +24,13 @@ import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static mtvs.onvision.vision.common.util.AppTime.SEOUL;
 
 @Service
 @RequiredArgsConstructor
@@ -274,6 +278,14 @@ public class NavigationService {
         else return null;
     }
 
+    @Transactional(readOnly = true)
+    public List<RouteSummary> getRoutesInWeek(CurrentUser currentUser) {
+        // 오늘 포함 7일치 → 6일 전 KST 00:00부터. alert·command와 같은 규칙이다.
+        // createdAt은 DateTimeProvider가 KST 벽시계로 채우므로 그대로 비교할 수 있다
+        LocalDateTime from = LocalDate.now(SEOUL).minusDays(6).atStartOfDay();
+        Long wardId = currentUser.getRole()==UserRole.WARD? currentUser.getId() : userService.getWardIdFromGuardianId(currentUser.getId());
+        return routeRepository.findAllByWardIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(wardId, from);
+    }
 
 
     private @NonNull MultiValueMap<String, String> getStringStringMultiValueMap(NavigationPreRequest request, TransportMode mode) {

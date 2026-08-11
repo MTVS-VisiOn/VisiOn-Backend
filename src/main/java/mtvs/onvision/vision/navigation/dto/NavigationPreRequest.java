@@ -1,6 +1,7 @@
 package mtvs.onvision.vision.navigation.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import mtvs.onvision.vision.navigation.domain.TransportMode;
 
@@ -20,6 +21,7 @@ public record NavigationPreRequest(
     TransportMode mode,
 
     @NotNull
+    @Valid
     @Schema(
             description = "출발지. 클라이언트가 좌표까지 실어 보낸다",
             requiredMode = Schema.RequiredMode.REQUIRED
@@ -27,6 +29,7 @@ public record NavigationPreRequest(
     LocationInfo start,
 
     @NotNull
+    @Valid
     @Schema(
             description = "도착지",
             requiredMode = Schema.RequiredMode.REQUIRED

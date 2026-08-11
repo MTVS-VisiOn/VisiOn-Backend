@@ -12,6 +12,8 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 
+import static mtvs.onvision.vision.common.util.AppTime.SEOUL;
+
 @MappedSuperclass
 @Getter
 @EntityListeners(AuditingEntityListener.class)
@@ -29,6 +31,7 @@ public abstract class BaseEntity {
 
     public void delete(){
         PreConditions.check(this.deletedAt != null,ErrorCode.ALREADY_DELETED);
-        this.deletedAt = LocalDateTime.now();
+        // createdAt·updatedAt은 DateTimeProvider가 KST로 채운다. 여기만 JVM 시간대면 컬럼끼리 어긋난다
+        this.deletedAt = LocalDateTime.now(SEOUL);
     }
 }

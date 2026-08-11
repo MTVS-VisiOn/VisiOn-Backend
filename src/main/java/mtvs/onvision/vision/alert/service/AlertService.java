@@ -12,6 +12,7 @@ import mtvs.onvision.vision.alert.repository.AlertRepository;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
+import mtvs.onvision.vision.common.util.AppTime;
 import mtvs.onvision.vision.common.util.PreConditions;
 import mtvs.onvision.vision.image.service.ImageService;
 import mtvs.onvision.vision.location.service.LocationService;
@@ -41,7 +42,8 @@ public class AlertService {
     private final LocationService locationService;
     private final ImageService imageService;
 
-    public static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
+    // 실체는 common.util.AppTime.SEOUL이다. 기존 import 경로를 깨지 않으려고 여기서 재노출한다
+    public static final ZoneId SEOUL = AppTime.SEOUL;
 
 
     @Transactional

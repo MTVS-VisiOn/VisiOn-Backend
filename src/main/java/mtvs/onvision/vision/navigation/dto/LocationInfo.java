@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 public record LocationInfo(
-        @NotBlank
+        @NotBlank(message = "장소명은 필수입니다.")
         @Size(max = 50)
         @Schema(
                 examples = "신논현역",
@@ -16,7 +16,6 @@ public record LocationInfo(
         String name,
 
         @Size(max = 50)
-        @NotNull
         @Schema(
                 examples = "회사",
                 description = """
