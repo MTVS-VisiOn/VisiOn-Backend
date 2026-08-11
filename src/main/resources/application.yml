@@ -91,3 +91,9 @@ init-data:
   password:
     ward: ${PASSWORD_WARD}
     guardian: ${PASSWORD_GUARDIAN}
+location:
+  flush:  # Redis 버퍼 → DB 배치 INSERT
+    interval: 30s
+    batch-size: 1000
+    max-loops: 10   # 한 틱에 최대 10,000건. 유입이 이걸 넘으면 로그에 경고가 남는다
+    enabled: true
