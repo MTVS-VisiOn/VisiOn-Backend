@@ -10,7 +10,6 @@ import mtvs.onvision.vision.location.domain.MovementStatus;
 import mtvs.onvision.vision.location.dto.*;
 import mtvs.onvision.vision.location.repository.LocationHistoryRepository;
 import mtvs.onvision.vision.location.repository.RealtimeLocationRepository;
-import mtvs.onvision.vision.presence.service.PresenceService;
 import mtvs.onvision.vision.user.service.UserService;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -26,7 +25,6 @@ import java.util.Optional;
 public class LocationService {
     private final LocationHistoryRepository locationHistoryRepository;
     private final RealtimeLocationRepository realtimeLocationRepository;
-    private final PresenceService presenceService;
     private final UserService userService;
     private final ObjectMapper objectMapper;
     private final RestClient tmapRestClient;
@@ -128,5 +126,7 @@ public class LocationService {
     private double nvl(Float accuracy) {
         return accuracy != null ? accuracy : 20.0;         // 기본 오차 20m
     }
+
+
 
 }

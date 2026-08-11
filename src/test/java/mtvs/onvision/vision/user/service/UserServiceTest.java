@@ -27,7 +27,7 @@ import mtvs.onvision.vision.user.dto.UserResponse;
 import mtvs.onvision.vision.user.dto.RegisterGuardianResponse;
 import mtvs.onvision.vision.user.dto.SignupRequest;
 import mtvs.onvision.vision.user.repository.FidRepository;
-import mtvs.onvision.vision.user.repository.RegisterTokenRepository;
+import mtvs.onvision.vision.user.repository.RegisterCodeRepository;
 import mtvs.onvision.vision.user.repository.RelationRepository;
 import mtvs.onvision.vision.user.repository.UserRepository;
 
@@ -38,9 +38,12 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -67,7 +70,7 @@ class UserServiceTest {
     private RelationRepository relationRepository;
 
     @Mock
-    private RegisterTokenRepository registerTokenRepository;
+    private RegisterCodeRepository registerCodeRepository;
 
     @Mock
     private FidRepository fidRepository;
@@ -80,7 +83,10 @@ class UserServiceTest {
     String encodedPassword = "encodedPassword1234";
     String nickname = "테스트유저";
     String phoneNumber = "010-1234-5678";
-    String registerToken = "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyIiwiZW1haWwiOiJ0ZXN0MUBuYXZlci5jb20iLCJyb2xlIjoiR1VBUkRJQU4iLCJpYXQiOjE3ODQ2OTc2OTgsImV4cCI6MTc4NDY5ODU5OH0.JdRlH8l-sMTe9Z7QQQmxtLbgT9qNWWkuabcFkw8cpEWVgPGihH8u1HqLofCr80ejBYGA5hIfY6Buzu9-r5IyQA";
+    String registerCode = "TV8HYB";
+    String malformedRegisterCode = "tv8hy";   // 소문자 + 5자리 — CODE_PATTERN 위반
+    String registerCodePattern = "^[ABCDEFGHJKLMNPRSTUVWXY23456789]{6}$";
+    int ISSUE_MAX_ATTEMPTS = 5;   // UserService의 같은 이름 상수와 맞춰야 한다
 
     SignupRequest signupRequest;
     LoginRequest loginRequest;
@@ -163,23 +169,22 @@ class UserServiceTest {
         }
 
         @Nested
-        @DisplayName("Context: role이 GUARDIAN이고 유효한 registerToken이 주어지면")
-        class Context_with_available_register_token {
+        @DisplayName("Context: role이 GUARDIAN이고 유효한 registerCode가 주어지면")
+        class Context_with_available_register_code {
             @BeforeEach
             void setup() {
-                signupRequest = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, registerToken);
+                signupRequest = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, registerCode);
                 ward = new User("ward@test.com", encodedPassword, "피보호자", "010-9999-8888", UserRole.WARD);
                 ReflectionTestUtils.setField(ward, "id", wardId);
             }
 
             @Test
-            @DisplayName("It : registerToken으로 wardId를 찾아 Guardian과 Relation 저장 성공")
-            void it_success_signup_with_register_token() {
+            @DisplayName("It : registerCode로 wardId를 찾아 Guardian과 Relation 저장 성공")
+            void it_success_signup_with_register_code() {
                 //given
                 given(userRepository.existsByEmail(email)).willReturn(false);
                 given(userRepository.existsByPhoneNumber(phoneNumber)).willReturn(false);
-                given(jwtTokenProvider.parseId(registerToken)).willReturn(wardId);
-                given(registerTokenRepository.getToken(wardId)).willReturn(Optional.of(registerToken));
+                given(registerCodeRepository.getToken(registerCode)).willReturn(Optional.of(wardId));
                 given(userRepository.findByIdAndRole(wardId, UserRole.WARD)).willReturn(Optional.of(ward));
                 given(relationRepository.existsByWard(ward)).willReturn(false);
                 given(passwordEncoder.encode(password)).willReturn(encodedPassword);
@@ -204,11 +209,11 @@ class UserServiceTest {
         }
 
         @Nested
-        @DisplayName("Context: role이 GUARDIAN이고 저장소에 registerToken이 존재하지 않으면")
-        class Context_with_no_stored_register_token {
+        @DisplayName("Context: role이 GUARDIAN이고 저장소에 registerCode가 존재하지 않으면")
+        class Context_with_no_stored_register_code {
             @BeforeEach
             void setup() {
-                signupRequest = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, registerToken);
+                signupRequest = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, registerCode);
             }
 
             @Test
@@ -217,8 +222,7 @@ class UserServiceTest {
                 //given
                 given(userRepository.existsByEmail(email)).willReturn(false);
                 given(userRepository.existsByPhoneNumber(phoneNumber)).willReturn(false);
-                given(jwtTokenProvider.parseId(registerToken)).willReturn(wardId);
-                given(registerTokenRepository.getToken(wardId)).willReturn(Optional.empty());
+                given(registerCodeRepository.getToken(registerCode)).willReturn(Optional.empty());
                 //when&then
                 BusinessException exception = assertThrows(BusinessException.class, () -> userService.signup(signupRequest));
                 assertThat(exception.getMessage()).isEqualTo(ErrorCode.NOT_FOUND_REGISTER.getMessage());
@@ -226,33 +230,32 @@ class UserServiceTest {
         }
 
         @Nested
-        @DisplayName("Context: role이 GUARDIAN이고 저장된 토큰과 요청 토큰이 일치하지 않으면")
-        class Context_with_mismatching_register_token {
+        @DisplayName("Context: role이 GUARDIAN이고 registerCode 형식이 올바르지 않으면")
+        class Context_with_malformed_register_code {
             @BeforeEach
             void setup() {
-                signupRequest = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, registerToken);
+                signupRequest = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, malformedRegisterCode);
             }
 
             @Test
-            @DisplayName("It : INVALID_REGISTER_TOKEN 오류 발생")
-            void it_throws_invalid_register_token() {
+            @DisplayName("It : 저장소를 조회하지 않고 INVALID_REGISTER_CODE 오류 발생")
+            void it_throws_invalid_register_code() {
                 //given
                 given(userRepository.existsByEmail(email)).willReturn(false);
                 given(userRepository.existsByPhoneNumber(phoneNumber)).willReturn(false);
-                given(jwtTokenProvider.parseId(registerToken)).willReturn(wardId);
-                given(registerTokenRepository.getToken(wardId)).willReturn(Optional.of("differentToken"));
                 //when&then
                 BusinessException exception = assertThrows(BusinessException.class, () -> userService.signup(signupRequest));
-                assertThat(exception.getMessage()).isEqualTo(ErrorCode.INVALID_REGISTER_TOKEN.getMessage());
+                assertThat(exception.getMessage()).isEqualTo(ErrorCode.INVALID_REGISTER_CODE.getMessage());
+                verifyNoInteractions(registerCodeRepository);
             }
         }
 
         @Nested
-        @DisplayName("Context: role이 GUARDIAN이고 registerToken으로 찾은 피보호자가 존재하지 않으면")
+        @DisplayName("Context: role이 GUARDIAN이고 registerCode로 찾은 피보호자가 존재하지 않으면")
         class Context_with_unavailable_ward_id {
             @BeforeEach
             void setup() {
-                signupRequest = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, registerToken);
+                signupRequest = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, registerCode);
             }
 
             @Test
@@ -261,8 +264,7 @@ class UserServiceTest {
                 //given
                 given(userRepository.existsByEmail(email)).willReturn(false);
                 given(userRepository.existsByPhoneNumber(phoneNumber)).willReturn(false);
-                given(jwtTokenProvider.parseId(registerToken)).willReturn(wardId);
-                given(registerTokenRepository.getToken(wardId)).willReturn(Optional.of(registerToken));
+                given(registerCodeRepository.getToken(registerCode)).willReturn(Optional.of(wardId));
                 given(userRepository.findByIdAndRole(wardId, UserRole.WARD)).willReturn(Optional.empty());
                 //when&then
                 BusinessException exception = assertThrows(BusinessException.class, () -> userService.signup(signupRequest));
@@ -275,7 +277,7 @@ class UserServiceTest {
         class Context_with_existing_guardian {
             @BeforeEach
             void setup() {
-                signupRequest = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, registerToken);
+                signupRequest = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, registerCode);
                 ward = new User("ward@test.com", encodedPassword, "피보호자", "010-9999-8888", UserRole.WARD);
                 ReflectionTestUtils.setField(ward, "id", wardId);
             }
@@ -286,8 +288,7 @@ class UserServiceTest {
                 //given
                 given(userRepository.existsByEmail(email)).willReturn(false);
                 given(userRepository.existsByPhoneNumber(phoneNumber)).willReturn(false);
-                given(jwtTokenProvider.parseId(registerToken)).willReturn(wardId);
-                given(registerTokenRepository.getToken(wardId)).willReturn(Optional.of(registerToken));
+                given(registerCodeRepository.getToken(registerCode)).willReturn(Optional.of(wardId));
                 given(userRepository.findByIdAndRole(wardId, UserRole.WARD)).willReturn(Optional.of(ward));
                 given(relationRepository.existsByWard(ward)).willReturn(true);
                 //when&then
@@ -573,7 +574,7 @@ class UserServiceTest {
                 //when-then
                 assertThatThrownBy(() -> userService.logout(new LogoutRequest(fid), currentUser))
                         .isInstanceOf(BusinessException.class)
-                        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_OWNER);
+                        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_OWNER_FID);
 
                 verify(fidRepository, never()).delete(any(Fid.class));
             }
@@ -581,8 +582,8 @@ class UserServiceTest {
     }
 
     @Nested
-    @DisplayName("Describe: getGuardianRegisterToken 메서드는")
-    class Describe_with_getGuardianRegisterToken {
+    @DisplayName("Describe: getGuardianRegisterCode 메서드는")
+    class Describe_with_getGuardianRegisterCode {
 
         CurrentUser currentUser = new CurrentUser(userId, email, UserRole.WARD);
 
@@ -591,16 +592,38 @@ class UserServiceTest {
         class Context_with_available_data {
 
             @Test
-            @DisplayName("It : registerToken을 발급하고 저장한 뒤 응답으로 반환한다")
-            void it_success_issue_register_token() {
+            @DisplayName("It : 규격에 맞는 registerCode를 발급하고 저장한 뒤 응답으로 반환한다")
+            void it_success_issue_register_code() {
                 //given
-                given(jwtTokenProvider.issueRegisterToken(userId, email, UserRole.WARD)).willReturn(registerToken);
-                //when
-                RegisterGuardianResponse response = userService.getGuardianRegisterToken(currentUser);
+                given(registerCodeRepository.saveIfAbsent(anyString(), eq(userId))).willReturn(true);
 
-                //then
-                assertThat(response.registerToken()).isEqualTo(registerToken);
-                verify(registerTokenRepository).save(userId, registerToken);
+                //when
+                RegisterGuardianResponse response = userService.getGuardianRegisterCode(currentUser);
+
+                //then : 코드가 무작위라 값을 고정할 수 없다. 저장한 값과 응답이 같은지, 규격에 맞는지만 본다
+                ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+                verify(registerCodeRepository).saveIfAbsent(captor.capture(), eq(userId));
+
+                assertThat(response.registerCode()).isEqualTo(captor.getValue());
+                assertThat(response.registerCode()).matches(registerCodePattern);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 발급한 코드가 매번 이미 선점되어 있으면")
+        class Context_with_code_collision {
+
+            @Test
+            @DisplayName("It : 재시도 상한까지 시도한 뒤 FAILED_ISSUE_REGISTER_CODE 오류 발생")
+            void it_throws_failed_issue_register_code() {
+                //given
+                given(registerCodeRepository.saveIfAbsent(anyString(), eq(userId))).willReturn(false);
+
+                //when&then
+                BusinessException exception = assertThrows(BusinessException.class,
+                        () -> userService.getGuardianRegisterCode(currentUser));
+                assertThat(exception.getMessage()).isEqualTo(ErrorCode.FAILED_ISSUE_REGISTER_CODE.getMessage());
+                verify(registerCodeRepository, times(ISSUE_MAX_ATTEMPTS)).saveIfAbsent(anyString(), eq(userId));
             }
         }
     }

@@ -1,0 +1,5 @@
+ALTER TABLE commands
+    ADD occurred_at TIMESTAMP WITHOUT TIME ZONE;
+
+ALTER TABLE commands
+    ALTER COLUMN occurred_at SET NOT NULL;

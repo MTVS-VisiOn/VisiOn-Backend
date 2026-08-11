@@ -3,6 +3,9 @@ package mtvs.onvision.vision.navigation.service;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
+import mtvs.onvision.vision.location.domain.MovementStatus;
+import mtvs.onvision.vision.location.dto.LocationReport;
+import mtvs.onvision.vision.location.repository.RealtimeLocationRepository;
 import mtvs.onvision.vision.navigation.domain.Route;
 import mtvs.onvision.vision.navigation.domain.RouteStatus;
 import mtvs.onvision.vision.navigation.domain.TransportMode;
@@ -26,7 +29,10 @@ import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -34,10 +40,14 @@ import static mtvs.onvision.vision.alert.service.AlertService.SEOUL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("NavigationService의")
@@ -57,6 +67,12 @@ class NavigationServiceTest {
 
     @Mock
     private UserService userService;
+
+    @Mock
+    private RealtimeLocationRepository realtimeLocationRepository;
+
+    @Mock
+    private RouteProgressCalculator routeProgressCalculator;
 
     /**
      * 진짜 매퍼를 쓴다. Redis의 report를 다시 읽는 게 이 도메인에서 가장 조용히 깨지는 자리라
@@ -446,6 +462,43 @@ class NavigationServiceTest {
                 assertThat(response.end().latitude()).isEqualTo(37.479103);
                 assertThat(response.end().longitude()).isEqualTo(127.037476);
             }
+
+            @Test
+            @DisplayName("(피보호자 위치가 없을때)It : remainingDistanceM이 null이고 report를 파싱하지 않는다")
+            void it_skips_calculation_without_location() {
+                //given
+                given(routeRepository.findByWardIdAndStatus(wardId, RouteStatus.IN_PROGRESS))
+                        .willReturn(Optional.of(existingRoute()));
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.empty());
+
+                //when
+                NavigationResponse response = navigationService.getProcessingRoute(ward);
+
+                //then : 안내 중 반복 호출되는 API라 위치가 없으면 JSON 파싱까지 건너뛴다
+                assertThat(response.remainingDistanceM()).isNull();
+                verifyNoInteractions(routeProgressCalculator);
+            }
+
+            @Test
+            @DisplayName("(피보호자 위치가 있을때)It : 계산기 결과를 remainingDistanceM에 싣는다")
+            void it_carries_remaining_distance() {
+                //given
+                given(routeRepository.findByWardIdAndStatus(wardId, RouteStatus.IN_PROGRESS))
+                        .willReturn(Optional.of(existingRoute()));
+                LocationReport location = new LocationReport(
+                        wardId, 37.503900, 127.025200, 5.0f, MovementStatus.ON_FOOT, Instant.parse("2026-08-03T07:20:00Z"));
+                given(realtimeLocationRepository.getLastLocation(wardId))
+                        .willReturn(Optional.of(fixtureMapper.writeValueAsString(location)));
+                given(routeProgressCalculator.remainingDistance(
+                        any(NavigationRouteReport.class), eq(37.503900), eq(127.025200), anyInt()))
+                        .willReturn(1830);
+
+                //when
+                NavigationResponse response = navigationService.getProcessingRoute(ward);
+
+                //then
+                assertThat(response.remainingDistanceM()).isEqualTo(1830);
+            }
         }
 
         @Nested
@@ -650,6 +703,70 @@ class NavigationServiceTest {
         }
 
         @Nested
+        @DisplayName("Context: 남은 거리는")
+        class Context_with_remaining_distance {
+
+            private void givenRoute() {
+                given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
+                given(routeRepository.findByWardIdAndStatus(wardId, RouteStatus.IN_PROGRESS))
+                        .willReturn(Optional.of(route(TransportMode.WALK, walkSummary(), walkReportJsonWithPath())));
+            }
+
+            @Test
+            @DisplayName("(피보호자 위치가 없을때)It : null이고 계산기를 부르지 않는다")
+            void it_is_null_without_location() {
+                //given : 앱이 꺼져 있거나 마지막 좌표가 Redis TTL을 넘긴 상태
+                givenRoute();
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.empty());
+
+                //when
+                MapResponse response = navigationService.getMapRoute(guardian);
+
+                //then : 총거리로 대신 채우면 프론트가 진짜 값과 구분할 수 없다
+                assertThat(response.remainingDistanceM()).isNull();
+                assertThat(response.distanceM()).isEqualTo(24269);
+                verifyNoInteractions(routeProgressCalculator);
+            }
+
+            @Test
+            @DisplayName("(피보호자 위치가 있을때)It : 계산기 결과를 그대로 싣는다")
+            void it_carries_calculated_value() {
+                //given
+                givenRoute();
+                LocationReport location = new LocationReport(
+                        wardId, 37.503900, 127.025200, 5.0f, MovementStatus.ON_FOOT, Instant.parse("2026-08-03T07:20:00Z"));
+                given(realtimeLocationRepository.getLastLocation(wardId))
+                        .willReturn(Optional.of(fixtureMapper.writeValueAsString(location)));
+                given(routeProgressCalculator.remainingDistance(
+                        any(NavigationRouteReport.class), eq(37.503900), eq(127.025200), eq(24269)))
+                        .willReturn(2450);
+
+                //when
+                MapResponse response = navigationService.getMapRoute(guardian);
+
+                //then
+                assertThat(response.remainingDistanceM()).isEqualTo(2450);
+            }
+
+            @Test
+            @DisplayName("(경로를 벗어나 계산기가 null을 줄때)It : null을 그대로 내보낸다")
+            void it_passes_null_through() {
+                //given
+                givenRoute();
+                LocationReport location = new LocationReport(
+                        wardId, 37.600000, 127.100000, 5.0f, MovementStatus.ON_FOOT, Instant.parse("2026-08-03T07:20:00Z"));
+                given(realtimeLocationRepository.getLastLocation(wardId))
+                        .willReturn(Optional.of(fixtureMapper.writeValueAsString(location)));
+                given(routeProgressCalculator.remainingDistance(
+                        any(NavigationRouteReport.class), anyDouble(), anyDouble(), anyInt()))
+                        .willReturn(null);
+
+                //when&then
+                assertThat(navigationService.getMapRoute(guardian).remainingDistanceM()).isNull();
+            }
+        }
+
+        @Nested
         @DisplayName("Context: 보행 경로가 진행 중이면")
         class Context_with_walk_route {
 
@@ -750,6 +867,121 @@ class NavigationServiceTest {
                 assertThat(response.path().getLast())
                         .containsEntry("latitude", 37.479103)
                         .containsEntry("longitude", 127.037476);
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Describe: getRoutesInWeek 메서드는")
+    class Describe_with_getRoutesInWeek {
+
+        private RouteSummary summary(Long id, RouteStatus status) {
+            return new RouteSummary(id, "회사", LocalDateTime.now(SEOUL), status);
+        }
+
+        @Nested
+        @DisplayName("Context: 피보호자가 호출하면")
+        class Context_with_ward {
+
+            @Test
+            @DisplayName("It : 관계를 조회하지 않고 본인 id로 찾는다")
+            void it_uses_own_id() {
+                //given
+                given(routeRepository.findAllByWardIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+                        eq(wardId), any(LocalDateTime.class))).willReturn(List.of());
+
+                //when
+                navigationService.getRoutesInWeek(ward);
+
+                //then
+                verify(userService, never()).getWardIdFromGuardianId(anyLong());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 보호자가 호출하면")
+        class Context_with_guardian {
+
+            @Test
+            @DisplayName("It : 연결된 피보호자 id로 찾는다")
+            void it_resolves_ward_id() {
+                //given
+                given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
+                given(routeRepository.findAllByWardIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+                        eq(wardId), any(LocalDateTime.class))).willReturn(List.of());
+
+                //when
+                navigationService.getRoutesInWeek(guardian);
+
+                //then : 보호자 본인 id로 찾으면 남의 경로가 나오거나 빈 목록이 된다
+                verify(routeRepository).findAllByWardIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+                        eq(wardId), any(LocalDateTime.class));
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 조회 기준 시각은")
+        class Context_with_time_window {
+
+            @Test
+            @DisplayName("It : 6일 전 KST 00:00이다")
+            void it_starts_at_kst_midnight_six_days_ago() {
+                //given
+                given(routeRepository.findAllByWardIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+                        eq(wardId), any(LocalDateTime.class))).willReturn(List.of());
+
+                //when
+                navigationService.getRoutesInWeek(ward);
+
+                //then : createdAt은 DateTimeProvider가 KST 벽시계로 채운다. 여기가 어긋나면 하루가 통째로 빠진다
+                ArgumentCaptor<LocalDateTime> captor = ArgumentCaptor.forClass(LocalDateTime.class);
+                verify(routeRepository)
+                        .findAllByWardIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(eq(wardId), captor.capture());
+
+                LocalDateTime expected = LocalDate.now(SEOUL).minusDays(6).atStartOfDay();
+                assertThat(captor.getValue()).isEqualTo(expected);
+                assertThat(captor.getValue().toLocalTime()).isEqualTo(LocalTime.MIDNIGHT);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 상태가 다른 경로가 섞여 있으면")
+        class Context_with_mixed_status {
+
+            @Test
+            @DisplayName("It : 거르지 않고 조회 순서 그대로 반환한다")
+            void it_returns_all_statuses() {
+                //given : 취소·진행 중도 화면에 보여주기로 했다. 서버는 필터하지 않는다
+                given(routeRepository.findAllByWardIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+                        eq(wardId), any(LocalDateTime.class)))
+                        .willReturn(List.of(
+                                summary(12L, RouteStatus.IN_PROGRESS),
+                                summary(11L, RouteStatus.COMPLETED),
+                                summary(10L, RouteStatus.CANCELED)));
+
+                //when
+                List<RouteSummary> response = navigationService.getRoutesInWeek(ward);
+
+                //then
+                assertThat(response).extracting(RouteSummary::id).containsExactly(12L, 11L, 10L);
+                assertThat(response).extracting(RouteSummary::status)
+                        .containsExactly(RouteStatus.IN_PROGRESS, RouteStatus.COMPLETED, RouteStatus.CANCELED);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 기간 안에 경로가 없으면")
+        class Context_without_route {
+
+            @Test
+            @DisplayName("It : 빈 목록을 반환한다")
+            void it_returns_empty_list() {
+                //given
+                given(routeRepository.findAllByWardIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+                        eq(wardId), any(LocalDateTime.class))).willReturn(List.of());
+
+                //when&then
+                assertThat(navigationService.getRoutesInWeek(ward)).isEmpty();
             }
         }
     }

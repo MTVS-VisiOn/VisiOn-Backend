@@ -64,7 +64,7 @@ class UserControllerTest {
     String password = "password1234";
     String nickname = "테스트유저";
     String phoneNumber = "010-1234-5678";
-    String registerToken = "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyIiwiZW1haWwiOiJ0ZXN0MUBuYXZlci5jb20iLCJyb2xlIjoiR1VBUkRJQU4iLCJpYXQiOjE3ODQ2OTc2OTgsImV4cCI6MTc4NDY5ODU5OH0.JdRlH8l-sMTe9Z7QQQmxtLbgT9qNWWkuabcFkw8cpEWVgPGihH8u1HqLofCr80ejBYGA5hIfY6Buzu9-r5IyQA";
+    String registerCode = "TV8HYB";
 
     @Nested
     @DisplayName("Describe: POST /signup 엔드포인트는")
@@ -101,11 +101,11 @@ class UserControllerTest {
         }
 
         @Nested
-        @DisplayName("Context: role이 GUARDIAN이고 올바른 registerToken이 주어지면")
+        @DisplayName("Context: role이 GUARDIAN이고 올바른 registerCode가 주어지면")
         class Context_with_guardian_role {
             @BeforeEach
             void setUp() {
-                request = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, registerToken);
+                request = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, registerCode);
             }
 
             @Test
@@ -163,7 +163,7 @@ class UserControllerTest {
         }
 
         @Nested
-        @DisplayName("Context: role이 GUARDIAN이고 registerToken이 없으면")
+        @DisplayName("Context: role이 GUARDIAN이고 registerCode가 없으면")
         class Context_with_guardian_role_and_no_register_token {
             @BeforeEach
             void setUp() {
@@ -410,11 +410,11 @@ class UserControllerTest {
         }
 
         @Nested
-        @DisplayName("Context: role이 GUARDIAN이고 registerToken으로 찾은 피보호자가 없으면")
+        @DisplayName("Context: role이 GUARDIAN이고 registerCode로 찾은 피보호자가 없으면")
         class Context_with_ward_not_found {
             @BeforeEach
             void setUp() {
-                request = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, registerToken);
+                request = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, registerCode);
             }
 
             @Test
@@ -441,11 +441,11 @@ class UserControllerTest {
         }
 
         @Nested
-        @DisplayName("Context: role이 GUARDIAN이고 저장소에 registerToken이 존재하지 않으면")
+        @DisplayName("Context: role이 GUARDIAN이고 저장소에 registerCode가 존재하지 않으면")
         class Context_with_register_token_not_found {
             @BeforeEach
             void setUp() {
-                request = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, registerToken);
+                request = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, registerCode);
             }
 
             @Test
@@ -472,18 +472,18 @@ class UserControllerTest {
         }
 
         @Nested
-        @DisplayName("Context: role이 GUARDIAN이고 registerToken이 저장된 토큰과 일치하지 않으면")
+        @DisplayName("Context: role이 GUARDIAN이고 registerCode 형식이 올바르지 않으면")
         class Context_with_invalid_register_token {
             @BeforeEach
             void setUp() {
-                request = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, registerToken);
+                request = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, registerCode);
             }
 
             @Test
-            @DisplayName("It : 400 상태와 INVALID_REGISTER_TOKEN을 반환한다")
+            @DisplayName("It : 400 상태와 INVALID_REGISTER_CODE를 반환한다")
             void it_return_400_badRequest_and_invalid_register_token() throws Exception {
                 //given
-                doThrow(new BusinessException(ErrorCode.INVALID_REGISTER_TOKEN))
+                doThrow(new BusinessException(ErrorCode.INVALID_REGISTER_CODE))
                         .when(userService)
                         .signup(eq(request));
 
@@ -496,8 +496,8 @@ class UserControllerTest {
                         )
                         .andExpect(status().isBadRequest())
                         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                        .andExpect(jsonPath("$.code").value(ErrorCode.INVALID_REGISTER_TOKEN.name()))
-                        .andExpect(jsonPath("$.message").value(ErrorCode.INVALID_REGISTER_TOKEN.getMessage()))
+                        .andExpect(jsonPath("$.code").value(ErrorCode.INVALID_REGISTER_CODE.name()))
+                        .andExpect(jsonPath("$.message").value(ErrorCode.INVALID_REGISTER_CODE.getMessage()))
                         .andDo(print());
             }
         }
@@ -507,7 +507,7 @@ class UserControllerTest {
         class Context_with_existing_guardian {
             @BeforeEach
             void setUp() {
-                request = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, registerToken);
+                request = new SignupRequest(email, password, nickname, phoneNumber, UserRole.GUARDIAN, registerCode);
             }
 
             @Test
@@ -535,8 +535,8 @@ class UserControllerTest {
     }
 
     @Nested
-    @DisplayName("Describe: GET /guardian/register-token 엔드포인트는")
-    class getGuardianRegisterToken {
+    @DisplayName("Describe: GET /guardian/register-code 엔드포인트는")
+    class getGuardianRegisterCode {
 
         CurrentUser currentUser = new CurrentUser(userId, email, UserRole.WARD);
 
@@ -559,18 +559,18 @@ class UserControllerTest {
             @DisplayName("It : 200 상태와 생성된 등록 토큰을 반환한다")
             void it_return_200_ok_and_register_token() throws Exception {
                 //given
-                given(userService.getGuardianRegisterToken(currentUser))
-                        .willReturn(new RegisterGuardianResponse(registerToken));
+                given(userService.getGuardianRegisterCode(currentUser))
+                        .willReturn(new RegisterGuardianResponse(registerCode));
 
                 //when-then
                 mockMvc.perform(
-                                get("/api/users/guardian/register-token")
+                                get("/api/users/guardian/register-code")
                         )
                         .andExpect(status().isOk())
                         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                        .andExpect(jsonPath("$.code").value(SuccessCode.REGISTER_TOKEN_CREATED.name()))
-                        .andExpect(jsonPath("$.message").value(SuccessCode.REGISTER_TOKEN_CREATED.getSuccessMessage()))
-                        .andExpect(jsonPath("$.data.registerToken").value(registerToken))
+                        .andExpect(jsonPath("$.code").value(SuccessCode.REGISTER_CODE_CREATED.name()))
+                        .andExpect(jsonPath("$.message").value(SuccessCode.REGISTER_CODE_CREATED.getSuccessMessage()))
+                        .andExpect(jsonPath("$.data.registerCode").value(registerCode))
                         .andDo(print());
             }
         }

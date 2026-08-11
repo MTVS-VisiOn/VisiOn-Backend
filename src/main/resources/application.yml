@@ -37,12 +37,13 @@ jwt:
   validations:
     access: 900000
     refresh: 604800000
-    register: 900000
+
   secrets:
     app-key: ${JWT_APP_KEY}
     origin-key: ${JWT_SECRET_KEY}
 redis:
   expired:
+    register: 900000
     presence: 180  #초단위
     location: 30  #분단위
     navigation: 30  #분단위
@@ -86,3 +87,13 @@ s3:
 firebase:
   service-account:
     path: ${FIREBASE_SERVICE_ACCOUNT_PATH:classpath:firebase/onvision-4cdc3-firebase-adminsdk-fbsvc-65c38117ac.json}
+init-data:
+  password:
+    ward: ${PASSWORD_WARD}
+    guardian: ${PASSWORD_GUARDIAN}
+location:
+  flush:  # Redis 버퍼 → DB 배치 INSERT
+    interval: 30s
+    batch-size: 1000
+    max-loops: 10   # 한 틱에 최대 10,000건. 유입이 이걸 넘으면 로그에 경고가 남는다
+    enabled: true

@@ -28,7 +28,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth ->auth
                         .requestMatchers("/api/users/signup", "/api/auth/login").anonymous()
                         .requestMatchers("/api/users/refresh").permitAll()
-                        .requestMatchers("/api/users/guardian/register-token").hasAuthority("WARD")
+                        .requestMatchers("/api/users/guardian/register-code").hasAuthority("WARD")
                         .requestMatchers("/api/users/device-fid").hasAnyAuthority("WARD","GUARDIAN")
                         .requestMatchers("/api/users/me").hasAnyAuthority("WARD","GUARDIAN")
                         .requestMatchers("/api/common", "/api/auth/logout").authenticated()
@@ -48,6 +48,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/ice-servers").hasAnyAuthority("WARD","GUARDIAN")
                         .requestMatchers("/api/alerts/detect/obstacle").hasAuthority("WARD")
                         .requestMatchers(HttpMethod.GET,"/api/alerts/**").hasAuthority("GUARDIAN")
+                        .requestMatchers("/api/commands/instruction").hasAuthority("GUARDIAN")
+                        .requestMatchers(HttpMethod.GET,"/api/commands").hasAuthority("GUARDIAN")
+                        .requestMatchers("/api/instructions/**").hasAuthority("GUARDIAN")
                         .anyRequest().permitAll()
                 )
                 .exceptionHandling(exp -> exp

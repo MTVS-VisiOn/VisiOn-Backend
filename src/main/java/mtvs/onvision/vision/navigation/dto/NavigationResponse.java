@@ -9,13 +9,14 @@ public record NavigationResponse(
         TransportMode mode,
         LocationInfo start,
         LocationInfo end,
+        Integer remainingDistanceM,
         @JsonRawValue
         String report
 
 ) {
-    public static NavigationResponse from(Route route) {
+    public static NavigationResponse from(Route route, Integer remainingDistanceM) {
         LocationInfo start = new LocationInfo(route.getStartingName(), route.getStartingName(), route.getStartingLat(), route.getStartingLon(), route.getStartingAddress(), null);
         LocationInfo end = new LocationInfo(route.getDestinationName(), route.getDestinationName(), route.getDestinationLat(), route.getDestinationLon(), route.getDestinationAddress(), null);
-        return new NavigationResponse(route.getId(),route.getMode(), start, end, route.getReport());
+        return new NavigationResponse(route.getId(),route.getMode(), start, end, remainingDistanceM, route.getReport());
     }
 }

@@ -91,4 +91,13 @@ public class NavigationController implements NavigationControllerSupporter {
         MapResponse response = navigationService.getMapRoute(currentUser);
         return ApiResult.ok(SuccessCode.ROUTE_READ, response);
     }
+
+    //최근 일주일 경로 조회
+    @Override
+    @GetMapping("/lastweek")
+    @ApiUnauthorized
+    public ResponseEntity<ApiResult<List<RouteSummary>>> getRoutesInWeek(@AuthenticationPrincipal CurrentUser currentUser) {
+        List<RouteSummary> response = navigationService.getRoutesInWeek(currentUser);
+        return ApiResult.ok(SuccessCode.ROUTE_READ,  response);
+    }
 }

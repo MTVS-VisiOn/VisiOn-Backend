@@ -9,7 +9,7 @@ public enum SuccessCode {
     /*User*/
     USER_CREATED("계정이 정상적으로 생성되었습니다."),
     USER_READ("계정정보가 정상적으로 조회되었습니다."),
-    REGISTER_TOKEN_CREATED("보호자 등록 토큰이 정상적으로 생성되었습니다."),
+    REGISTER_CODE_CREATED("보호자 등록 코드가 정상적으로 생성되었습니다."),
     CHECK_FID("기기 등록번호(fid)가 정상적으로 확인되었습니다."),
 
 
@@ -47,6 +47,13 @@ public enum SuccessCode {
     DETECT_OBSTACLE_CREATED("장애물 감지가 정상적으로 저장되었습니다."),
     ALERT_READ("알림 내용이 정상적으로 조회되었습니다."),
 
+    /*Command*/
+    COMMAND_CREATED("지시어가 정상적으로 저장되었습니다."),
+    COMMAND_READ("지시어가 정상적으로 조회되었습니다."),
+    INSTRUCTION_CREATED("빠른 지시어가 정상적으로 저장되었습니다."),
+    INSTRUCTION_READ("빠른 지시어가 정상적으로 조회되었습니다."),
+    INSTRUCTION_UPDATED("빠른 지시어가 정상적으로 수정되었습니다."),
+    INSTRUCTION_DELETED("빠른 지시어가 정상적으로 삭제되었습니다."),
 
 
     /*common*/

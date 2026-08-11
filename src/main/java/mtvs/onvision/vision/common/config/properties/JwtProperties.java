@@ -16,7 +16,6 @@ public class JwtProperties {
     public static class Validations {
         private final Long access;
         private final Long refresh;
-        private final Long register;
     }
 
     @Getter

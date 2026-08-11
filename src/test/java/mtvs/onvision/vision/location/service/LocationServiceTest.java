@@ -7,7 +7,6 @@ import mtvs.onvision.vision.location.domain.MovementStatus;
 import mtvs.onvision.vision.location.dto.*;
 import mtvs.onvision.vision.location.repository.LocationHistoryRepository;
 import mtvs.onvision.vision.location.repository.RealtimeLocationRepository;
-import mtvs.onvision.vision.presence.service.PresenceService;
 import mtvs.onvision.vision.user.domain.UserRole;
 import mtvs.onvision.vision.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,9 +50,6 @@ class LocationServiceTest {
     private RealtimeLocationRepository realtimeLocationRepository;
 
     @Mock
-    private PresenceService presenceService;
-
-    @Mock
     private UserService userService;
 
     @Mock
@@ -94,7 +90,6 @@ class LocationServiceTest {
         locationService = new LocationService(
                 locationHistoryRepository,
                 realtimeLocationRepository,
-                presenceService,
                 userService,
                 objectMapper,
                 tmapRestClient
@@ -361,27 +356,8 @@ class LocationServiceTest {
                 assertThat(response.recordedAt()).isEqualTo(recordedAt);
             }
 
-            @Test
-            @DisplayName("It : presence를 조회하지 않는다")
-            void it_does_not_consult_presence() {
-                //given : presence 게이트 제거(2026-08-04) 회귀 방지
-                String latestJson = "{\"latest\":true}";
-                LocationReport latest = new LocationReport(
-                        wardId, 37.5, 127.0, 10f, MovementStatus.ON_FOOT, Instant.now());
-
-                given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
-                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.of(latestJson));
-                given(objectMapper.readValue(latestJson, LocationReport.class)).willReturn(latest);
-
-                tmapServer.expect(requestTo(startsWith(BASE_URL + "/tmap/geo/reversegeocoding")))
-                        .andRespond(withSuccess(TMAP_RESPONSE, MediaType.APPLICATION_JSON));
-
-                //when
-                locationService.getLastLocation(guardian);
-
-                //then
-                verify(presenceService, org.mockito.Mockito.never()).getIsConnected(wardId);
-            }
+            // "presence를 조회하지 않는다"(presence 게이트 제거, 2026-08-04) 테스트는 지웠다.
+            // LocationService가 PresenceService를 아예 의존하지 않게 되어 컴파일러가 막아준다.
         }
     }
 

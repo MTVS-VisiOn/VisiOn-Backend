@@ -41,11 +41,6 @@ public class JwtTokenProvider {
         return issue(id, email, role, jwtProperties.getValidations().getRefresh());
     }
 
-    //register 토큰 만들기
-    public String issueRegisterToken(Long id, String email, UserRole role) {
-        return issue(id, email, role, jwtProperties.getValidations().getRegister());
-    }
-
     //jwt 토큰 만들기
     private String issue(Long id, String email, UserRole role, Long validTime) {
         return Jwts.builder()
