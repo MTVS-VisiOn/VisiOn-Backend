@@ -25,11 +25,14 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
+import static mtvs.onvision.vision.alert.service.AlertService.SEOUL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.inOrder;
@@ -229,14 +232,34 @@ class CommandServiceTest {
             void it_reads_ward_commands() {
                 //given
                 given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
-                given(commandRepository.findTop5ByReceiverIdOrderByCreatedAtDesc(wardId))
+                given(commandRepository.findAllByReceiverIdAndOccurredAtGreaterThanEqualOrderByOccurredAtDesc(eq(wardId), any(Instant.class)))
                         .willReturn(List.of());
 
                 //when
                 commandService.getInstructs(guardian);
 
                 //then
-                verify(commandRepository).findTop5ByReceiverIdOrderByCreatedAtDesc(wardId);
+                verify(commandRepository).findAllByReceiverIdAndOccurredAtGreaterThanEqualOrderByOccurredAtDesc(eq(wardId), any(Instant.class));
+            }
+
+            @Test
+            @DisplayName("It : 조회 기준 시각을 오늘 KST 00:00으로 잡는다")
+            void it_uses_today_window_in_kst() {
+                //given
+                given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
+                given(commandRepository.findAllByReceiverIdAndOccurredAtGreaterThanEqualOrderByOccurredAtDesc(eq(wardId), any(Instant.class)))
+                        .willReturn(List.of());
+
+                //when
+                commandService.getInstructs(guardian);
+
+                //then : 서버 기본 시간대가 아니라 KST 기준이어야 한다. UTC로 잡으면 하루 경계가 9시간 어긋난다
+                ArgumentCaptor<Instant> captor = ArgumentCaptor.forClass(Instant.class);
+                verify(commandRepository)
+                        .findAllByReceiverIdAndOccurredAtGreaterThanEqualOrderByOccurredAtDesc(eq(wardId), captor.capture());
+
+                Instant expected = LocalDate.now(SEOUL).atStartOfDay(SEOUL).toInstant();
+                assertThat(captor.getValue()).isEqualTo(expected);
             }
 
             @Test
@@ -244,7 +267,7 @@ class CommandServiceTest {
             void it_maps_to_response_keeping_order() {
                 //given
                 given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
-                given(commandRepository.findTop5ByReceiverIdOrderByCreatedAtDesc(wardId))
+                given(commandRepository.findAllByReceiverIdAndOccurredAtGreaterThanEqualOrderByOccurredAtDesc(eq(wardId), any(Instant.class)))
                         .willReturn(List.of(command(3L, "지금 어디가니?"), command(2L, "횡단보도 입니다.")));
 
                 //when
@@ -268,7 +291,7 @@ class CommandServiceTest {
             void it_returns_empty_list() {
                 //given
                 given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
-                given(commandRepository.findTop5ByReceiverIdOrderByCreatedAtDesc(wardId))
+                given(commandRepository.findAllByReceiverIdAndOccurredAtGreaterThanEqualOrderByOccurredAtDesc(eq(wardId), any(Instant.class)))
                         .willReturn(List.of());
 
                 //when&then
