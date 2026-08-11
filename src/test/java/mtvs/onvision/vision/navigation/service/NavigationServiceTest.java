@@ -3,6 +3,9 @@ package mtvs.onvision.vision.navigation.service;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
+import mtvs.onvision.vision.location.domain.MovementStatus;
+import mtvs.onvision.vision.location.dto.LocationReport;
+import mtvs.onvision.vision.location.repository.RealtimeLocationRepository;
 import mtvs.onvision.vision.navigation.domain.Route;
 import mtvs.onvision.vision.navigation.domain.RouteStatus;
 import mtvs.onvision.vision.navigation.domain.TransportMode;
@@ -26,6 +29,7 @@ import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -36,11 +40,14 @@ import static mtvs.onvision.vision.alert.service.AlertService.SEOUL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("NavigationService의")
@@ -60,6 +67,12 @@ class NavigationServiceTest {
 
     @Mock
     private UserService userService;
+
+    @Mock
+    private RealtimeLocationRepository realtimeLocationRepository;
+
+    @Mock
+    private RouteProgressCalculator routeProgressCalculator;
 
     /**
      * 진짜 매퍼를 쓴다. Redis의 report를 다시 읽는 게 이 도메인에서 가장 조용히 깨지는 자리라
@@ -449,6 +462,43 @@ class NavigationServiceTest {
                 assertThat(response.end().latitude()).isEqualTo(37.479103);
                 assertThat(response.end().longitude()).isEqualTo(127.037476);
             }
+
+            @Test
+            @DisplayName("(피보호자 위치가 없을때)It : remainingDistanceM이 null이고 report를 파싱하지 않는다")
+            void it_skips_calculation_without_location() {
+                //given
+                given(routeRepository.findByWardIdAndStatus(wardId, RouteStatus.IN_PROGRESS))
+                        .willReturn(Optional.of(existingRoute()));
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.empty());
+
+                //when
+                NavigationResponse response = navigationService.getProcessingRoute(ward);
+
+                //then : 안내 중 반복 호출되는 API라 위치가 없으면 JSON 파싱까지 건너뛴다
+                assertThat(response.remainingDistanceM()).isNull();
+                verifyNoInteractions(routeProgressCalculator);
+            }
+
+            @Test
+            @DisplayName("(피보호자 위치가 있을때)It : 계산기 결과를 remainingDistanceM에 싣는다")
+            void it_carries_remaining_distance() {
+                //given
+                given(routeRepository.findByWardIdAndStatus(wardId, RouteStatus.IN_PROGRESS))
+                        .willReturn(Optional.of(existingRoute()));
+                LocationReport location = new LocationReport(
+                        wardId, 37.503900, 127.025200, 5.0f, MovementStatus.ON_FOOT, Instant.parse("2026-08-03T07:20:00Z"));
+                given(realtimeLocationRepository.getLastLocation(wardId))
+                        .willReturn(Optional.of(fixtureMapper.writeValueAsString(location)));
+                given(routeProgressCalculator.remainingDistance(
+                        any(NavigationRouteReport.class), eq(37.503900), eq(127.025200), anyInt()))
+                        .willReturn(1830);
+
+                //when
+                NavigationResponse response = navigationService.getProcessingRoute(ward);
+
+                //then
+                assertThat(response.remainingDistanceM()).isEqualTo(1830);
+            }
         }
 
         @Nested
@@ -649,6 +699,70 @@ class NavigationServiceTest {
                 //then
                 verify(routeRepository).findByWardIdAndStatus(wardId, RouteStatus.IN_PROGRESS);
                 verify(routeRepository, never()).findByWardIdAndStatus(guardianId, RouteStatus.IN_PROGRESS);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 남은 거리는")
+        class Context_with_remaining_distance {
+
+            private void givenRoute() {
+                given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
+                given(routeRepository.findByWardIdAndStatus(wardId, RouteStatus.IN_PROGRESS))
+                        .willReturn(Optional.of(route(TransportMode.WALK, walkSummary(), walkReportJsonWithPath())));
+            }
+
+            @Test
+            @DisplayName("(피보호자 위치가 없을때)It : null이고 계산기를 부르지 않는다")
+            void it_is_null_without_location() {
+                //given : 앱이 꺼져 있거나 마지막 좌표가 Redis TTL을 넘긴 상태
+                givenRoute();
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.empty());
+
+                //when
+                MapResponse response = navigationService.getMapRoute(guardian);
+
+                //then : 총거리로 대신 채우면 프론트가 진짜 값과 구분할 수 없다
+                assertThat(response.remainingDistanceM()).isNull();
+                assertThat(response.distanceM()).isEqualTo(24269);
+                verifyNoInteractions(routeProgressCalculator);
+            }
+
+            @Test
+            @DisplayName("(피보호자 위치가 있을때)It : 계산기 결과를 그대로 싣는다")
+            void it_carries_calculated_value() {
+                //given
+                givenRoute();
+                LocationReport location = new LocationReport(
+                        wardId, 37.503900, 127.025200, 5.0f, MovementStatus.ON_FOOT, Instant.parse("2026-08-03T07:20:00Z"));
+                given(realtimeLocationRepository.getLastLocation(wardId))
+                        .willReturn(Optional.of(fixtureMapper.writeValueAsString(location)));
+                given(routeProgressCalculator.remainingDistance(
+                        any(NavigationRouteReport.class), eq(37.503900), eq(127.025200), eq(24269)))
+                        .willReturn(2450);
+
+                //when
+                MapResponse response = navigationService.getMapRoute(guardian);
+
+                //then
+                assertThat(response.remainingDistanceM()).isEqualTo(2450);
+            }
+
+            @Test
+            @DisplayName("(경로를 벗어나 계산기가 null을 줄때)It : null을 그대로 내보낸다")
+            void it_passes_null_through() {
+                //given
+                givenRoute();
+                LocationReport location = new LocationReport(
+                        wardId, 37.600000, 127.100000, 5.0f, MovementStatus.ON_FOOT, Instant.parse("2026-08-03T07:20:00Z"));
+                given(realtimeLocationRepository.getLastLocation(wardId))
+                        .willReturn(Optional.of(fixtureMapper.writeValueAsString(location)));
+                given(routeProgressCalculator.remainingDistance(
+                        any(NavigationRouteReport.class), anyDouble(), anyDouble(), anyInt()))
+                        .willReturn(null);
+
+                //when&then
+                assertThat(navigationService.getMapRoute(guardian).remainingDistanceM()).isNull();
             }
         }
 

@@ -645,6 +645,24 @@ public interface NavigationControllerSupporter {
                     한글 라벨은 `report.summary.legs[].mode` 쪽이다.
 
                     모든 좌표는 `[위도, 경도]`다.
+
+                    ### `remainingDistanceM` — 남은 거리(m)
+
+                    `report` 안의 거리·시간이 전부 **저장 시점의 값**인 것과 달리, 이 값만 호출할 때마다
+                    피보호자의 마지막 좌표를 경로선 위에 투영해 다시 계산한다. 서버가 진행률을 저장하지 않아서
+                    **매 호출이 그 시점의 추정치**다. `GET /api/navigations/map`의 같은 이름 필드와 동일한 값이다.
+
+                    **다음 경우 `null`이다. 값이 0인 것과 구분해야 한다.**
+
+                    | 상황 | 왜 |
+                    |---|---|
+                    | 피보호자 위치가 없음 | 앱이 꺼져 있거나 마지막 좌표가 30분(Redis TTL)을 넘겼다 |
+                    | 경로에서 200m 넘게 벗어남 | 어느 구간에 있는지 특정할 수 없다. 틀린 숫자보다 빈 값을 준다 |
+
+                    `report.summary.totalDistance`와 같은 척도라 **`0 <= remainingDistanceM <= totalDistance`** 다.
+
+                    > **대중교통(`TRANSIT`)은 정확도가 떨어진다.** 도보·자동차는 구간마다 누적 거리가 저장돼 있지만
+                    > 대중교통에는 없어서 leg 길이를 이어 붙여 추정한다. 대략적인 값으로만 쓸 것.
                     """,
             extensions = @Extension(properties = @ExtensionProperty(name = "x-order", value = "4"))
     )
@@ -682,6 +700,7 @@ public interface NavigationControllerSupporter {
                                                                         "roadAddress": "서울 서초구 강남대로 213",
                                                                         "favoriteId": null
                                                                     },
+                                                                    "remainingDistanceM": 2450,
                                                                     "report": {
                                                                         "summary": {
                                                                             "index": 0,
@@ -797,6 +816,7 @@ public interface NavigationControllerSupporter {
                                                                         "roadAddress": "서울 서초구 강남대로 213",
                                                                         "favoriteId": null
                                                                     },
+                                                                    "remainingDistanceM": 2450,
                                                                     "report": {
                                                                         "summary": {
                                                                             "index": 0,
@@ -1052,7 +1072,26 @@ public interface NavigationControllerSupporter {
 
                     **진행 중인 경로가 없으면 404가 아니라 `data: null`이다.** 목적지 미설정은 오류가 아니다.
 
-                    거리·시간은 **경로를 저장한 시점의 전체 값**이다. 이동한 만큼 줄어들지 않는다""",
+                    `distanceM`·`etaMin`은 **경로를 저장한 시점의 전체 값**이다. 이동한 만큼 줄어들지 않는다.
+                    줄어드는 값은 `remainingDistanceM` 하나뿐이다.
+
+                    ### `remainingDistanceM` — 남은 거리(m)
+
+                    호출할 때마다 피보호자의 마지막 좌표를 경로선 위에 투영해 다시 계산한다.
+                    서버가 진행률을 저장하지 않기 때문에 **매 호출이 그 시점의 추정치**다.
+
+                    **다음 경우 `null`이다. 값이 0인 것과 구분해야 한다.**
+
+                    | 상황 | 왜 |
+                    |---|---|
+                    | 피보호자 위치가 없음 | 앱이 꺼져 있거나 마지막 좌표가 30분(Redis TTL)을 넘겼다 |
+                    | 경로에서 200m 넘게 벗어남 | 어느 구간에 있는지 특정할 수 없다. 틀린 숫자보다 빈 값을 준다 |
+
+                    `distanceM`과 같은 척도로 맞춰서 내보내므로 **`0 <= remainingDistanceM <= distanceM`** 이 보장된다.
+
+                    > **대중교통(`TRANSIT`)은 정확도가 떨어진다.** 도보·자동차는 구간마다 누적 거리가 저장돼 있지만
+                    > 대중교통에는 없어서 leg 길이를 이어 붙여 추정한다. 게다가 티맵이 주는 `totalDistance`가
+                    > leg 길이 합과 일치하지 않아 비율로 환산한다. 대략적인 값으로만 쓸 것.""",
             extensions = @Extension(properties = @ExtensionProperty(name = "x-order", value = "7"))
     )
     @ApiResponses(value = {
@@ -1076,6 +1115,32 @@ public interface NavigationControllerSupporter {
                                                                     "latitude": 37.479103,
                                                                     "longitude": 127.037476,
                                                                     "distanceM": 24269,
+                                                                    "remainingDistanceM": 2450,
+                                                                    "etaMin": 360,
+                                                                    "departureTime": "2026-08-03T07:08:00Z",
+                                                                    "mode": "WALK",
+                                                                    "path": [
+                                                                        { "latitude": 37.504585, "longitude": 127.024798 },
+                                                                        { "latitude": 37.503900, "longitude": 127.025200 }
+                                                                    ]
+                                                                }
+                                                            }
+                                                            """
+                                            ),
+                                            @ExampleObject(
+                                                    name = "위치를 알 수 없을 때 — remainingDistanceM만 null",
+                                                    value = """
+                                                            {
+                                                                "success": true,
+                                                                "code": "ROUTE_READ",
+                                                                "message": "경로가 정상적으로 조회되었습니다.",
+                                                                "data": {
+                                                                    "name": "말죽거리공원사거리",
+                                                                    "address": "서울 서초구 강남대로 213",
+                                                                    "latitude": 37.479103,
+                                                                    "longitude": 127.037476,
+                                                                    "distanceM": 24269,
+                                                                    "remainingDistanceM": null,
                                                                     "etaMin": 360,
                                                                     "departureTime": "2026-08-03T07:08:00Z",
                                                                     "mode": "WALK",

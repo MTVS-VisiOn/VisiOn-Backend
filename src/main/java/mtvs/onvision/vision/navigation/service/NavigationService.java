@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
+import mtvs.onvision.vision.location.dto.LocationReport;
+import mtvs.onvision.vision.location.repository.RealtimeLocationRepository;
 import mtvs.onvision.vision.navigation.domain.Route;
 import mtvs.onvision.vision.navigation.domain.RouteStatus;
 import mtvs.onvision.vision.navigation.domain.TransportMode;
@@ -42,6 +44,8 @@ public class NavigationService {
 
     private static final Pattern DISTANCE_TAIL = Pattern.compile("\\d+m 이동$");
     private final UserService userService;
+    private final RealtimeLocationRepository realtimeLocationRepository;
+    private final RouteProgressCalculator routeProgressCalculator;
 
 
     //네비게이션 경로 찾기
@@ -238,7 +242,37 @@ public class NavigationService {
         else wardId = userService.getWardIdFromGuardianId(currentUser.getId());
         Route route = routeRepository.findByWardIdAndStatus(wardId, RouteStatus.IN_PROGRESS)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROUTE));
-        return NavigationResponse.from(route);
+        return NavigationResponse.from(route, remainingDistanceOf(route, wardId));
+    }
+
+    /**
+     * 남은 거리를 구하려고 저장된 경로 JSON을 한 번 더 파싱한다.
+     *
+     * `/processing`은 `report`를 `@JsonRawValue`로 그대로 흘려보내서 원래는 파싱이 필요 없었다.
+     * 안내 중에 반복 호출되는 API라 부담이 되면 계산 결과를 Redis에 짧게 캐시하는 쪽을 봐야 한다.
+     */
+    private Integer remainingDistanceOf(Route route, Long wardId) {
+        LocationReport location = lastLocationOf(wardId);
+        if (location == null) return null;
+
+        String json = route.getReport();
+        TransportMode mode = route.getMode();
+        if (mode.equals(TransportMode.WALK) || mode.equals(TransportMode.CAR)) {
+            return remainingDistance(objectMapper.readValue(json, NavigationRouteReport.class), location);
+        }
+        return remainingDistance(objectMapper.readValue(json, TransitRoute.class), location);
+    }
+
+    private Integer remainingDistance(NavigationRouteReport report, LocationReport location) {
+        if (location == null) return null;
+        return routeProgressCalculator.remainingDistance(
+                report, location.latitude(), location.longitude(), report.summary().totalDistance());
+    }
+
+    private Integer remainingDistance(TransitRoute report, LocationReport location) {
+        if (location == null) return null;
+        return routeProgressCalculator.remainingDistance(
+                report, location.latitude(), location.longitude(), report.summary().totalDistance());
     }
 
 
@@ -266,16 +300,29 @@ public class NavigationService {
             Route route = opRoute.get();
             TransportMode mode = route.getMode();
             String json = route.getReport();
+            LocationReport location = lastLocationOf(wardId);
             if (mode.equals(TransportMode.WALK) || mode.equals(TransportMode.CAR)) {
                 NavigationRouteReport report = objectMapper.readValue(json, NavigationRouteReport.class);
-                return MapResponse.from(report, mode, route.getCreatedAt());
+                return MapResponse.from(report, mode, route.getCreatedAt(), remainingDistance(report, location));
             } else {
                 //대중교통일때
                 TransitRoute report = objectMapper.readValue(json, TransitRoute.class);
-                return MapResponse.from(report, route.getCreatedAt());
+                return MapResponse.from(report, route.getCreatedAt(), remainingDistance(report, location));
             }
         }
         else return null;
+    }
+
+    /**
+     * 남은 거리 계산용 현재 좌표. 없으면 null이고 남은 거리도 null이 된다.
+     *
+     * `LocationService.getLastLocation`을 쓰지 않는 이유는 그쪽이 좌표마다 티맵 역지오코딩을 부르기 때문이다.
+     * 여기서는 주소가 필요 없고, 지도 갱신 주기마다 외부 API를 때릴 이유가 없다.
+     */
+    private LocationReport lastLocationOf(Long wardId) {
+        return realtimeLocationRepository.getLastLocation(wardId)
+                .map(json -> objectMapper.readValue(json, LocationReport.class))
+                .orElse(null);
     }
 
     @Transactional(readOnly = true)
