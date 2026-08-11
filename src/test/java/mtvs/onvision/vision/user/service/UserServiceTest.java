@@ -604,8 +604,8 @@ class UserServiceTest {
                 ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
                 verify(registerCodeRepository).saveIfAbsent(captor.capture(), eq(userId));
 
-                assertThat(response.code()).isEqualTo(captor.getValue());
-                assertThat(response.code()).matches(registerCodePattern);
+                assertThat(response.registerCode()).isEqualTo(captor.getValue());
+                assertThat(response.registerCode()).matches(registerCodePattern);
             }
         }
 

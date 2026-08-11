@@ -163,7 +163,7 @@ public interface UserControllerSupporter {
             description = """
                     피보호자 등록 코드 생성 API.
 
-                    응답 필드는 `code` 하나이며, 회원가입 시에는 `registerCode` 필드에 그대로 실어 보낸다.
+                    응답 필드는 `registerCode` 하나이며, 회원가입 시 같은 이름의 필드에 그대로 실어 보낸다.
                     코드는 6자리이고 `ABCDEFGHJKLMNPRSTUVWXY23456789`만 쓴다(I·O·Q·Z·0·1 제외).
                     유효 시간은 15분이며, 만료되면 재발급받아야 한다.
                     """,
@@ -183,7 +183,7 @@ public interface UserControllerSupporter {
                                                         "code": "REGISTER_CODE_CREATED",
                                                         "message": "보호자 등록 코드가 정상적으로 생성되었습니다.",
                                                         "data": {
-                                                            "code": "TV8HYB"
+                                                            "registerCode": "TV8HYB"
                                                         }
                                                     }
                                                     """

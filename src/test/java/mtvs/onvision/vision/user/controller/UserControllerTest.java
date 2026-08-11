@@ -570,7 +570,7 @@ class UserControllerTest {
                         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                         .andExpect(jsonPath("$.code").value(SuccessCode.REGISTER_CODE_CREATED.name()))
                         .andExpect(jsonPath("$.message").value(SuccessCode.REGISTER_CODE_CREATED.getSuccessMessage()))
-                        .andExpect(jsonPath("$.data.code").value(registerCode))
+                        .andExpect(jsonPath("$.data.registerCode").value(registerCode))
                         .andDo(print());
             }
         }
