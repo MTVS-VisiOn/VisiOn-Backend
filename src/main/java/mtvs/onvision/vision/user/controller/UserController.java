@@ -29,18 +29,18 @@ public class UserController implements UserControllerSupporter {
     @PostMapping("/signup")
     public ResponseEntity<ApiResult<Void>> signup(@RequestBody @Valid SignupRequest request) {
         if (request.role() == UserRole.GUARDIAN) {
-            if (request.registerToken() == null) throw new BusinessException(ErrorCode.INVALID_WARD);
+            if (request.registerCode() == null) throw new BusinessException(ErrorCode.INVALID_WARD);
         }
         userService.signup(request);
         return ApiResult.created(SuccessCode.USER_CREATED);
     }
 
     @Override
-    @GetMapping("/guardian/register-token")
+    @GetMapping("/guardian/register-code")
     @ApiUnauthorized
-    public ResponseEntity<ApiResult<RegisterGuardianResponse>> getGuardianRegisterToken(@AuthenticationPrincipal CurrentUser currentUser) {
-        RegisterGuardianResponse response = userService.getGuardianRegisterToken(currentUser);
-        return ApiResult.ok(SuccessCode.REGISTER_TOKEN_CREATED, response);
+    public ResponseEntity<ApiResult<RegisterGuardianResponse>> getGuardianRegisterCode(@AuthenticationPrincipal CurrentUser currentUser) {
+        RegisterGuardianResponse response = userService.getGuardianRegisterCode(currentUser);
+        return ApiResult.ok(SuccessCode.REGISTER_CODE_CREATED, response);
     }
 
     @PostMapping("/device-fid")

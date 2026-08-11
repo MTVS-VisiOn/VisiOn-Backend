@@ -26,14 +26,23 @@ jwt:
   validations:
     access: 900000   #밀리초 단위
     refresh: 604800000
-    register: 900000
+
 redis:
   expired:
+    register: 900000
     presence: 180  #초단위
     location: 30  #분단위
     navigation: 30  #분단위
     alert-cooldown: 60  #초단위
     alert-notified: 3600  #초단위
+
+location:
+  flush:
+    interval: 30s
+    batch-size: 1000
+    max-loops: 10
+    enabled: false   # 테스트에서 스케줄러가 멋대로 돌지 않게 한다. flush()는 직접 호출한다
+
 presence:
   battery:
     thresholds: 20,10,5

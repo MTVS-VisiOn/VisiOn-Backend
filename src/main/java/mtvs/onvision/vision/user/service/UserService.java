@@ -17,7 +17,7 @@ import mtvs.onvision.vision.user.dto.RegisterGuardianResponse;
 import mtvs.onvision.vision.user.dto.SignupRequest;
 import mtvs.onvision.vision.user.dto.UserResponse;
 import mtvs.onvision.vision.user.repository.FidRepository;
-import mtvs.onvision.vision.user.repository.RegisterTokenRepository;
+import mtvs.onvision.vision.user.repository.RegisterCodeRepository;
 import mtvs.onvision.vision.user.repository.RelationRepository;
 import mtvs.onvision.vision.user.repository.UserRepository;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -27,7 +27,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.util.List;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Service
@@ -38,8 +40,15 @@ public class UserService implements UserDetailsService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenRepository refreshTokenRepository;
-    private final RegisterTokenRepository registerTokenRepository;
+    private final RegisterCodeRepository registerCodeRepository;
     private final FidRepository fidRepository;
+
+    // I·O·Q·Z 제외 — 사람이 읽어서 전달하는 코드다
+    private static final char[] CODE_ALPHABET = "ABCDEFGHJKLMNPRSTUVWXY23456789".toCharArray();
+    private static final Pattern CODE_PATTERN = Pattern.compile("^[" + new String(CODE_ALPHABET) + "]{6}$");
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final int CODE_LENGTH = 6;
+    private static final int ISSUE_MAX_ATTEMPTS = 5;
 
     @Transactional
     public void signup(SignupRequest request) {
@@ -52,9 +61,8 @@ public class UserService implements UserDetailsService {
         }
         else {
             //토큰 확인
-            Long wardId = jwtTokenProvider.parseId(request.registerToken());
-            String repositoryToken = registerTokenRepository.getToken(wardId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_REGISTER));
-            PreConditions.check(!repositoryToken.equals(request.registerToken()), ErrorCode.INVALID_REGISTER_TOKEN);
+            PreConditions.check(!CODE_PATTERN.matcher(request.registerCode()).matches(), ErrorCode.INVALID_REGISTER_CODE);
+            Long wardId = registerCodeRepository.getToken(request.registerCode()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_REGISTER));
 
             //회원 등록
             User ward = userRepository.findByIdAndRole(wardId, UserRole.WARD).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_WARD));
@@ -67,10 +75,14 @@ public class UserService implements UserDetailsService {
     }
 
     @Transactional
-    public RegisterGuardianResponse getGuardianRegisterToken(CurrentUser currentUser) {
-        String registerToken = jwtTokenProvider.issueRegisterToken(currentUser.getId(), currentUser.getEmail(), UserRole.WARD);
-        registerTokenRepository.save(currentUser.getId(), registerToken);
-        return new RegisterGuardianResponse(registerToken);
+    public RegisterGuardianResponse getGuardianRegisterCode(CurrentUser currentUser) {
+        for (int i = 0; i < ISSUE_MAX_ATTEMPTS; i++) {
+            String code = generateRegisterCode();
+            if (registerCodeRepository.saveIfAbsent(code, currentUser.getId())) {
+                return new RegisterGuardianResponse(code);
+            }
+        }
+        throw new BusinessException(ErrorCode.FAILED_ISSUE_REGISTER_CODE);
     }
 
     @Transactional
@@ -190,5 +202,13 @@ public class UserService implements UserDetailsService {
         fidRepository.deleteByFid(fid);
         // FCM이 UNREGISTERED를 돌려준 죽은 기기. 중복 푸시 추적의 근거가 된다
         log.info("Fid removed by FCM UNREGISTERED: fid={}", fid);
+    }
+
+    private String generateRegisterCode() {
+        StringBuilder code = new StringBuilder(CODE_LENGTH);
+        for (int i = 0; i < CODE_LENGTH; i++) {
+                code.append(CODE_ALPHABET[SECURE_RANDOM.nextInt(CODE_ALPHABET.length)]);
+        }
+        return code.toString();
     }
 }

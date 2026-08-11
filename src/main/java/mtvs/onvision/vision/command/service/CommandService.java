@@ -14,7 +14,11 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
+
+import static mtvs.onvision.vision.alert.service.AlertService.SEOUL;
 
 @Service
 @RequiredArgsConstructor
@@ -35,7 +39,9 @@ public class CommandService {
     @Transactional(readOnly = true)
     public List<CommandResponse> getInstructs(CurrentUser currentUser) {
         Long wardId = userService.getWardIdFromGuardianId(currentUser.getId());
-        return commandRepository.findTop5ByReceiverIdOrderByCreatedAtDesc(wardId)
+        // 오늘치 → 오늘 KST 00:00부터. 자정이 지나면 목록은 비워진다
+        Instant from = LocalDate.now(SEOUL).atStartOfDay(SEOUL).toInstant();
+        return commandRepository.findAllByReceiverIdAndOccurredAtGreaterThanEqualOrderByOccurredAtDesc(wardId, from)
                 .stream().map(CommandResponse::from).toList();
     }
 }

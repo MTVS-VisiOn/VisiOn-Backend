@@ -34,6 +34,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
@@ -97,6 +98,7 @@ class NavigationControllerTest {
         return new NavigationResponse(
                 7L, TransportMode.TRANSIT,
                 location("신논현역"), location("말죽거리공원사거리"),
+                1830,
                 "{\"summary\":{\"mode\":\"TRANSIT\",\"totalTime\":953},\"legs\":[]}");
     }
 
@@ -301,6 +303,28 @@ class NavigationControllerTest {
                         .andExpect(jsonPath("$.code").value(SuccessCode.ROUTE_READ.name()))
                         .andExpect(jsonPath("$.data.id").value(7))
                         .andExpect(jsonPath("$.data.mode").value("TRANSIT"))
+                        .andExpect(jsonPath("$.data.remainingDistanceM").value(1830))
+                        .andDo(print());
+            }
+
+            @Test
+            @DisplayName("(피보호자 위치를 모를때)It : remainingDistanceM을 생략하지 않고 null로 내보낸다")
+            void it_writes_remaining_distance_as_null() throws Exception {
+                //given : /map과 같은 규약이다. 필드가 빠지면 '0m 남음'과 '모름'이 구분되지 않는다
+                NavigationResponse unknown = new NavigationResponse(
+                        7L, TransportMode.TRANSIT,
+                        location("신논현역"), location("말죽거리공원사거리"),
+                        null,
+                        "{\"summary\":{\"mode\":\"TRANSIT\",\"totalTime\":953},\"legs\":[]}");
+                given(navigationService.getProcessingRoute(any())).willReturn(unknown);
+
+                //when-then
+                mockMvc.perform(get("/api/navigations/processing"))
+                        .andExpect(status().isOk())
+                        // exists()는 값이 non-null이어야 통과한다. null을 허용하면서
+                        // 키가 있는지만 보려면 hasJsonPath()다
+                        .andExpect(jsonPath("$.data.remainingDistanceM").hasJsonPath())
+                        .andExpect(jsonPath("$.data.remainingDistanceM").value(nullValue()))
                         .andDo(print());
             }
 
@@ -439,7 +463,7 @@ class NavigationControllerTest {
         private MapResponse mapResponse() {
             return new MapResponse(
                     "말죽거리공원사거리", "서울 서초구 강남대로 213", 37.479103, 127.037476,
-                    24269, 360, Instant.parse("2026-08-03T07:08:00Z"), TransportMode.WALK,
+                    24269, 2450, 360, Instant.parse("2026-08-03T07:08:00Z"), TransportMode.WALK,
                     List.of(Map.of("latitude", 37.504585, "longitude", 127.024798),
                             Map.of("latitude", 37.503900, "longitude", 127.025200)));
         }
@@ -461,8 +485,31 @@ class NavigationControllerTest {
                         .andExpect(jsonPath("$.code").value(SuccessCode.ROUTE_READ.name()))
                         .andExpect(jsonPath("$.data.name").value("말죽거리공원사거리"))
                         .andExpect(jsonPath("$.data.distanceM").value(24269))
+                        .andExpect(jsonPath("$.data.remainingDistanceM").value(2450))
                         .andExpect(jsonPath("$.data.etaMin").value(360))
                         .andExpect(jsonPath("$.data.mode").value("WALK"))
+                        .andDo(print());
+            }
+
+            @Test
+            @DisplayName("(피보호자 위치를 모를때)It : remainingDistanceM을 생략하지 않고 null로 내보낸다")
+            void it_writes_remaining_distance_as_null() throws Exception {
+                //given : 필드가 빠지면 프론트가 '0m 남음'과 '모름'을 구분할 수 없다.
+                // 이 프로젝트는 NON_NULL을 안 걸어서 null이 그대로 나가야 한다(handoff §0 null 정책)
+                MapResponse unknown = new MapResponse(
+                        "말죽거리공원사거리", "서울 서초구 강남대로 213", 37.479103, 127.037476,
+                        24269, null, 360, Instant.parse("2026-08-03T07:08:00Z"), TransportMode.WALK,
+                        List.of());
+                given(navigationService.getMapRoute(any())).willReturn(unknown);
+
+                //when-then
+                mockMvc.perform(get("/api/navigations/map"))
+                        .andExpect(status().isOk())
+                        // exists()는 값이 non-null이어야 통과한다. null을 허용하면서
+                        // 키가 있는지만 보려면 hasJsonPath()다
+                        .andExpect(jsonPath("$.data.remainingDistanceM").hasJsonPath())
+                        .andExpect(jsonPath("$.data.remainingDistanceM").value(nullValue()))
+                        .andExpect(jsonPath("$.data.distanceM").value(24269))
                         .andDo(print());
             }
 

@@ -17,14 +17,15 @@ public enum ErrorCode {
     NOT_FOUND_GUARDIAN(HttpStatus.NOT_FOUND, "해당하는 아이디의 보호자를 찾을 수 없습니다."),
     NOT_FOUND_USER(HttpStatus.NOT_FOUND, "해당하는 아이디의 유저를 찾을 수 없습니다."),
     NOT_FOUND_REFRESH(HttpStatus.NOT_FOUND, "해당하는 refresh 토큰을 찾을 수 없습니다."),
-    NOT_FOUND_REGISTER(HttpStatus.NOT_FOUND, "해당하는 register 토큰을 찾을 수 없습니다."),
+    NOT_FOUND_REGISTER(HttpStatus.NOT_FOUND, "해당하는 register 코드를 찾을 수 없습니다."),
     NOT_FOUND_RELATION(HttpStatus.NOT_FOUND, "해당하는 relation 을 찾을 수 없습니다."),
     NOT_MATCH_PASSWORD(HttpStatus.BAD_REQUEST, "비밀번호가 일치하지 않습니다."),
     INVALID_REFRESH_TOKEN(HttpStatus.BAD_REQUEST, "refresh 토큰이 맞지 않습니다."),
-    INVALID_REGISTER_TOKEN(HttpStatus.BAD_REQUEST, "register 토큰이 맞지 않습니다."),
+    INVALID_REGISTER_CODE(HttpStatus.BAD_REQUEST, "등록 코드 형식이 올바르지 않습니다."),
     NOT_FOUND_FID(HttpStatus.NOT_FOUND, "사용자의 동록된 기기를 찾을 수 없습니다."),
     NOT_OWNER_FID(HttpStatus.FORBIDDEN, "해당 기기의 주인이 아닙니다."),
     NOT_GUARDIAN(HttpStatus.FORBIDDEN, "해당 피보호자의 보호자가 아닙니다."),
+    FAILED_ISSUE_REGISTER_CODE(HttpStatus.CONFLICT, "등록 코드를 생성하는 것에 실패했습니다."),
 
     /*signalling*/
     MAX_CONNECT(HttpStatus.CONFLICT, "이미 연결 중인 세션이 있어 참여할 수 없습니다."),
