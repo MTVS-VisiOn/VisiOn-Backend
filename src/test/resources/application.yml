@@ -26,9 +26,10 @@ jwt:
   validations:
     access: 900000   #밀리초 단위
     refresh: 604800000
-    register: 900000
+
 redis:
   expired:
+    register: 900000
     presence: 180  #초단위
     location: 30  #분단위
     navigation: 30  #분단위

@@ -51,7 +51,7 @@ public interface UserControllerSupporter {
                                             "nickname":"test3",
                                             "phoneNumber":"010-0000-0003",
                                             "role":"GUARDIAN",
-                                            "registerToken": "피보호자의 등록 토큰값을 넣어주세요"
+                                            "registerCode": "TV8HYB"
                                         }
                                         """
                             )
@@ -118,7 +118,7 @@ public interface UserControllerSupporter {
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "등록 토큰이 이미 만료되었을떄",
+                    description = "등록 코드 형식이 올바르지 않을때(6자리가 아니거나 허용되지 않은 문자가 섞였을때)",
                     content = {
                             @Content(
                                     mediaType = MediaType.APPLICATION_JSON_VALUE,
@@ -126,8 +126,27 @@ public interface UserControllerSupporter {
                                             value = """
                                                     {
                                                         "success": false,
-                                                        "code": "INVALID_REGISTER_TOKEN",
-                                                        "message": "register 토큰이 맞지 않습니다.",
+                                                        "code": "INVALID_REGISTER_CODE",
+                                                        "message": "등록 코드 형식이 올바르지 않습니다.",
+                                                        "data": null
+                                                    }
+                                                    """
+                                    )
+                            )
+                    }
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "등록 코드가 만료되었거나 존재하지 않을때",
+                    content = {
+                            @Content(
+                                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                                    examples = @ExampleObject(
+                                            value = """
+                                                    {
+                                                        "success": false,
+                                                        "code": "NOT_FOUND_REGISTER",
+                                                        "message": "해당하는 register 코드를 찾을 수 없습니다.",
                                                         "data": null
                                                     }
                                                     """
@@ -140,14 +159,20 @@ public interface UserControllerSupporter {
 
 
     @Operation(
-            summary = "피보호자 등록 토큰 생성",
-            description = "피보호자 등록 토큰 생성 API",
+            summary = "피보호자 등록 코드 생성",
+            description = """
+                    피보호자 등록 코드 생성 API.
+
+                    응답 필드는 `code` 하나이며, 회원가입 시에는 `registerCode` 필드에 그대로 실어 보낸다.
+                    코드는 6자리이고 `ABCDEFGHJKLMNPRSTUVWXY23456789`만 쓴다(I·O·Q·Z·0·1 제외).
+                    유효 시간은 15분이며, 만료되면 재발급받아야 한다.
+                    """,
             extensions = @Extension(properties = @ExtensionProperty(name = "x-order", value = "2"))
     )
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "200",
-                    description = "등록 토큰 생성 성공",
+                    description = "등록 코드 생성 성공",
                     content = {
                             @Content(
                                     mediaType = MediaType.APPLICATION_JSON_VALUE,
@@ -155,11 +180,30 @@ public interface UserControllerSupporter {
                                             value = """
                                                     {
                                                         "success": true,
-                                                        "code": "REGISTER_TOKEN_CREATED",
-                                                        "message": "보호자 등록 토큰이 정상적으로 생성되었습니다.",
+                                                        "code": "REGISTER_CODE_CREATED",
+                                                        "message": "보호자 등록 코드가 정상적으로 생성되었습니다.",
                                                         "data": {
-                                                            "registerToken": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyIiwiZW1haWwiOiJ0ZXN0MUBuYXZlci5jb20iLCJyb2xlIjoiR1VBUkRJQU4iLCJpYXQiOjE3ODQ2OTc2OTgsImV4cCI6MTc4NDY5ODU5OH0.JdRlH8l-sMTe9Z7QQQmxtLbgT9qNWWkuabcFkw8cpEWVgPGihH8u1HqLofCr80ejBYGA5hIfY6Buzu9-r5IyQA"
+                                                            "code": "TV8HYB"
                                                         }
+                                                    }
+                                                    """
+                                    )
+                            )
+                    }
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "코드 생성이 재시도 상한까지 모두 충돌했을때(사실상 발생하지 않는다)",
+                    content = {
+                            @Content(
+                                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                                    examples = @ExampleObject(
+                                            value = """
+                                                    {
+                                                        "success": false,
+                                                        "code": "FAILED_ISSUE_REGISTER_CODE",
+                                                        "message": "등록 코드를 생성하는 것에 실패했습니다.",
+                                                        "data": null
                                                     }
                                                     """
                                     )
@@ -168,7 +212,7 @@ public interface UserControllerSupporter {
             )
     })
     @SecurityRequirement(name = "Bearer Authentication")
-    ResponseEntity<ApiResult<RegisterGuardianResponse>> getGuardianRegisterToken(CurrentUser currentUser);
+    ResponseEntity<ApiResult<RegisterGuardianResponse>> getGuardianRegisterCode(CurrentUser currentUser);
 
     @Operation(
             summary = "계정 정보 조회",
