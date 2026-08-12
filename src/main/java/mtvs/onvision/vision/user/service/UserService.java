@@ -235,4 +235,9 @@ public class UserService implements UserDetailsService {
         }
         return code.toString();
     }
+
+    public PairingDeviceResponse getDeviceAccessToken(CurrentUser currentUser) {
+        String token = jwtTokenProvider.issueDeviceToken(currentUser.getId(), currentUser.getEmail(), currentUser.getRole());
+        return new PairingDeviceResponse(token);
+    }
 }

@@ -879,4 +879,33 @@ class UserServiceTest {
             }
         }
     }
+
+    @Nested
+    @DisplayName("Describe: getDeviceAccessToken 메서드는")
+    class Describe_with_getDeviceAccessToken {
+
+        String reissuedToken = "reissued.device.token";
+        CurrentUser wardUser = new CurrentUser(wardId, "ward@test.com", UserRole.WARD);
+
+        @Nested
+        @DisplayName("Context: 로그인한 피보호자가 요청하면")
+        class Context_with_authenticated_ward {
+
+            @Test
+            @DisplayName("It : 기기(DEVICE) 토큰을 발급한다")
+            void it_issues_device_token() {
+                //given
+                given(jwtTokenProvider.issueDeviceToken(wardId, "ward@test.com", UserRole.WARD))
+                        .willReturn(reissuedToken);
+
+                //when
+                PairingDeviceResponse response = userService.getDeviceAccessToken(wardUser);
+
+                //then : 페어링 코드를 거치지 않는 재발급 경로다. 등록 코드 저장소를 보지 않는다
+                assertThat(response.accessToken()).isEqualTo(reissuedToken);
+                verifyNoInteractions(registerCodeRepository);
+                verify(jwtTokenProvider, never()).issueAccessToken(anyLong(), anyString(), any(UserRole.class));
+            }
+        }
+    }
 }
