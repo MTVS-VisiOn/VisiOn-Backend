@@ -9,6 +9,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
+import mtvs.onvision.vision.auth.domain.TokenType;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.auth.dto.KeyPair;
 import mtvs.onvision.vision.auth.dto.LoginRequest;
@@ -380,7 +381,7 @@ class UserServiceTest {
     class Describe_with_refreshToken {
 
         String requestToken = "requestRefreshToken";
-        TokenBody tokenBody = new TokenBody(userId, email, UserRole.WARD);
+        TokenBody tokenBody = new TokenBody(userId, email, UserRole.WARD, TokenType.ACCOUNT);
         KeyPair keyPair = new KeyPair("newAccessToken", "newRefreshToken");
 
         @Nested
@@ -812,14 +813,14 @@ class UserServiceTest {
         class Context_with_valid_code {
 
             @Test
-            @DisplayName("It : 코드가 가리키는 피보호자 권한의 access 토큰을 발급한다")
+            @DisplayName("It : 코드가 가리키는 피보호자의 기기 토큰을 발급한다")
             void it_success_issue_device_access_token() {
                 //given
                 ward = new User("ward@test.com", encodedPassword, "피보호자", "010-9999-8888", UserRole.WARD);
                 given(registerCodeRepository.getUserId(RegisterType.DEVICE, registerCode))
                         .willReturn(Optional.of(wardId));
                 given(userRepository.findByIdAndDeletedAtIsNull(wardId)).willReturn(Optional.of(ward));
-                given(jwtTokenProvider.issueAccessToken(wardId, ward.getEmail(), UserRole.WARD))
+                given(jwtTokenProvider.issueDeviceToken(wardId, ward.getEmail(), UserRole.WARD))
                         .willReturn(deviceAccessToken);
 
                 //when
