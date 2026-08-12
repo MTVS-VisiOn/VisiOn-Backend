@@ -1,6 +1,7 @@
 package mtvs.onvision.vision.user.repository;
 
 import lombok.RequiredArgsConstructor;
+import mtvs.onvision.vision.user.domain.RegisterType;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;
@@ -13,20 +14,27 @@ import java.util.Optional;
 public class RegisterCodeRepository {
     private final StringRedisTemplate redisTemplate;
 
-    @Value("${redis.expired.register}")
-    Long expiredTime;
+    @Value("${redis.expired.guardian-register}")
+    Long gExpiredTime;
+    @Value("${redis.expired.device-register}")
+    Long dExpiredTime;
 
-    private final String KEY_PREFIX = "registerCode:";
+    private final String KEY_PREFIX_GUARDIAN = "registerCode:guardian:";
+    private final String KEY_PREFIX_DEVICE = "registerCode:device:";
 
-    public boolean saveIfAbsent(String code, Long userId) {
+    public boolean saveIfAbsent(RegisterType type, String code, Long userId) {
+        String prefix = type.equals(RegisterType.GUARDIAN) ? KEY_PREFIX_GUARDIAN : KEY_PREFIX_DEVICE;
+        Long expiredTime = type.equals(RegisterType.GUARDIAN) ? gExpiredTime : dExpiredTime;
         return Boolean.TRUE.equals(redisTemplate.opsForValue()
-                .setIfAbsent(KEY_PREFIX + code, userId.toString(), Duration.ofMillis(expiredTime)));
+                .setIfAbsent(prefix + code, userId.toString(), Duration.ofMillis(expiredTime)));
     }
-    public Optional<Long> getToken(String code) {
-        return Optional.ofNullable(redisTemplate.opsForValue().get(KEY_PREFIX + code)).map(Long::valueOf);
+    public Optional<Long> getUserId(RegisterType type, String code) {
+        String prefix = type.equals(RegisterType.GUARDIAN) ? KEY_PREFIX_GUARDIAN : KEY_PREFIX_DEVICE;
+        return Optional.ofNullable(redisTemplate.opsForValue().get(prefix + code)).map(Long::valueOf);
     }
 
-    public void delete(String code) {
-        redisTemplate.delete(KEY_PREFIX+code);
+    public void delete(RegisterType type, String code) {
+        String prefix = type.equals(RegisterType.GUARDIAN) ? KEY_PREFIX_GUARDIAN : KEY_PREFIX_DEVICE;
+        redisTemplate.delete(prefix +code);
     }
 }
