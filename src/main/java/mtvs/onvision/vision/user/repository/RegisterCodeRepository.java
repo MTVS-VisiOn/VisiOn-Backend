@@ -28,7 +28,7 @@ public class RegisterCodeRepository {
         return Boolean.TRUE.equals(redisTemplate.opsForValue()
                 .setIfAbsent(prefix + code, userId.toString(), Duration.ofMillis(expiredTime)));
     }
-    public Optional<Long> getToken(RegisterType type, String code) {
+    public Optional<Long> getUserId(RegisterType type, String code) {
         String prefix = type.equals(RegisterType.GUARDIAN) ? KEY_PREFIX_GUARDIAN : KEY_PREFIX_DEVICE;
         return Optional.ofNullable(redisTemplate.opsForValue().get(prefix + code)).map(Long::valueOf);
     }

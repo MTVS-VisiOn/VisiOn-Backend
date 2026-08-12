@@ -1,5 +1,6 @@
 package mtvs.onvision.vision.user.service;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import mtvs.onvision.vision.auth.dto.*;
@@ -9,10 +10,7 @@ import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.common.util.PreConditions;
 import mtvs.onvision.vision.user.domain.*;
-import mtvs.onvision.vision.user.dto.FidRequest;
-import mtvs.onvision.vision.user.dto.RegisterResponse;
-import mtvs.onvision.vision.user.dto.SignupRequest;
-import mtvs.onvision.vision.user.dto.UserResponse;
+import mtvs.onvision.vision.user.dto.*;
 import mtvs.onvision.vision.user.repository.FidRepository;
 import mtvs.onvision.vision.user.repository.RegisterCodeRepository;
 import mtvs.onvision.vision.user.repository.RelationRepository;
@@ -60,7 +58,7 @@ public class UserService implements UserDetailsService {
         else {
             //토큰 확인
             PreConditions.check(!CODE_PATTERN.matcher(request.registerCode()).matches(), ErrorCode.INVALID_REGISTER_CODE);
-            Long wardId = registerCodeRepository.getToken(RegisterType.GUARDIAN, request.registerCode()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_REGISTER));
+            Long wardId = registerCodeRepository.getUserId(RegisterType.GUARDIAN, request.registerCode()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_REGISTER));
 
             //회원 등록
             User ward = userRepository.findByIdAndRole(wardId, UserRole.WARD).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_WARD));
@@ -200,6 +198,15 @@ public class UserService implements UserDetailsService {
 
     public RegisterResponse getDeviceRegisterCode(CurrentUser currentUser) {
         return getRegisterCode(currentUser, RegisterType.DEVICE);
+    }
+
+    public PairingDeviceResponse pairingDevice(@Valid DeviceRegisterRequest request) {
+        Long wardId = registerCodeRepository.getUserId(RegisterType.DEVICE, request.code()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_REGISTER));
+        User user = userRepository.findByIdAndDeletedAtIsNull(wardId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
+        log.info("Device paired: wardId={}, deviceName={}, deviceSerialTail={}", wardId, request.deviceName(), request.deviceSerialTail());
+        registerCodeRepository.delete(RegisterType.DEVICE, request.code());
+        String token = jwtTokenProvider.issueAccessToken(wardId, user.getEmail(), user.getRole());
+        return new PairingDeviceResponse(token);
     }
 
 

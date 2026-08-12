@@ -63,4 +63,11 @@ public class UserController implements UserControllerSupporter {
         RegisterResponse response = userService.getDeviceRegisterCode(currentUser);
         return ApiResult.ok(SuccessCode.REGISTER_CODE_CREATED, response);
     }
+
+    @Override
+    @PostMapping("/device/pairing/exchange")
+    public ResponseEntity<ApiResult<PairingDeviceResponse>> pairingDevice(@RequestBody @Valid DeviceRegisterRequest request) {
+        PairingDeviceResponse response = userService.pairingDevice(request);
+        return ApiResult.ok(SuccessCode.PAIRING_SUCCESS, response);
+    }
 }

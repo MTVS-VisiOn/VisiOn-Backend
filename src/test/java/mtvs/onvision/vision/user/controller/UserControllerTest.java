@@ -22,6 +22,8 @@ import mtvs.onvision.vision.common.filter.JwtAuthenticationFilter;
 import mtvs.onvision.vision.common.response.SuccessCode;
 import mtvs.onvision.vision.user.domain.UserRole;
 import mtvs.onvision.vision.user.dto.UserResponse;
+import mtvs.onvision.vision.user.dto.DeviceRegisterRequest;
+import mtvs.onvision.vision.user.dto.PairingDeviceResponse;
 import mtvs.onvision.vision.user.dto.RegisterResponse;
 import mtvs.onvision.vision.user.dto.SignupRequest;
 import mtvs.onvision.vision.user.service.UserService;
@@ -472,7 +474,7 @@ class UserControllerTest {
         }
 
         @Nested
-        @DisplayName("Context: role이 GUARDIAN이고 registerCode 형식이 올바르지 않으면")
+        @DisplayName("Context: role이 GUARDIAN이고 code 형식이 올바르지 않으면")
         class Context_with_invalid_register_token {
             @BeforeEach
             void setUp() {
@@ -745,6 +747,90 @@ class UserControllerTest {
                         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                         .andExpect(jsonPath("$.code").value(ErrorCode.FAILED_ISSUE_REGISTER_CODE.name()))
                         .andExpect(jsonPath("$.message").value(ErrorCode.FAILED_ISSUE_REGISTER_CODE.getMessage()))
+                        .andDo(print());
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Describe: POST /device/pairing/exchange 엔드포인트는")
+    class pairingDevice {
+
+        String deviceAccessToken = "device.access.token";
+        DeviceRegisterRequest request =
+                new DeviceRegisterRequest(registerCode, "Meta Quest 3", "7F2C");
+
+        @Nested
+        @DisplayName("Context: 유효한 기기 등록 코드가 주어지면")
+        class Context_with_valid_code {
+
+            @Test
+            @DisplayName("It : 200 상태와 기기용 accessToken을 반환한다")
+            void it_return_200_ok_and_access_token() throws Exception {
+                //given
+                given(userService.pairingDevice(request))
+                        .willReturn(new PairingDeviceResponse(deviceAccessToken));
+
+                //when-then : 인증 없이 호출된다. Quest는 이 시점에 토큰이 없다
+                mockMvc.perform(
+                                post("/api/users/device/pairing/exchange")
+                                        .with(csrf())
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(om.writeValueAsString(request))
+                        )
+                        .andExpect(status().isOk())
+                        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                        .andExpect(jsonPath("$.code").value(SuccessCode.PAIRING_SUCCESS.name()))
+                        .andExpect(jsonPath("$.message").value(SuccessCode.PAIRING_SUCCESS.getSuccessMessage()))
+                        .andExpect(jsonPath("$.data.accessToken").value(deviceAccessToken))
+                        .andDo(print());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: registerCode가 비어 있으면")
+        class Context_with_blank_code {
+
+            @Test
+            @DisplayName("It : 400 상태와 VALIDATION_FAILED를 반환한다")
+            void it_return_400_bad_request() throws Exception {
+                //given
+                DeviceRegisterRequest blank =
+                        new DeviceRegisterRequest("  ", "Meta Quest 3", "7F2C");
+
+                //when-then
+                mockMvc.perform(
+                                post("/api/users/device/pairing/exchange")
+                                        .with(csrf())
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(om.writeValueAsString(blank))
+                        )
+                        .andExpect(status().isBadRequest())
+                        .andDo(print());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 만료됐거나 존재하지 않는 코드가 주어지면")
+        class Context_with_unknown_code {
+
+            @Test
+            @DisplayName("It : 404 상태와 NOT_FOUND_REGISTER를 반환한다")
+            void it_return_404_not_found() throws Exception {
+                //given
+                given(userService.pairingDevice(request))
+                        .willThrow(new BusinessException(ErrorCode.NOT_FOUND_REGISTER));
+
+                //when-then
+                mockMvc.perform(
+                                post("/api/users/device/pairing/exchange")
+                                        .with(csrf())
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(om.writeValueAsString(request))
+                        )
+                        .andExpect(status().isNotFound())
+                        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                        .andExpect(jsonPath("$.code").value(ErrorCode.NOT_FOUND_REGISTER.name()))
                         .andDo(print());
             }
         }

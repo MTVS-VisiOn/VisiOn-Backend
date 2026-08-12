@@ -30,6 +30,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/users/refresh").permitAll()
                         .requestMatchers("/api/users/guardian/register-code").hasAuthority("WARD")
                         .requestMatchers("/api/users/device/register-code").hasAuthority("WARD")
+                        .requestMatchers(HttpMethod.POST, "/api/users/device/pairing/exchange").permitAll()
                         .requestMatchers("/api/users/device-fid").hasAnyAuthority("WARD","GUARDIAN")
                         .requestMatchers("/api/users/me").hasAnyAuthority("WARD","GUARDIAN")
                         .requestMatchers("/api/common", "/api/auth/logout").authenticated()

@@ -25,6 +25,8 @@ import mtvs.onvision.vision.user.domain.User;
 import mtvs.onvision.vision.user.domain.RegisterType;
 import mtvs.onvision.vision.user.domain.UserRole;
 import mtvs.onvision.vision.user.dto.UserResponse;
+import mtvs.onvision.vision.user.dto.DeviceRegisterRequest;
+import mtvs.onvision.vision.user.dto.PairingDeviceResponse;
 import mtvs.onvision.vision.user.dto.RegisterResponse;
 import mtvs.onvision.vision.user.dto.SignupRequest;
 import mtvs.onvision.vision.user.repository.FidRepository;
@@ -185,7 +187,7 @@ class UserServiceTest {
                 //given
                 given(userRepository.existsByEmail(email)).willReturn(false);
                 given(userRepository.existsByPhoneNumber(phoneNumber)).willReturn(false);
-                given(registerCodeRepository.getToken(RegisterType.GUARDIAN, registerCode)).willReturn(Optional.of(wardId));
+                given(registerCodeRepository.getUserId(RegisterType.GUARDIAN, registerCode)).willReturn(Optional.of(wardId));
                 given(userRepository.findByIdAndRole(wardId, UserRole.WARD)).willReturn(Optional.of(ward));
                 given(relationRepository.existsByWard(ward)).willReturn(false);
                 given(passwordEncoder.encode(password)).willReturn(encodedPassword);
@@ -223,7 +225,7 @@ class UserServiceTest {
                 //given
                 given(userRepository.existsByEmail(email)).willReturn(false);
                 given(userRepository.existsByPhoneNumber(phoneNumber)).willReturn(false);
-                given(registerCodeRepository.getToken(RegisterType.GUARDIAN, registerCode)).willReturn(Optional.empty());
+                given(registerCodeRepository.getUserId(RegisterType.GUARDIAN, registerCode)).willReturn(Optional.empty());
                 //when&then
                 BusinessException exception = assertThrows(BusinessException.class, () -> userService.signup(signupRequest));
                 assertThat(exception.getMessage()).isEqualTo(ErrorCode.NOT_FOUND_REGISTER.getMessage());
@@ -231,7 +233,7 @@ class UserServiceTest {
         }
 
         @Nested
-        @DisplayName("Context: role이 GUARDIAN이고 registerCode 형식이 올바르지 않으면")
+        @DisplayName("Context: role이 GUARDIAN이고 code 형식이 올바르지 않으면")
         class Context_with_malformed_register_code {
             @BeforeEach
             void setup() {
@@ -265,7 +267,7 @@ class UserServiceTest {
                 //given
                 given(userRepository.existsByEmail(email)).willReturn(false);
                 given(userRepository.existsByPhoneNumber(phoneNumber)).willReturn(false);
-                given(registerCodeRepository.getToken(RegisterType.GUARDIAN, registerCode)).willReturn(Optional.of(wardId));
+                given(registerCodeRepository.getUserId(RegisterType.GUARDIAN, registerCode)).willReturn(Optional.of(wardId));
                 given(userRepository.findByIdAndRole(wardId, UserRole.WARD)).willReturn(Optional.empty());
                 //when&then
                 BusinessException exception = assertThrows(BusinessException.class, () -> userService.signup(signupRequest));
@@ -289,7 +291,7 @@ class UserServiceTest {
                 //given
                 given(userRepository.existsByEmail(email)).willReturn(false);
                 given(userRepository.existsByPhoneNumber(phoneNumber)).willReturn(false);
-                given(registerCodeRepository.getToken(RegisterType.GUARDIAN, registerCode)).willReturn(Optional.of(wardId));
+                given(registerCodeRepository.getUserId(RegisterType.GUARDIAN, registerCode)).willReturn(Optional.of(wardId));
                 given(userRepository.findByIdAndRole(wardId, UserRole.WARD)).willReturn(Optional.of(ward));
                 given(relationRepository.existsByWard(ward)).willReturn(true);
                 //when&then
@@ -791,6 +793,88 @@ class UserServiceTest {
                 assertThat(exception.getMessage()).isEqualTo(ErrorCode.FAILED_ISSUE_REGISTER_CODE.getMessage());
                 verify(registerCodeRepository, times(ISSUE_MAX_ATTEMPTS))
                         .saveIfAbsent(eq(RegisterType.DEVICE), anyString(), eq(userId));
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Describe: pairingDevice 메서드는")
+    class Describe_with_pairingDevice {
+
+        String deviceName = "Meta Quest 3";
+        String deviceSerialTail = "7F2C";
+        String deviceAccessToken = "device.access.token";
+        DeviceRegisterRequest request =
+                new DeviceRegisterRequest(registerCode, deviceName, deviceSerialTail);
+
+        @Nested
+        @DisplayName("Context: 유효한 기기 등록 코드가 주어지면")
+        class Context_with_valid_code {
+
+            @Test
+            @DisplayName("It : 코드가 가리키는 피보호자 권한의 access 토큰을 발급한다")
+            void it_success_issue_device_access_token() {
+                //given
+                ward = new User("ward@test.com", encodedPassword, "피보호자", "010-9999-8888", UserRole.WARD);
+                given(registerCodeRepository.getUserId(RegisterType.DEVICE, registerCode))
+                        .willReturn(Optional.of(wardId));
+                given(userRepository.findByIdAndDeletedAtIsNull(wardId)).willReturn(Optional.of(ward));
+                given(jwtTokenProvider.issueAccessToken(wardId, ward.getEmail(), UserRole.WARD))
+                        .willReturn(deviceAccessToken);
+
+                //when
+                PairingDeviceResponse response = userService.pairingDevice(request);
+
+                //then : 보호자 저장소가 아니라 DEVICE 저장소를 봐야 한다
+                assertThat(response.accessToken()).isEqualTo(deviceAccessToken);
+                verify(registerCodeRepository, never())
+                        .getUserId(eq(RegisterType.GUARDIAN), anyString());
+
+                // 한 번 쓴 코드는 즉시 폐기된다. 남으면 TTL 동안 다른 기기도 같은 코드로 붙는다
+                verify(registerCodeRepository).delete(RegisterType.DEVICE, registerCode);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 만료됐거나 존재하지 않는 코드가 주어지면")
+        class Context_with_unknown_code {
+
+            @Test
+            @DisplayName("It : NOT_FOUND_REGISTER 오류 발생")
+            void it_throws_not_found_register() {
+                //given
+                given(registerCodeRepository.getUserId(RegisterType.DEVICE, registerCode))
+                        .willReturn(Optional.empty());
+
+                //when&then
+                BusinessException exception = assertThrows(BusinessException.class,
+                        () -> userService.pairingDevice(request));
+
+                assertThat(exception.getMessage()).isEqualTo(ErrorCode.NOT_FOUND_REGISTER.getMessage());
+                verifyNoInteractions(jwtTokenProvider);
+                verify(registerCodeRepository, never()).delete(any(RegisterType.class), anyString());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 코드는 있지만 피보호자가 탈퇴한 상태이면")
+        class Context_with_deleted_ward {
+
+            @Test
+            @DisplayName("It : NOT_FOUND_USER 오류 발생")
+            void it_throws_not_found_user() {
+                //given
+                given(registerCodeRepository.getUserId(RegisterType.DEVICE, registerCode))
+                        .willReturn(Optional.of(wardId));
+                given(userRepository.findByIdAndDeletedAtIsNull(wardId)).willReturn(Optional.empty());
+
+                //when&then
+                BusinessException exception = assertThrows(BusinessException.class,
+                        () -> userService.pairingDevice(request));
+
+                assertThat(exception.getMessage()).isEqualTo(ErrorCode.NOT_FOUND_USER.getMessage());
+                verifyNoInteractions(jwtTokenProvider);
+                verify(registerCodeRepository, never()).delete(any(RegisterType.class), anyString());
             }
         }
     }
