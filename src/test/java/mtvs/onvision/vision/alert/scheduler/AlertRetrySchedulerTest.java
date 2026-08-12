@@ -4,7 +4,7 @@ import mtvs.onvision.vision.alert.domain.AlertType;
 import mtvs.onvision.vision.alert.domain.NotifyStatus;
 import mtvs.onvision.vision.alert.dto.RetryTarget;
 import mtvs.onvision.vision.alert.service.AlertDeliveryService;
-import mtvs.onvision.vision.alert.service.FcmService;
+import mtvs.onvision.vision.common.service.FcmService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

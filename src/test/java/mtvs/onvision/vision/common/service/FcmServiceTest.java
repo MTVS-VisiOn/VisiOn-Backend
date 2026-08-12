@@ -1,4 +1,4 @@
-package mtvs.onvision.vision.alert.service;
+package mtvs.onvision.vision.common.service;
 
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
@@ -26,11 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("FcmService의")
@@ -53,7 +49,8 @@ class FcmServiceTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(fcmService, "maxAttempts", maxAttempts);
-        ReflectionTestUtils.setField(fcmService, "pushTtl", Duration.ofHours(24));
+        ReflectionTestUtils.setField(fcmService, "pushCommandTtl", Duration.ofHours(24));
+        ReflectionTestUtils.setField(fcmService, "signalPushTtl", Duration.ofSeconds(60));
     }
 
     /** 생성자가 막혀 있어 직접 만들 수 없다. Mockito가 생성자를 우회해 만든다 */

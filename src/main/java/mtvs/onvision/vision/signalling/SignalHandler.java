@@ -7,9 +7,11 @@ import lombok.extern.slf4j.Slf4j;
 import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.common.util.PreConditions;
+import mtvs.onvision.vision.signalling.event.GuardianEntered;
 import mtvs.onvision.vision.user.domain.Relation;
 import mtvs.onvision.vision.user.domain.UserRole;
 import mtvs.onvision.vision.user.repository.RelationRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.PingMessage;
 import org.springframework.web.socket.TextMessage;
@@ -17,6 +19,7 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,6 +31,7 @@ import java.util.concurrent.*;
 public class SignalHandler extends TextWebSocketHandler {
 
     private final RelationRepository relationRepository;
+    private final ApplicationEventPublisher eventPublisher;
     //어떤 방에 어떤 세션아이디가 들어있는지 저장 -> {roomId : [{userId: sessionId},..] ,...}
     private final Map<Long, List<Map<Long, String>>> roomInfo = new ConcurrentHashMap<>();
     //세션아이디 기준 어떤 방에 들어있는지 저장 -> { userUUID1 : 방번호, userUUID2 : 방번호, ... }
@@ -149,6 +153,9 @@ public class SignalHandler extends TextWebSocketHandler {
                             List<Map<Long, String>> newRoom = new ArrayList<>();
                             newRoom.add(userDetail);
                             roomInfo.put(roomId, newRoom);
+                            // 방이 열렸으니 피보호자에게 붙으라고 알린다.
+                            // 앱이 먼저 붙으면 방이 없어 NOT_FOUND_ROOM 이므로 순서를 푸시로 강제한다
+                            eventPublisher.publishEvent(new GuardianEntered(relation.getWard().getId(), Instant.now()));
                         }
                     }
 
