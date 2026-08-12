@@ -29,7 +29,8 @@ jwt:
 
 redis:
   expired:
-    register: 900000
+    guardian-register: 900000
+    device-register: 180000
     presence: 180  #초단위
     location: 30  #분단위
     navigation: 30  #분단위

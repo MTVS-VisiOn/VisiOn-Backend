@@ -1,6 +1,6 @@
 package mtvs.onvision.vision.user.dto;
 
-public record RegisterGuardianResponse(
+public record RegisterResponse(
         String registerCode
 ) {
 }

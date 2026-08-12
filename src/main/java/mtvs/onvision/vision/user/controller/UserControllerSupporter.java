@@ -12,7 +12,9 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.response.ApiResult;
-import mtvs.onvision.vision.user.dto.RegisterGuardianResponse;
+import mtvs.onvision.vision.user.dto.DeviceRegisterRequest;
+import mtvs.onvision.vision.user.dto.PairingDeviceResponse;
+import mtvs.onvision.vision.user.dto.RegisterResponse;
 import mtvs.onvision.vision.user.dto.SignupRequest;
 import mtvs.onvision.vision.user.dto.UserResponse;
 import org.springframework.http.MediaType;
@@ -181,7 +183,7 @@ public interface UserControllerSupporter {
                                                     {
                                                         "success": true,
                                                         "code": "REGISTER_CODE_CREATED",
-                                                        "message": "보호자 등록 코드가 정상적으로 생성되었습니다.",
+                                                        "message": "등록 코드가 정상적으로 생성되었습니다.",
                                                         "data": {
                                                             "registerCode": "TV8HYB"
                                                         }
@@ -212,7 +214,160 @@ public interface UserControllerSupporter {
             )
     })
     @SecurityRequirement(name = "Bearer Authentication")
-    ResponseEntity<ApiResult<RegisterGuardianResponse>> getGuardianRegisterCode(CurrentUser currentUser);
+    ResponseEntity<ApiResult<RegisterResponse>> getGuardianRegisterCode(CurrentUser currentUser);
+
+    @Operation(
+            summary = "기기 등록 코드 생성",
+            description = """
+                    Quest 기기 페어링용 일회용 코드 생성 API. 피보호자 본인만 발급할 수 있다.
+
+                    응답 필드는 `registerCode` 하나이며, 모바일이 이 값을 QR과 6자리 코드로 표시한다.
+                    코드는 6자리이고 `ABCDEFGHJKLMNPRSTUVWXY23456789`만 쓴다(I·O·Q·Z·0·1 제외).
+                    **유효 시간은 3분**이며, 만료되면 재발급받아야 한다.
+
+                    보호자 등록 코드와 문자 규격·응답 형태·성공 코드가 모두 같지만
+                    **저장소가 분리돼 있어 서로 통용되지 않는다.**
+                    회원가입(`registerCode`)에 이 코드를 넣으면 `NOT_FOUND_REGISTER`가 난다.
+                    """,
+            extensions = @Extension(properties = @ExtensionProperty(name = "x-order", value = "3"))
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "기기 등록 코드 생성 성공",
+                    content = {
+                            @Content(
+                                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                                    examples = @ExampleObject(
+                                            value = """
+                                                    {
+                                                        "success": true,
+                                                        "code": "REGISTER_CODE_CREATED",
+                                                        "message": "등록 코드가 정상적으로 생성되었습니다.",
+                                                        "data": {
+                                                            "registerCode": "TV8HYB"
+                                                        }
+                                                    }
+                                                    """
+                                    )
+                            )
+                    }
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "코드 생성이 재시도 상한까지 모두 충돌했을때(사실상 발생하지 않는다)",
+                    content = {
+                            @Content(
+                                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                                    examples = @ExampleObject(
+                                            value = """
+                                                    {
+                                                        "success": false,
+                                                        "code": "FAILED_ISSUE_REGISTER_CODE",
+                                                        "message": "등록 코드를 생성하는 것에 실패했습니다.",
+                                                        "data": null
+                                                    }
+                                                    """
+                                    )
+                            )
+                    }
+            )
+    })
+    @SecurityRequirement(name = "Bearer Authentication")
+    ResponseEntity<ApiResult<RegisterResponse>> getDeviceRegisterCode(CurrentUser currentUser);
+
+    @Operation(
+            summary = "Quest 기기 페어링 (코드 → 토큰 교환)",
+            description = """
+                    Quest가 모바일 화면의 QR에서 읽은 일회용 코드를 기기용 access 토큰으로 교환한다.
+
+                    **인증 없이 호출된다.** 이 시점에 Quest는 아무 토큰도 갖고 있지 않다.
+                    코드의 TTL 3분과 6자리 규격이 유일한 방어선이다.
+
+                    발급되는 토큰은 **피보호자(WARD) 권한의 access 토큰**이며 refresh 토큰은 주지 않는다.
+                    만료되면 모바일이 재발급받아 BLE로 기기에 전달한다.
+
+                    `deviceName`·`deviceSerialTail`은 저장하지 않고 로그로만 남긴다.
+                    `deviceSerialTail`은 실제 하드웨어 시리얼이 아닐 수 있어 **인증 수단으로 쓰지 않는다.**
+                    """,
+            extensions = @Extension(properties = @ExtensionProperty(name = "x-order", value = "5"))
+    )
+    @RequestBody(
+            content = @Content(
+                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    examples = @ExampleObject(
+                            value = """
+                                {
+                                    "code": "TV8HYB",
+                                    "deviceName": "Meta Quest 3",
+                                    "deviceSerialTail": "7F2C"
+                                }
+                                """
+                    )
+            )
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "페어링 성공",
+                    content = {
+                            @Content(
+                                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                                    examples = @ExampleObject(
+                                            value = """
+                                                    {
+                                                        "success": true,
+                                                        "code": "PAIRING_SUCCESS",
+                                                        "message": "페어링 넘버가 확인되었습니다.",
+                                                        "data": {
+                                                            "accessToken": "eyJhbGciOiJIUzI1NiJ9..."
+                                                        }
+                                                    }
+                                                    """
+                                    )
+                            )
+                    }
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "요청 필드가 비었을때",
+                    content = {
+                            @Content(
+                                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                                    examples = @ExampleObject(
+                                            value = """
+                                                    {
+                                                        "success": false,
+                                                        "code": "VALIDATION_FAILED",
+                                                        "message": "must not be blank",
+                                                        "data": null
+                                                    }
+                                                    """
+                                    )
+                            )
+                    }
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "코드가 만료됐거나 존재하지 않을때 / 코드가 가리키는 피보호자가 없을때",
+                    content = {
+                            @Content(
+                                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                                    examples = @ExampleObject(
+                                            value = """
+                                                    {
+                                                        "success": false,
+                                                        "code": "NOT_FOUND_REGISTER",
+                                                        "message": "해당하는 register 코드를 찾을 수 없습니다.",
+                                                        "data": null
+                                                    }
+                                                    """
+                                    )
+                            )
+                    }
+            )
+    })
+    ResponseEntity<ApiResult<PairingDeviceResponse>> pairingDevice(DeviceRegisterRequest request);
 
     @Operation(
             summary = "계정 정보 조회",
