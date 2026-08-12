@@ -15,8 +15,8 @@
 - [ ] Location
 - [ ] Signal
 - [ ] Call
-- [ ] VoiceInstruction
-- [ ] AlertEvent
+- [ ] Command
+- [ ] Alert
 - [ ] Infra
 
 ## 테스트
