@@ -26,6 +26,7 @@ jwt:
   validations:
     access: 900000   #밀리초 단위
     refresh: 604800000
+    device: 43200000  #12시간
 
 redis:
   expired:
@@ -58,6 +59,7 @@ alert:
     enabled: false
   push:
     ttl: 24h
+    signal-ttl: 60s
 tmap:
   base-url: https://apis.openapi.sk.com
   app-key: test

@@ -284,7 +284,7 @@ public interface UserControllerSupporter {
                     **인증 없이 호출된다.** 이 시점에 Quest는 아무 토큰도 갖고 있지 않다.
                     코드의 TTL 3분과 6자리 규격이 유일한 방어선이다.
 
-                    발급되는 토큰은 **피보호자(WARD) 권한의 access 토큰**이며 refresh 토큰은 주지 않는다.
+                    발급되는 토큰은 **DEVICE 권한 전용 토큰**이며 refresh 토큰은 주지 않는다. 수명은 12시간이다.
                     만료되면 모바일이 재발급받아 BLE로 기기에 전달한다.
 
                     `deviceName`·`deviceSerialTail`은 저장하지 않고 로그로만 남긴다.
@@ -368,6 +368,48 @@ public interface UserControllerSupporter {
             )
     })
     ResponseEntity<ApiResult<PairingDeviceResponse>> pairingDevice(DeviceRegisterRequest request);
+
+    @Operation(
+            summary = "기기 토큰 재발급",
+            description = """
+                    이미 페어링된 기기에 넘겨줄 토큰을 모바일이 다시 발급받는다.
+
+                    **피보호자(WARD) 전용이다.** 기기 토큰으로는 호출할 수 없으므로 Quest가 스스로 갱신하지 못한다.
+                    모바일이 받아 BLE로 기기에 전달한다.
+
+                    **페어링 이력을 확인하지 않는다.** 기기가 이미 연결돼 있는 상황을 전제한 재발급 경로이며,
+                    로그인한 피보호자면 페어링 여부와 무관하게 발급된다.
+
+                    발급되는 토큰은 `POST /device/pairing/exchange`가 주는 것과 같은 DEVICE 권한 토큰이고
+                    수명도 같다(12시간). refresh 토큰은 주지 않는다.
+                    """,
+            extensions = @Extension(properties = @ExtensionProperty(name = "x-order", value = "6"))
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "재발급 성공",
+                    content = {
+                            @Content(
+                                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                                    examples = @ExampleObject(
+                                            value = """
+                                                    {
+                                                        "success": true,
+                                                        "code": "PAIRING_SUCCESS",
+                                                        "message": "페어링 넘버가 확인되었습니다.",
+                                                        "data": {
+                                                            "accessToken": "eyJhbGciOiJIUzI1NiJ9..."
+                                                        }
+                                                    }
+                                                    """
+                                    )
+                            )
+                    }
+            )
+    })
+    @SecurityRequirement(name = "Bearer Authentication")
+    ResponseEntity<ApiResult<PairingDeviceResponse>> getDeviceAccessToken(CurrentUser currentUser);
 
     @Operation(
             summary = "계정 정보 조회",

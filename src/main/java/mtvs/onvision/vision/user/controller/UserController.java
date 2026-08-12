@@ -70,4 +70,12 @@ public class UserController implements UserControllerSupporter {
         PairingDeviceResponse response = userService.pairingDevice(request);
         return ApiResult.ok(SuccessCode.PAIRING_SUCCESS, response);
     }
+
+    @Override
+    @GetMapping("/device/pairing/token")
+    @ApiUnauthorized
+    public ResponseEntity<ApiResult<PairingDeviceResponse>> getDeviceAccessToken(@AuthenticationPrincipal CurrentUser currentUser) {
+        PairingDeviceResponse response = userService.getDeviceAccessToken(currentUser);
+        return ApiResult.ok(SuccessCode.PAIRING_SUCCESS,response);
+    }
 }
