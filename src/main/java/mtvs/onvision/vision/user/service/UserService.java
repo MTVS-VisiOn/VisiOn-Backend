@@ -103,6 +103,14 @@ public class UserService implements UserDetailsService {
         return new CurrentUser(user.getId(), user.getEmail(), user.getRole());
     }
 
+    // 토큰 종류까지 반영해서 principal 을 만든다. UserDetailsService 계약은 종류를 못 실어 나른다
+    @Transactional(readOnly = true)
+    public CurrentUser loadCurrentUser(TokenBody tokenBody) {
+        User user = userRepository.findByEmailAndDeletedAtIsNull(tokenBody.email())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
+        return new CurrentUser(user.getId(), user.getEmail(), user.getRole(), tokenBody.type());
+    }
+
     @Transactional
     public void logout(LogoutRequest request, CurrentUser currentUser) {
         refreshTokenRepository.delete(currentUser.getId());
@@ -205,7 +213,7 @@ public class UserService implements UserDetailsService {
         User user = userRepository.findByIdAndDeletedAtIsNull(wardId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_USER));
         log.info("Device paired: wardId={}, deviceName={}, deviceSerialTail={}", wardId, request.deviceName(), request.deviceSerialTail());
         registerCodeRepository.delete(RegisterType.DEVICE, request.code());
-        String token = jwtTokenProvider.issueAccessToken(wardId, user.getEmail(), user.getRole());
+        String token = jwtTokenProvider.issueDeviceToken(wardId, user.getEmail(), user.getRole());
         return new PairingDeviceResponse(token);
     }
 
@@ -226,5 +234,10 @@ public class UserService implements UserDetailsService {
                 code.append(CODE_ALPHABET[SECURE_RANDOM.nextInt(CODE_ALPHABET.length)]);
         }
         return code.toString();
+    }
+
+    public PairingDeviceResponse getDeviceAccessToken(CurrentUser currentUser) {
+        String token = jwtTokenProvider.issueDeviceToken(currentUser.getId(), currentUser.getEmail(), currentUser.getRole());
+        return new PairingDeviceResponse(token);
     }
 }

@@ -835,4 +835,47 @@ class UserControllerTest {
             }
         }
     }
+
+    @Nested
+    @DisplayName("Describe: GET /device/pairing/token 엔드포인트는")
+    class getDeviceAccessToken {
+
+        CurrentUser currentUser = new CurrentUser(userId, email, UserRole.WARD);
+        String reissuedToken = "reissued.device.token";
+
+        @BeforeEach
+        void setUp() {
+            SecurityContextHolder.getContext().setAuthentication(
+                    new UsernamePasswordAuthenticationToken(currentUser, null, currentUser.getAuthorities()));
+        }
+
+        @AfterEach
+        void tearDown() {
+            SecurityContextHolder.clearContext();
+        }
+
+        @Nested
+        @DisplayName("Context: 인증된 피보호자가 요청하면")
+        class Context_with_authenticated_ward {
+
+            @Test
+            @DisplayName("It : 200 상태와 기기용 accessToken을 반환한다")
+            void it_return_200_ok_and_device_access_token() throws Exception {
+                //given
+                given(userService.getDeviceAccessToken(currentUser))
+                        .willReturn(new PairingDeviceResponse(reissuedToken));
+
+                //when-then
+                mockMvc.perform(
+                                get("/api/users/device/pairing/token")
+                        )
+                        .andExpect(status().isOk())
+                        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                        .andExpect(jsonPath("$.code").value(SuccessCode.PAIRING_SUCCESS.name()))
+                        .andExpect(jsonPath("$.message").value(SuccessCode.PAIRING_SUCCESS.getSuccessMessage()))
+                        .andExpect(jsonPath("$.data.accessToken").value(reissuedToken))
+                        .andDo(print());
+            }
+        }
+    }
 }

@@ -26,6 +26,7 @@ jwt:
   validations:
     access: 900000   #밀리초 단위
     refresh: 604800000
+    device: 43200000  #12시간
 
 redis:
   expired:

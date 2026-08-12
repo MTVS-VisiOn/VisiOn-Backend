@@ -430,7 +430,9 @@ class AuthControllerTest {
     class logout {
 
         CurrentUser currentUser = new CurrentUser(userId, email, UserRole.WARD);
-        TestingAuthenticationToken authenticationToken = new TestingAuthenticationToken(currentUser, null, "ROLE_WARD");
+        // 권한 문자열은 CurrentUser.getAuthorities()가 내보내는 것과 같아야 한다.
+        // SecurityConfig가 ROLE_ 접두어 없이 hasAnyAuthority("WARD","GUARDIAN")로 검사한다.
+        TestingAuthenticationToken authenticationToken = new TestingAuthenticationToken(currentUser, null, "WARD");
 
         @Nested
         @DisplayName("Context: 인증된 유저가 fid와 함께 요청하면")
