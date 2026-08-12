@@ -59,6 +59,7 @@ alert:
     enabled: false
   push:
     ttl: 24h
+    signal-ttl: 60s
 tmap:
   base-url: https://apis.openapi.sk.com
   app-key: test

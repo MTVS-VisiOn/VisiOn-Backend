@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import mtvs.onvision.vision.common.interceptor.AuthHandshakeInterceptor;
 import mtvs.onvision.vision.signalling.SignalHandler;
 import mtvs.onvision.vision.user.repository.RelationRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.WebSocketHandler;
@@ -17,15 +18,16 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 public class WebSocketConfig implements WebSocketConfigurer {
     private final RelationRepository relationRepository;
     private final AuthHandshakeInterceptor authHandshakeInterceptor;
+    private final ApplicationEventPublisher eventPublisher;
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(signalingSocketHandler(relationRepository), "/signal")  //핸들러와 연결될 endpoint
+        registry.addHandler(signalingSocketHandler(relationRepository, eventPublisher), "/signal")  //핸들러와 연결될 endpoint
                 .addInterceptors(authHandshakeInterceptor)
                 .setAllowedOriginPatterns("*")                 //CORS 설정
                 .withSockJS();
 
         // 테스트용 raw WS (SockJS 없음)
-        registry.addHandler(signalingSocketHandler(relationRepository), "/signal-raw")
+        registry.addHandler(signalingSocketHandler(relationRepository, eventPublisher), "/signal-raw")
                 .addInterceptors(authHandshakeInterceptor)
                 .setAllowedOriginPatterns("*");//SockJS 설정
     }
@@ -33,7 +35,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
 
     @Bean
-    public WebSocketHandler signalingSocketHandler(RelationRepository relationRepository) {
-        return new SignalHandler(relationRepository);
+    public WebSocketHandler signalingSocketHandler(RelationRepository relationRepository, ApplicationEventPublisher eventPublisher) {
+        return new SignalHandler(relationRepository, eventPublisher);
     }
 }
