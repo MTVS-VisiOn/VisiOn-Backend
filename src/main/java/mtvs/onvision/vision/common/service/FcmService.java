@@ -1,11 +1,11 @@
-package mtvs.onvision.vision.alert.service;
+package mtvs.onvision.vision.common.service;
 
 import com.google.firebase.messaging.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import mtvs.onvision.vision.alert.domain.AlertType;
 import mtvs.onvision.vision.alert.domain.NotifyStatus;
-import mtvs.onvision.vision.command.domain.CommandType;
+import mtvs.onvision.vision.common.constant.DataMessageType;
 import mtvs.onvision.vision.user.service.UserService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -27,8 +27,10 @@ public class FcmService {
     @Value("${alert.retry.max-attempts}")
     private int maxAttempts;
 
-    @Value("${alert.push.ttl}")
-    private Duration pushTtl;
+    @Value("${alert.push.command-ttl}")
+    private Duration pushCommandTtl;
+    @Value("${alert.push.signal-ttl}")
+    private Duration signalPushTtl;
 
     private static final long BACKOFF_MILLIS = 200L;
 
@@ -62,9 +64,22 @@ public class FcmService {
     }
 
     //앱으로 보내는 지시사항
-    public void sendToDevice(Long commandId, String content, CommandType type, Instant occurredAt, String fid) {
+    public void sendToDevice(Long commandId, String content, DataMessageType type, Instant occurredAt, String fid) {
         Message message = buildMessage(commandId, type, content, occurredAt, fid);
         send(fid, message);
+    }
+
+    /** 시그널링 방 개설 통지. 저장되는 이벤트가 아니라 id 가 없다 */
+    public void sendSignalReady(String type, Instant occurredAt, String fid) {
+        send(fid, Message.builder()
+                .setFid(fid)
+                .putData("type", type)
+                .putData("occurredAt", occurredAt.atZone(SEOUL).toLocalDateTime().toString())
+                .setAndroidConfig(AndroidConfig.builder()
+                        .setPriority(AndroidConfig.Priority.HIGH)
+                        .setTtl(signalPushTtl.toMillis())
+                        .build())
+                .build());
     }
 
     private NotifyStatus send(String fid, Message message) {
@@ -107,12 +122,12 @@ public class FcmService {
                         .setPriority(AndroidConfig.Priority.HIGH)
                         // 기기가 오프라인인 건 장애가 아니다. 켜지면 그때라도 배달되게 둔다.
                         // 서버 재시도 만료(alert.retry.expire-minutes)와는 다른 층이다
-                        .setTtl(pushTtl.toMillis())
+                        .setTtl(pushCommandTtl.toMillis())
                         .build())
                 .build();
     }
 
-    private Message buildMessage(Long commandId, CommandType type, String content, Instant occurredAt, String fid) {
+    private Message buildMessage(Long commandId, DataMessageType type, String content, Instant occurredAt, String fid) {
         return Message.builder()
                 .setFid(fid)
                 .putData("alertId", commandId.toString())
@@ -123,7 +138,7 @@ public class FcmService {
                         .setPriority(AndroidConfig.Priority.HIGH)
                         // 기기가 오프라인인 건 장애가 아니다. 켜지면 그때라도 배달되게 둔다.
                         // 서버 재시도 만료(alert.retry.expire-minutes)와는 다른 층이다
-                        .setTtl(pushTtl.toMillis())
+                        .setTtl(pushCommandTtl.toMillis())
                         .build())
                 .build();
     }

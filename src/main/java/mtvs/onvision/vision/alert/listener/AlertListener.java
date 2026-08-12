@@ -10,7 +10,7 @@ import mtvs.onvision.vision.alert.event.ObstacleDetected;
 import mtvs.onvision.vision.alert.repository.AlertNotificationRepository;
 import mtvs.onvision.vision.alert.service.AlertDeliveryService;
 import mtvs.onvision.vision.alert.service.AlertService;
-import mtvs.onvision.vision.alert.service.FcmService;
+import mtvs.onvision.vision.common.service.FcmService;
 import mtvs.onvision.vision.user.service.UserService;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;

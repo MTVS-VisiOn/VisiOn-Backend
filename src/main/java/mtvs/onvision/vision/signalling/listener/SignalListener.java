@@ -1,34 +1,33 @@
-package mtvs.onvision.vision.command.listener;
+package mtvs.onvision.vision.signalling.listener;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import mtvs.onvision.vision.common.constant.DataMessageType;
 import mtvs.onvision.vision.common.service.FcmService;
-import mtvs.onvision.vision.command.domain.CommandType;
-import mtvs.onvision.vision.command.event.GuardianInstructed;
+import mtvs.onvision.vision.signalling.event.GuardianEntered;
 import mtvs.onvision.vision.user.service.UserService;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.List;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class CommandListener {
+public class SignalListener {
     private final FcmService fcmService;
     private final UserService userService;
 
     @Async
-    @TransactionalEventListener
-    public void handleGuardianInstructedEvent(GuardianInstructed event) {
-        log.info("Received guardian instructed alert event {}", event);
+    @EventListener
+    public void handleGuardianEnteredEvent(GuardianEntered event) {
+        log.info("Received guardian entered in signal server alert event {}", event);
         List<String> fids = userService.getFids(event.receiverId());
         if (fids.isEmpty()) {
             log.info("No device for ward: wardId={}", event.receiverId());
             return;
         }
-        fids.forEach(fid -> fcmService.sendToDevice(event.commandId(), event.content(), DataMessageType.GUARDIAN_INSTRUCTION, event.occurredAt(), fid));
+        fids.forEach(fid -> fcmService.sendSignalReady(DataMessageType.GUARDIAN_ENTERED.name(), event.occurredAt(), fid));
     }
 }

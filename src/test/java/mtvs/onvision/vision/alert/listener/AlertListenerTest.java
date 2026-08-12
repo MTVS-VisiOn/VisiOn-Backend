@@ -6,7 +6,7 @@ import mtvs.onvision.vision.alert.event.ObstacleDetected;
 import mtvs.onvision.vision.alert.repository.AlertNotificationRepository;
 import mtvs.onvision.vision.alert.service.AlertDeliveryService;
 import mtvs.onvision.vision.alert.service.AlertService;
-import mtvs.onvision.vision.alert.service.FcmService;
+import mtvs.onvision.vision.common.service.FcmService;
 import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.presence.event.DisconnectDetected;
