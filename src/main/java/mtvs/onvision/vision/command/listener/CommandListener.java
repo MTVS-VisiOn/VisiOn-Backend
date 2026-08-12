@@ -2,10 +2,9 @@ package mtvs.onvision.vision.command.listener;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import mtvs.onvision.vision.command.event.GuardianInstructed;
 import mtvs.onvision.vision.common.constant.DataMessageType;
 import mtvs.onvision.vision.common.service.FcmService;
-import mtvs.onvision.vision.command.domain.CommandType;
-import mtvs.onvision.vision.command.event.GuardianInstructed;
 import mtvs.onvision.vision.user.service.UserService;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;

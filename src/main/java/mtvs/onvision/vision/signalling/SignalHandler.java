@@ -155,7 +155,7 @@ public class SignalHandler extends TextWebSocketHandler {
                             roomInfo.put(roomId, newRoom);
                             // 방이 열렸으니 피보호자에게 붙으라고 알린다.
                             // 앱이 먼저 붙으면 방이 없어 NOT_FOUND_ROOM 이므로 순서를 푸시로 강제한다
-                            eventPublisher.publishEvent(new GuardianEntered(roomId, relation.getWard().getId(), Instant.now()));
+                            eventPublisher.publishEvent(new GuardianEntered(relation.getWard().getId(), Instant.now()));
                         }
                     }
 

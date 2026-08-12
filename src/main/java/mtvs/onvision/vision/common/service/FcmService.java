@@ -27,7 +27,7 @@ public class FcmService {
     @Value("${alert.retry.max-attempts}")
     private int maxAttempts;
 
-    @Value("${alert.push.command-ttl}")
+    @Value("${alert.push.ttl}")
     private Duration pushCommandTtl;
     @Value("${alert.push.signal-ttl}")
     private Duration signalPushTtl;

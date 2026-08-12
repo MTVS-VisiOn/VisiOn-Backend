@@ -36,12 +36,11 @@ class SignalListenerTest {
     @Mock
     private UserService userService;
 
-    Long roomId = 7L;
     Long wardId = 2L;
 
     Instant occurredAt = Instant.parse("2026-08-12T05:31:00Z");
 
-    GuardianEntered event = new GuardianEntered(roomId, wardId, occurredAt);
+    GuardianEntered event = new GuardianEntered(wardId, occurredAt);
 
     @Nested
     @DisplayName("Describe: handleGuardianEnteredEvent 메서드는")

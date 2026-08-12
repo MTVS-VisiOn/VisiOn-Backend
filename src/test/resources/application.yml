@@ -57,7 +57,7 @@ alert:
     interval: 1m # 재전송 스케줄러 주기, 1분
     enabled: false
   push:
-    command-ttl: 24h
+    ttl: 24h
     signal-ttl: 60s
 tmap:
   base-url: https://apis.openapi.sk.com
