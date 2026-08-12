@@ -9,10 +9,7 @@ import mtvs.onvision.vision.common.response.ApiResult;
 import mtvs.onvision.vision.common.response.SuccessCode;
 import mtvs.onvision.vision.common.swagger.ApiUnauthorized;
 import mtvs.onvision.vision.user.domain.UserRole;
-import mtvs.onvision.vision.user.dto.FidRequest;
-import mtvs.onvision.vision.user.dto.RegisterGuardianResponse;
-import mtvs.onvision.vision.user.dto.SignupRequest;
-import mtvs.onvision.vision.user.dto.UserResponse;
+import mtvs.onvision.vision.user.dto.*;
 import mtvs.onvision.vision.user.service.UserService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -38,8 +35,8 @@ public class UserController implements UserControllerSupporter {
     @Override
     @GetMapping("/guardian/register-code")
     @ApiUnauthorized
-    public ResponseEntity<ApiResult<RegisterGuardianResponse>> getGuardianRegisterCode(@AuthenticationPrincipal CurrentUser currentUser) {
-        RegisterGuardianResponse response = userService.getGuardianRegisterCode(currentUser);
+    public ResponseEntity<ApiResult<RegisterResponse>> getGuardianRegisterCode(@AuthenticationPrincipal CurrentUser currentUser) {
+        RegisterResponse response = userService.getGuardianRegisterCode(currentUser);
         return ApiResult.ok(SuccessCode.REGISTER_CODE_CREATED, response);
     }
 
@@ -57,5 +54,13 @@ public class UserController implements UserControllerSupporter {
     public ResponseEntity<ApiResult<UserResponse>> getUserInfo(@AuthenticationPrincipal CurrentUser currentUser) {
         UserResponse response = userService.getUserInfo(currentUser);
         return ApiResult.ok(SuccessCode.USER_READ, response);
+    }
+
+    @Override
+    @GetMapping("/device/register-code")
+    @ApiUnauthorized
+    public ResponseEntity<ApiResult<RegisterResponse>> getDeviceRegisterCode(@AuthenticationPrincipal CurrentUser currentUser) {
+        RegisterResponse response = userService.getDeviceRegisterCode(currentUser);
+        return ApiResult.ok(SuccessCode.REGISTER_CODE_CREATED, response);
     }
 }

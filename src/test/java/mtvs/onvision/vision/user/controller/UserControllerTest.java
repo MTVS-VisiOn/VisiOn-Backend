@@ -22,7 +22,7 @@ import mtvs.onvision.vision.common.filter.JwtAuthenticationFilter;
 import mtvs.onvision.vision.common.response.SuccessCode;
 import mtvs.onvision.vision.user.domain.UserRole;
 import mtvs.onvision.vision.user.dto.UserResponse;
-import mtvs.onvision.vision.user.dto.RegisterGuardianResponse;
+import mtvs.onvision.vision.user.dto.RegisterResponse;
 import mtvs.onvision.vision.user.dto.SignupRequest;
 import mtvs.onvision.vision.user.service.UserService;
 import tools.jackson.databind.ObjectMapper;
@@ -560,7 +560,7 @@ class UserControllerTest {
             void it_return_200_ok_and_register_token() throws Exception {
                 //given
                 given(userService.getGuardianRegisterCode(currentUser))
-                        .willReturn(new RegisterGuardianResponse(registerCode));
+                        .willReturn(new RegisterResponse(registerCode));
 
                 //when-then
                 mockMvc.perform(
@@ -680,6 +680,71 @@ class UserControllerTest {
                         .andExpect(jsonPath("$.data.id").value(wardId))
                         .andExpect(jsonPath("$.data.role").value(UserRole.WARD.name()))
                         .andExpect(jsonPath("$.data.ward").doesNotExist())
+                        .andDo(print());
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Describe: GET /device/register-code 엔드포인트는")
+    class getDeviceRegisterCode {
+
+        CurrentUser currentUser = new CurrentUser(userId, email, UserRole.WARD);
+
+        @BeforeEach
+        void setUp() {
+            SecurityContextHolder.getContext().setAuthentication(
+                    new UsernamePasswordAuthenticationToken(currentUser, null, currentUser.getAuthorities()));
+        }
+
+        @AfterEach
+        void tearDown() {
+            SecurityContextHolder.clearContext();
+        }
+
+        @Nested
+        @DisplayName("Context: 인증된 피보호자가 요청하면")
+        class Context_with_authenticated_ward {
+
+            @Test
+            @DisplayName("It : 200 상태와 생성된 기기 등록 코드를 반환한다")
+            void it_return_200_ok_and_device_register_code() throws Exception {
+                //given
+                given(userService.getDeviceRegisterCode(currentUser))
+                        .willReturn(new RegisterResponse(registerCode));
+
+                //when-then
+                mockMvc.perform(
+                                get("/api/users/device/register-code")
+                        )
+                        .andExpect(status().isOk())
+                        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                        .andExpect(jsonPath("$.code").value(SuccessCode.REGISTER_CODE_CREATED.name()))
+                        .andExpect(jsonPath("$.message").value(SuccessCode.REGISTER_CODE_CREATED.getSuccessMessage()))
+                        .andExpect(jsonPath("$.data.registerCode").value(registerCode))
+                        .andDo(print());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 코드 생성이 재시도 상한까지 모두 충돌하면")
+        class Context_with_device_code_collision {
+
+            @Test
+            @DisplayName("It : 409 상태와 FAILED_ISSUE_REGISTER_CODE를 반환한다")
+            void it_return_409_conflict() throws Exception {
+                //given
+                given(userService.getDeviceRegisterCode(currentUser))
+                        .willThrow(new BusinessException(ErrorCode.FAILED_ISSUE_REGISTER_CODE));
+
+                //when-then
+                mockMvc.perform(
+                                get("/api/users/device/register-code")
+                        )
+                        .andExpect(status().isConflict())
+                        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                        .andExpect(jsonPath("$.code").value(ErrorCode.FAILED_ISSUE_REGISTER_CODE.name()))
+                        .andExpect(jsonPath("$.message").value(ErrorCode.FAILED_ISSUE_REGISTER_CODE.getMessage()))
                         .andDo(print());
             }
         }

@@ -22,9 +22,10 @@ import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.user.domain.Fid;
 import mtvs.onvision.vision.user.domain.Relation;
 import mtvs.onvision.vision.user.domain.User;
+import mtvs.onvision.vision.user.domain.RegisterType;
 import mtvs.onvision.vision.user.domain.UserRole;
 import mtvs.onvision.vision.user.dto.UserResponse;
-import mtvs.onvision.vision.user.dto.RegisterGuardianResponse;
+import mtvs.onvision.vision.user.dto.RegisterResponse;
 import mtvs.onvision.vision.user.dto.SignupRequest;
 import mtvs.onvision.vision.user.repository.FidRepository;
 import mtvs.onvision.vision.user.repository.RegisterCodeRepository;
@@ -184,7 +185,7 @@ class UserServiceTest {
                 //given
                 given(userRepository.existsByEmail(email)).willReturn(false);
                 given(userRepository.existsByPhoneNumber(phoneNumber)).willReturn(false);
-                given(registerCodeRepository.getToken(registerCode)).willReturn(Optional.of(wardId));
+                given(registerCodeRepository.getToken(RegisterType.GUARDIAN, registerCode)).willReturn(Optional.of(wardId));
                 given(userRepository.findByIdAndRole(wardId, UserRole.WARD)).willReturn(Optional.of(ward));
                 given(relationRepository.existsByWard(ward)).willReturn(false);
                 given(passwordEncoder.encode(password)).willReturn(encodedPassword);
@@ -222,7 +223,7 @@ class UserServiceTest {
                 //given
                 given(userRepository.existsByEmail(email)).willReturn(false);
                 given(userRepository.existsByPhoneNumber(phoneNumber)).willReturn(false);
-                given(registerCodeRepository.getToken(registerCode)).willReturn(Optional.empty());
+                given(registerCodeRepository.getToken(RegisterType.GUARDIAN, registerCode)).willReturn(Optional.empty());
                 //when&then
                 BusinessException exception = assertThrows(BusinessException.class, () -> userService.signup(signupRequest));
                 assertThat(exception.getMessage()).isEqualTo(ErrorCode.NOT_FOUND_REGISTER.getMessage());
@@ -264,7 +265,7 @@ class UserServiceTest {
                 //given
                 given(userRepository.existsByEmail(email)).willReturn(false);
                 given(userRepository.existsByPhoneNumber(phoneNumber)).willReturn(false);
-                given(registerCodeRepository.getToken(registerCode)).willReturn(Optional.of(wardId));
+                given(registerCodeRepository.getToken(RegisterType.GUARDIAN, registerCode)).willReturn(Optional.of(wardId));
                 given(userRepository.findByIdAndRole(wardId, UserRole.WARD)).willReturn(Optional.empty());
                 //when&then
                 BusinessException exception = assertThrows(BusinessException.class, () -> userService.signup(signupRequest));
@@ -288,7 +289,7 @@ class UserServiceTest {
                 //given
                 given(userRepository.existsByEmail(email)).willReturn(false);
                 given(userRepository.existsByPhoneNumber(phoneNumber)).willReturn(false);
-                given(registerCodeRepository.getToken(registerCode)).willReturn(Optional.of(wardId));
+                given(registerCodeRepository.getToken(RegisterType.GUARDIAN, registerCode)).willReturn(Optional.of(wardId));
                 given(userRepository.findByIdAndRole(wardId, UserRole.WARD)).willReturn(Optional.of(ward));
                 given(relationRepository.existsByWard(ward)).willReturn(true);
                 //when&then
@@ -595,14 +596,14 @@ class UserServiceTest {
             @DisplayName("It : 규격에 맞는 registerCode를 발급하고 저장한 뒤 응답으로 반환한다")
             void it_success_issue_register_code() {
                 //given
-                given(registerCodeRepository.saveIfAbsent(anyString(), eq(userId))).willReturn(true);
+                given(registerCodeRepository.saveIfAbsent(eq(RegisterType.GUARDIAN), anyString(), eq(userId))).willReturn(true);
 
                 //when
-                RegisterGuardianResponse response = userService.getGuardianRegisterCode(currentUser);
+                RegisterResponse response = userService.getGuardianRegisterCode(currentUser);
 
                 //then : 코드가 무작위라 값을 고정할 수 없다. 저장한 값과 응답이 같은지, 규격에 맞는지만 본다
                 ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-                verify(registerCodeRepository).saveIfAbsent(captor.capture(), eq(userId));
+                verify(registerCodeRepository).saveIfAbsent(eq(RegisterType.GUARDIAN), captor.capture(), eq(userId));
 
                 assertThat(response.registerCode()).isEqualTo(captor.getValue());
                 assertThat(response.registerCode()).matches(registerCodePattern);
@@ -617,13 +618,13 @@ class UserServiceTest {
             @DisplayName("It : 재시도 상한까지 시도한 뒤 FAILED_ISSUE_REGISTER_CODE 오류 발생")
             void it_throws_failed_issue_register_code() {
                 //given
-                given(registerCodeRepository.saveIfAbsent(anyString(), eq(userId))).willReturn(false);
+                given(registerCodeRepository.saveIfAbsent(eq(RegisterType.GUARDIAN), anyString(), eq(userId))).willReturn(false);
 
                 //when&then
                 BusinessException exception = assertThrows(BusinessException.class,
                         () -> userService.getGuardianRegisterCode(currentUser));
                 assertThat(exception.getMessage()).isEqualTo(ErrorCode.FAILED_ISSUE_REGISTER_CODE.getMessage());
-                verify(registerCodeRepository, times(ISSUE_MAX_ATTEMPTS)).saveIfAbsent(anyString(), eq(userId));
+                verify(registerCodeRepository, times(ISSUE_MAX_ATTEMPTS)).saveIfAbsent(eq(RegisterType.GUARDIAN), anyString(), eq(userId));
             }
         }
     }
@@ -737,6 +738,59 @@ class UserServiceTest {
                 assertThat(response.nickname()).isEqualTo(ward.getNickname());
                 assertThat(response.ward()).isNull();
                 verify(relationRepository, never()).findByGuardianId(anyLong());
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Describe: getDeviceRegisterCode 메서드는")
+    class Describe_with_getDeviceRegisterCode {
+
+        CurrentUser currentUser = new CurrentUser(userId, email, UserRole.WARD);
+
+        @Nested
+        @DisplayName("Context: 인증된 피보호자가 주어지면")
+        class Context_with_available_data {
+
+            @Test
+            @DisplayName("It : DEVICE 타입으로 저장하고 규격에 맞는 registerCode를 반환한다")
+            void it_success_issue_device_register_code() {
+                //given
+                given(registerCodeRepository.saveIfAbsent(eq(RegisterType.DEVICE), anyString(), eq(userId)))
+                        .willReturn(true);
+
+                //when
+                RegisterResponse response = userService.getDeviceRegisterCode(currentUser);
+
+                //then : 보호자 코드와 발급 로직을 공유한다. 타입이 DEVICE로 넘어가는지가 이 테스트의 핵심이다
+                ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+                verify(registerCodeRepository).saveIfAbsent(eq(RegisterType.DEVICE), captor.capture(), eq(userId));
+
+                assertThat(response.registerCode()).isEqualTo(captor.getValue());
+                assertThat(response.registerCode()).matches(registerCodePattern);
+                verify(registerCodeRepository, never())
+                        .saveIfAbsent(eq(RegisterType.GUARDIAN), anyString(), anyLong());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 발급한 코드가 매번 이미 선점되어 있으면")
+        class Context_with_device_code_collision {
+
+            @Test
+            @DisplayName("It : 재시도 상한까지 시도한 뒤 FAILED_ISSUE_REGISTER_CODE 오류 발생")
+            void it_throws_failed_issue_register_code() {
+                //given
+                given(registerCodeRepository.saveIfAbsent(eq(RegisterType.DEVICE), anyString(), eq(userId)))
+                        .willReturn(false);
+
+                //when&then
+                BusinessException exception = assertThrows(BusinessException.class,
+                        () -> userService.getDeviceRegisterCode(currentUser));
+
+                assertThat(exception.getMessage()).isEqualTo(ErrorCode.FAILED_ISSUE_REGISTER_CODE.getMessage());
+                verify(registerCodeRepository, times(ISSUE_MAX_ATTEMPTS))
+                        .saveIfAbsent(eq(RegisterType.DEVICE), anyString(), eq(userId));
             }
         }
     }

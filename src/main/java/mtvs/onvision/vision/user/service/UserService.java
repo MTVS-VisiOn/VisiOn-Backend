@@ -8,18 +8,16 @@ import mtvs.onvision.vision.auth.service.JwtTokenProvider;
 import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.common.util.PreConditions;
-import mtvs.onvision.vision.user.domain.Fid;
-import mtvs.onvision.vision.user.domain.Relation;
-import mtvs.onvision.vision.user.domain.User;
-import mtvs.onvision.vision.user.domain.UserRole;
+import mtvs.onvision.vision.user.domain.*;
 import mtvs.onvision.vision.user.dto.FidRequest;
-import mtvs.onvision.vision.user.dto.RegisterGuardianResponse;
+import mtvs.onvision.vision.user.dto.RegisterResponse;
 import mtvs.onvision.vision.user.dto.SignupRequest;
 import mtvs.onvision.vision.user.dto.UserResponse;
 import mtvs.onvision.vision.user.repository.FidRepository;
 import mtvs.onvision.vision.user.repository.RegisterCodeRepository;
 import mtvs.onvision.vision.user.repository.RelationRepository;
 import mtvs.onvision.vision.user.repository.UserRepository;
+import org.jspecify.annotations.NonNull;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -62,7 +60,7 @@ public class UserService implements UserDetailsService {
         else {
             //토큰 확인
             PreConditions.check(!CODE_PATTERN.matcher(request.registerCode()).matches(), ErrorCode.INVALID_REGISTER_CODE);
-            Long wardId = registerCodeRepository.getToken(request.registerCode()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_REGISTER));
+            Long wardId = registerCodeRepository.getToken(RegisterType.GUARDIAN, request.registerCode()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_REGISTER));
 
             //회원 등록
             User ward = userRepository.findByIdAndRole(wardId, UserRole.WARD).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_WARD));
@@ -75,15 +73,10 @@ public class UserService implements UserDetailsService {
     }
 
     @Transactional
-    public RegisterGuardianResponse getGuardianRegisterCode(CurrentUser currentUser) {
-        for (int i = 0; i < ISSUE_MAX_ATTEMPTS; i++) {
-            String code = generateRegisterCode();
-            if (registerCodeRepository.saveIfAbsent(code, currentUser.getId())) {
-                return new RegisterGuardianResponse(code);
-            }
-        }
-        throw new BusinessException(ErrorCode.FAILED_ISSUE_REGISTER_CODE);
+    public RegisterResponse getGuardianRegisterCode(CurrentUser currentUser) {
+        return getRegisterCode(currentUser, RegisterType.GUARDIAN);
     }
+
 
     @Transactional
     public KeyPair login(LoginRequest request) {
@@ -202,6 +195,22 @@ public class UserService implements UserDetailsService {
         fidRepository.deleteByFid(fid);
         // FCM이 UNREGISTERED를 돌려준 죽은 기기. 중복 푸시 추적의 근거가 된다
         log.info("Fid removed by FCM UNREGISTERED: fid={}", fid);
+    }
+
+
+    public RegisterResponse getDeviceRegisterCode(CurrentUser currentUser) {
+        return getRegisterCode(currentUser, RegisterType.DEVICE);
+    }
+
+
+    private @NonNull RegisterResponse getRegisterCode(CurrentUser currentUser, RegisterType type) {
+        for (int i = 0; i < ISSUE_MAX_ATTEMPTS; i++) {
+            String code = generateRegisterCode();
+            if (registerCodeRepository.saveIfAbsent(type, code, currentUser.getId())) {
+                return new RegisterResponse(code);
+            }
+        }
+        throw new BusinessException(ErrorCode.FAILED_ISSUE_REGISTER_CODE);
     }
 
     private String generateRegisterCode() {

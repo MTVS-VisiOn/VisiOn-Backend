@@ -9,8 +9,9 @@ public enum SuccessCode {
     /*User*/
     USER_CREATED("계정이 정상적으로 생성되었습니다."),
     USER_READ("계정정보가 정상적으로 조회되었습니다."),
-    REGISTER_CODE_CREATED("보호자 등록 코드가 정상적으로 생성되었습니다."),
+    REGISTER_CODE_CREATED("등록 코드가 정상적으로 생성되었습니다."),
     CHECK_FID("기기 등록번호(fid)가 정상적으로 확인되었습니다."),
+    REGISTER_CODE_CHECKED("등록 코드가 정상적으로 확인되었습니다."),
 
 
     /*Auth*/
