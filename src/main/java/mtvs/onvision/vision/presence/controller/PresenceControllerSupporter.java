@@ -57,6 +57,26 @@ public interface PresenceControllerSupporter {
                     피보호자가 로그아웃하거나 앱을 종료해도 heartbeat가 끊기므로 같은 알림이 나간다.
                     고장과 구분되지 않는다.
 
+                    ## 보호자 영상 상태
+                    `guardianStreamStatus`는 Quest가 보고하는 **보호자 실시간 영상 연결 단계**다. 필수값이며,
+                    조회 API(`GET /api/presence`)의 응답에 그대로 실린다.
+
+                    | 값 | 뜻 |
+                    |---|---|
+                    | `idle` | 영상이 꺼져 있다. 초기 상태이자 종료 후 상태다 |
+                    | `loading_ice_servers` | `GET /api/ice-servers` 호출 중 |
+                    | `connecting_signaling` | `/signal-raw` 웹소켓 연결 중 |
+                    | `waiting_for_guardian` | 방에 들어갔고 보호자를 기다리는 중 |
+                    | `negotiating` | offer/answer/candidate 교환 중 |
+                    | `streaming` | 영상이 흐르는 중 |
+                    | `failed` | 실패 |
+                    | `unknown` | **서버가 모르는 문자열을 받았을 때의 대체값.** 기기가 직접 보내는 값은 아니다 |
+
+                    목록에 없는 문자열이 와도 400이 아니라 `unknown`으로 저장된다. 필드 자체가 없으면 400이다.
+
+                    **값은 heartbeat 주기(30초)마다만 갱신된다.** 연결 단계는 초 단위로 지나가므로
+                    조회 시점의 값이 최대 한 주기만큼 뒤처질 수 있다.
+
                     ## 공통
                     **발송은 비동기다.** 201을 받았다고 알림이 갔다는 뜻이 아니고, 발송 실패도 이 응답에
                     반영되지 않는다.
@@ -154,7 +174,8 @@ public interface PresenceControllerSupporter {
                                                                     "battery": 77,
                                                                     "deviceConnected": true,
                                                                     "deviceNetwork": true,
-                                                                    "status": "정상"
+                                                                    "status": "정상",
+                                                                    "guardianStreamStatus": "streaming"
                                                                 }
                                                             }
                                                             """
@@ -170,7 +191,8 @@ public interface PresenceControllerSupporter {
                                                                     "battery": 77,
                                                                     "deviceConnected": true,
                                                                     "deviceNetwork": false,
-                                                                    "status": "네트워크 중단"
+                                                                    "status": "네트워크 중단",
+                                                                    "guardianStreamStatus": "idle"
                                                                 }
                                                             }
                                                             """
@@ -186,7 +208,8 @@ public interface PresenceControllerSupporter {
                                                                     "battery": null,
                                                                     "deviceConnected": false,
                                                                     "deviceNetwork": false,
-                                                                    "status": "연결 없음"
+                                                                    "status": "연결 없음",
+                                                                    "guardianStreamStatus": null
                                                                 }
                                                             }
                                                             """

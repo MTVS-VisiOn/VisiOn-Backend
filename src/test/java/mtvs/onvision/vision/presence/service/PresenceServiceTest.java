@@ -1,6 +1,7 @@
 package mtvs.onvision.vision.presence.service;
 
 import mtvs.onvision.vision.auth.dto.CurrentUser;
+import mtvs.onvision.vision.presence.domain.GuardianStreamStatus;
 import mtvs.onvision.vision.presence.domain.NetworkType;
 import mtvs.onvision.vision.presence.domain.PresenceType;
 import mtvs.onvision.vision.presence.dto.HeartbeatRequest;
@@ -63,7 +64,7 @@ class PresenceServiceTest {
     CurrentUser guardian = new CurrentUser(guardianId, "guardian@test.com", UserRole.GUARDIAN);
     CurrentUser ward = new CurrentUser(wardId, "ward@test.com", UserRole.WARD);
 
-    /** @Value 필드는 단위 테스트에서 주입되지 않는다. yml과 같은 값을 넣는다 */
+    /** \@Value 필드는 단위 테스트에서 주입되지 않는다. yml과 같은 값을 넣는다 */
     @BeforeEach
     void injectThresholds() {
         ReflectionTestUtils.setField(presenceService, "thresholds", List.of(20, 10, 5));
@@ -73,10 +74,18 @@ class PresenceServiceTest {
     /** lastSync가 2분 이내면 최근(isRecent=true)으로 판정된다 */
     private HeartbeatRequest heartbeat(boolean deviceConnected, Integer battery,
                                        boolean networkConnected, Instant lastSync) {
+        return heartbeat(deviceConnected, battery, networkConnected, lastSync, GuardianStreamStatus.IDLE);
+    }
+
+    /** 보호자 영상 상태까지 지정한다. 그 외 검증에는 IDLE로 고정된 위 헬퍼를 쓴다 */
+    private HeartbeatRequest heartbeat(boolean deviceConnected, Integer battery,
+                                       boolean networkConnected, Instant lastSync,
+                                       GuardianStreamStatus guardianStreamStatus) {
         return new HeartbeatRequest(
                 deviceConnected,
                 battery,
                 new HeartbeatRequest.NetworkRequest(NetworkType.LTE, networkConnected),
+                guardianStreamStatus,
                 Instant.now(),
                 lastSync
         );
@@ -88,6 +97,7 @@ class PresenceServiceTest {
                 true,
                 battery,
                 new HeartbeatRequest.NetworkRequest(NetworkType.LTE, true),
+                GuardianStreamStatus.IDLE,
                 lastHeartbeat,
                 Instant.now()
         );
@@ -325,6 +335,7 @@ class PresenceServiceTest {
                 assertThat(response.deviceConnected()).isFalse();
                 assertThat(response.deviceNetwork()).isFalse();
                 assertThat(response.status()).isEqualTo(PresenceType.NOT_FOUND.getDescription());
+                assertThat(response.guardianStreamStatus()).isNull();
             }
         }
 
@@ -414,6 +425,54 @@ class PresenceServiceTest {
 
                 //then
                 assertThat(response.status()).isEqualTo(PresenceType.NOT_FOUND.getDescription());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: heartbeat에 보호자 영상 상태가 실려 있으면")
+        class Context_with_guardian_stream_status {
+
+            @Test
+            @DisplayName("It : 저장된 값을 그대로 반환한다")
+            void it_return_guardian_stream_status() {
+                //given
+                HeartbeatRequest heartbeat =
+                        heartbeat(true, 77, true, Instant.now().minusSeconds(10), GuardianStreamStatus.STREAMING);
+                given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
+                given(presenceRepository.getLastHeartbeat(wardId)).willReturn(Optional.of(heartbeatJson));
+                given(objectMapper.readValue(heartbeatJson, HeartbeatRequest.class)).willReturn(heartbeat);
+
+                //when
+                PresenceResponse response = presenceService.getWardPresence(guardian);
+
+                //then
+                assertThat(response.guardianStreamStatus()).isEqualTo(GuardianStreamStatus.STREAMING);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 동기화가 오래됐는데 영상 상태는 streaming으로 남아 있으면")
+        class Context_with_stale_guardian_stream_status {
+
+            @Test
+            @DisplayName("It : 현재 구현은 streaming을 그대로 반환한다 (신선도 판정을 타지 않는다)")
+            void it_return_stale_status_as_is() {
+                //given - 마지막 heartbeat가 200초 전이라 status는 DELAY_SYNC로 내려간다.
+                // 그런데 guardianStreamStatus는 같은 판정을 타지 않아 값이 그대로 남는다.
+                // 보호자 화면에 '영상 나오는 중'이 최대 presence TTL(180초)만큼 남을 수 있다.
+                // 오래된 값을 UNKNOWN으로 내릴지는 미결이며, 정하면 이 테스트를 함께 고친다
+                HeartbeatRequest heartbeat =
+                        heartbeat(true, 50, true, Instant.now().minusSeconds(200), GuardianStreamStatus.STREAMING);
+                given(userService.getWardIdFromGuardianId(guardianId)).willReturn(wardId);
+                given(presenceRepository.getLastHeartbeat(wardId)).willReturn(Optional.of(heartbeatJson));
+                given(objectMapper.readValue(heartbeatJson, HeartbeatRequest.class)).willReturn(heartbeat);
+
+                //when
+                PresenceResponse response = presenceService.getWardPresence(guardian);
+
+                //then
+                assertThat(response.status()).isEqualTo(PresenceType.DELAY_SYNC.getDescription());
+                assertThat(response.guardianStreamStatus()).isEqualTo(GuardianStreamStatus.STREAMING);
             }
         }
     }
