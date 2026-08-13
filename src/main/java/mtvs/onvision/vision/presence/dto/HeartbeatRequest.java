@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import mtvs.onvision.vision.presence.domain.GuardianStreamStatus;
 import mtvs.onvision.vision.presence.domain.NetworkType;
 
 import java.time.Instant;
@@ -28,6 +29,15 @@ public record HeartbeatRequest(
         Integer battery,
         @NotNull(message = "네트워크 연결상태는 필수값입니다.")
         NetworkRequest network,
+
+        @NotNull
+        @Schema(
+                examples = {"idle", "streaming", "failed"},
+                description = "보호자 영상 연결 상태. 정의되지 않은 문자열은 unknown으로 저장된다",
+                requiredMode = Schema.RequiredMode.REQUIRED
+        )
+        GuardianStreamStatus guardianStreamStatus,
+
         @NotNull(message = "마지막 신호시간은 필수값입니다.")
         @Schema(
                 examples = "2026-07-26T14:32:10.123Z",
@@ -42,6 +52,8 @@ public record HeartbeatRequest(
                 requiredMode = Schema.RequiredMode.REQUIRED
         )
         Instant lastSync
+
+
 
 ) {
     public record NetworkRequest(
