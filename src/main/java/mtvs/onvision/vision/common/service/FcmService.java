@@ -69,10 +69,17 @@ public class FcmService {
         send(fid, message);
     }
 
+    /**
+      * 여기서 다루는 fid는 FCM 등록 토큰이다. Firebase Installation ID가 아니다.
+      * firebase-admin 9.10.0에서 setToken이 deprecated 됐지만 setFid는 대체재가 아니라
+      * JSON `fid` 필드로 직렬화되는 별개 타깃이고, 2026-08-13 기준 실제 FID를 넣어도 UNREGISTERED가 온다.
+      * 경고를 없애려고 setFid로 바꾸지 말 것.
+      */
     /** 시그널링 방 개설 통지. 저장되는 이벤트가 아니라 id 가 없다 */
+    @SuppressWarnings("deprecation")
     public void sendSignalReady(String type, Instant occurredAt, String fid) {
         send(fid, Message.builder()
-                .setFid(fid)
+                .setToken(fid)
                 .putData("type", type)
                 .putData("occurredAt", occurredAt.atZone(SEOUL).toLocalDateTime().toString())
                 .setAndroidConfig(AndroidConfig.builder()
@@ -109,9 +116,10 @@ public class FcmService {
         return NotifyStatus.FAILED;
     }
 
+    @SuppressWarnings("deprecation")
     private Message buildMessage(Long alertId, AlertType type, Instant occurredAt, String fid) {
         return Message.builder()
-                .setFid(fid)
+                .setToken(fid)
                 .setNotification(Notification.builder()
                         .setTitle(titleOf(type, occurredAt))
                         .setBody(type.getMessage())
@@ -127,9 +135,10 @@ public class FcmService {
                 .build();
     }
 
+    @SuppressWarnings("deprecation")
     private Message buildMessage(Long commandId, DataMessageType type, String content, Instant occurredAt, String fid) {
         return Message.builder()
-                .setFid(fid)
+                .setToken(fid)
                 .putData("alertId", commandId.toString())
                 .putData("type", type.name())
                 .putData("content", content)
