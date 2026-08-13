@@ -145,6 +145,15 @@ public class SignalHandler extends TextWebSocketHandler {
 
                         if (roomInfo.containsKey(roomId)) {
                             // 재연결: 기존 보호자 entry만 교체, 피보호자는 유지
+                            // entry 만 지우면 닫힌 옛 세션이 sessions/userInfo 에 영구히 남는다.
+                            // OFFER/ANSWER 는 sessions 전체를 순회하므로 재접속마다 비용이 늘어난다.
+                            for (Map<Long, String> old : roomInfo.get(roomId)) {
+                                String oldSessionId = old.get(userId);
+                                if (oldSessionId != null && !oldSessionId.equals(sessionId)) {
+                                    sessions.remove(oldSessionId);
+                                    userInfo.remove(oldSessionId);
+                                }
+                            }
                             roomInfo.get(roomId).removeIf(m -> m.containsKey(userId));
                             roomInfo.get(roomId).add(userDetail);
                             log.info(">>> [ws] 보호자 {} 재연결, 세션 교체", userId);
@@ -190,23 +199,25 @@ public class SignalHandler extends TextWebSocketHandler {
                 case ANSWER:
                 case CANDIDATE:
                     String receiver = message.getReceiver();
-                    //session에서 receiver를 찾아 전달
-                    sessions.values().forEach(s -> {
-                        try {
-                            if (s.getId().equals(receiver)) {
-                                s.sendMessage(new TextMessage(WebSocketUtils.getString(
-                                        SessionMessage.builder()
-                                                .type(message.getType())
-                                                .sdp(message.getSdp())
-                                                .candidate(message.getCandidate())
-                                                .sender(sessionId)
-                                                .receiver(receiver)
-                                                .build())));
-                            }
-                        } catch (Exception e) {
-                            log.info(">>> 에러 발생 : offer, candidate, answer 메시지 전달 실패 {}", e.getMessage());
-                        }
-                    });
+                    // sessions 는 sessionId 로 키를 잡으므로 전체 순회할 이유가 없다.
+                    // 기존 코드는 receiver 가 어디에도 없으면 아무 로그 없이 사라져 "보냈는데 안 왔다"를 가릴 수 없었다.
+                    WebSocketSession target = sessions.get(receiver);
+                    if (target == null || !target.isOpen()) {
+                        log.warn(">>> [ws] {} 전달 실패 : receiver {} 세션 없음/닫힘", message.getType(), receiver);
+                        break;
+                    }
+                    try {
+                        target.sendMessage(new TextMessage(WebSocketUtils.getString(
+                                SessionMessage.builder()
+                                        .type(message.getType())
+                                        .sdp(message.getSdp())
+                                        .candidate(message.getCandidate())
+                                        .sender(sessionId)
+                                        .receiver(receiver)
+                                        .build())));
+                    } catch (Exception e) {
+                        log.warn(">>> [ws] {} 전달 실패 : {} -> {}", message.getType(), sessionId, receiver, e);
+                    }
                     break;
                     //사용자가 앱을 종료시킬 경우
                 case USER_EXIT:
@@ -221,6 +232,12 @@ public class SignalHandler extends TextWebSocketHandler {
                 default:
                     log.info(">>> [ws] 잘못된 메시지 타입 {}", message.getType());
             }
+        } catch (BusinessException e) {
+            // 여기서 안 잡으면 ExceptionWebSocketHandlerDecorator 가 세션을 1011 로 닫는다.
+            // 클라이언트는 이유를 못 받고 서버 로그에도 ErrorCode 가 안 남는다.
+            // ward 가 보호자보다 먼저 붙는 경우(NOT_FOUND_ROOM)가 이 경로다.
+            log.warn(">>> [ws] 메시지 처리 실패 : 세션 - {}, 코드 - {}, 사유 - {}",
+                    session.getId(), e.getErrorCode(), e.getMessage());
         } catch (IOException e) {
             log.info(">>> 에러 발생 : 양방향 데이터 통신 실패 {}", e.getMessage());
         }
@@ -307,7 +324,10 @@ public class SignalHandler extends TextWebSocketHandler {
     //소켓 통신 예러
     @Override
     public void handleTransportError(WebSocketSession session, Throwable exception){
-        log.info(">>> 에러 발생 : 소켓 통신 에러 {}", exception.getMessage());
+        // getMessage() 만 찍으면 EOFException 처럼 메시지가 없는 예외가 "null" 로만 남아 원인이 사라진다.
+        // 마지막 인자로 넘긴 Throwable 은 SLF4J 가 스택트레이스로 출력한다.
+        log.warn(">>> [ws] 소켓 통신 에러 : 세션 - {}, 사용자 - {}",
+                session.getId(), session.getAttributes().get("userId"), exception);
     }
 
     private void deleteRoom(String otherSessionId, String sessionId, Long roomId, MessageType messageType) throws Exception {
