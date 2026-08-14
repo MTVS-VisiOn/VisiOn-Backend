@@ -1,6 +1,7 @@
 package mtvs.onvision.vision.presence.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.presence.domain.GuardianStreamStatus;
 import mtvs.onvision.vision.presence.domain.PresenceType;
@@ -19,6 +20,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PresenceService {
@@ -50,13 +52,17 @@ public class PresenceService {
 
     @Transactional
     public PresenceResponse getWardPresence(CurrentUser currentUser) {
+        log.debug("Presence read requested: userId={} role={} tokenType={}",
+                currentUser.getId(), currentUser.getRole(), currentUser.getTokenType());
         //피보호자의 아이디 조회
         Long wardId = userService.getWardIdFromGuardianId(currentUser.getId());
         //마지막 연결 상태가 존재하는지 확인
         Optional<String> json = presenceRepository.getLastHeartbeat(wardId);
         //상태값 없으면 연경x
-        if (json.isEmpty())
+        if (json.isEmpty()) {
+            log.debug("Presence read: heartbeat 없음 — guardianId={} wardId={}", currentUser.getId(), wardId);
             return new PresenceResponse(null, false, false,  PresenceType.NOT_FOUND.getDescription(), null);
+        }
         //있으면 연결상태 판별
         //마지막 동기화 시간이 2분 이내 인지와 네트워크가 연결된 상태인지 확인
         HeartbeatRequest heartbeat = objectMapper.readValue(json.get(), HeartbeatRequest.class);
@@ -71,6 +77,8 @@ public class PresenceService {
             else status = PresenceType.NOT_FOUND;
         }
         GuardianStreamStatus guardianStreamStatus = heartbeat.guardianStreamStatus();
+        log.debug("Presence read: wardId={} lastSync={} now={} thresholdSeconds={} isRecent={} networkConnected={} status={} battery={} guardianStreamStatus={}",
+                wardId, heartbeat.lastSync(), Instant.now(), thresholdSeconds, isRecent, networkConnected, status, heartbeat.battery(), guardianStreamStatus);
         return new PresenceResponse(heartbeat.battery(),  heartbeat.deviceConnected(), networkConnected, status.getDescription(),  guardianStreamStatus);
     }
 
