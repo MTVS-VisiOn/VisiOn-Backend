@@ -33,17 +33,28 @@ public class LocationService {
     private final String POI_SEARCH = "/tmap/pois";
 
     public void receiveLocation(LocationRequest request, CurrentUser currentUser) {
+        log.debug("Location write requested: userId={} role={} tokenType={} lat={} lon={} accuracy={} recordedAt={}",
+                currentUser.getId(), currentUser.getRole(), currentUser.getTokenType(),
+                request.latitude(), request.longitude(), request.accuracy(), request.recordedAt());
         MovementStatus status = classifyMovement(request, currentUser.getId());
         LocationReport report = LocationReport.from(request, currentUser.getId(),status);
         String json = objectMapper.writeValueAsString(report);
         realtimeLocationRepository.saveLocation(currentUser.getId(), json);
+        log.debug("Location write stored: key=location:latest:{} status={}", currentUser.getId(), status);
     }
 
     public LastLocationResponse getLastLocation(CurrentUser currentUser) {
+        log.debug("Location read requested: userId={} role={} tokenType={}",
+                currentUser.getId(), currentUser.getRole(), currentUser.getTokenType());
         Long wardId = userService.getWardIdFromGuardianId(currentUser.getId());
         //좌표 구하기
         Optional<String> json  = realtimeLocationRepository.getLastLocation(wardId);
-        if (json.isEmpty()) return null;
+        log.debug("Location lookup: key=location:latest:{} hit={}", wardId, json.isPresent());
+        if (json.isEmpty()) {
+            //200 + data=null 로 나간다. 앱에서는 '기록 없음'과 '서버 오류'가 구분되지 않는다
+            log.debug("Location read: 최근 위치 없음 — guardianId={} wardId={}", currentUser.getId(), wardId);
+            return null;
+        }
 
         LocationReport report = objectMapper.readValue(json.get(), LocationReport.class);
         Double latitude = report.latitude();
@@ -51,6 +62,9 @@ public class LocationService {
 
         String roadAddress = getRoadAddress(latitude, longitude);
 
+        log.debug("Location read: wardId={} lat={} lon={} status={} recordedAt={} roadAddress={}",
+                wardId, latitude, longitude, report.
+                        status(), report.recordedAt(), roadAddress);
         return new LastLocationResponse(latitude, longitude, roadAddress, report.status().getMessage() ,report.recordedAt());
     }
 
@@ -68,6 +82,7 @@ public class LocationService {
                 .retrieve()  //응답 받아오기
                 .body(TmapReverseGeoCodingResponse.class);
         String presentAddress = res.addressInfo().fullAddress();
+        log.debug("TMap reverse geocoding: lat={} lon={} fullAddress={}", latitude, longitude, presentAddress);
         return presentAddress.substring(presentAddress.lastIndexOf(",") + 1);
     }
 
@@ -87,6 +102,7 @@ public class LocationService {
             TmapPoiSearchResponse.SearchPoiInfo poiInfo = res.searchPoiInfo();
             List<Poi> pois = poiInfo.pois().poi();
             List<LocationSearchInfo> infos = pois.stream().map(LocationSearchInfo::from).toList();
+            log.debug("Location search: keyword={} totalCount={} returned={}", keyword, poiInfo.totalCount(), infos.size());
             return new LocationSearchResponse(poiInfo.totalCount(), poiInfo.count(), poiInfo.page(), infos);
         } catch (NullPointerException e) {
             log.info("TMap 호출 실패 keyword={}", keyword);
@@ -100,12 +116,18 @@ public class LocationService {
     //이동 상태 판별하기
     private MovementStatus classifyMovement(LocationRequest report, Long wardId) {
         Optional<String> preJson  = realtimeLocationRepository.getLastLocation(wardId);
-        if (preJson.isEmpty()) return MovementStatus.UNKNOWN;
+        if (preJson.isEmpty()) {
+            log.debug("Movement classify: 직전 좌표 없음 — wardId={} (첫 보고이거나 latest 키 TTL 만료)", wardId);
+            return MovementStatus.UNKNOWN;
+        }
 
         LocationReport preReport = objectMapper.readValue(preJson.get(), LocationReport.class);
         //값이 0 이전이거나 5분이 넘어간경우 알수 없음
         long dtSec = Duration.between(preReport.recordedAt(), report.recordedAt()).getSeconds();
-        if (dtSec <= 0 || dtSec > 300) return MovementStatus.UNKNOWN;
+        if (dtSec <= 0 || dtSec > 300) {
+            log.debug("Movement classify: 간격 이상 — wardId={} dtSec={} (0 이하면 시각 역전, 300 초과면 보고 끊김)", wardId, dtSec);
+            return MovementStatus.UNKNOWN;
+        }
 
         double distance = GeoUtils.distanceMeters(report.latitude(), report.longitude(), preReport.latitude(), preReport.longitude());
 

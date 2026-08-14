@@ -14,6 +14,7 @@ logging:
   level:
     root: info
     "mtvs.onvision.vision.presence": ${LOG_LEVEL_PRESENCE:info}
+    "mtvs.onvision.vision.location": ${LOG_LEVEL_LOCATION:info}
     "org.hibernate.SQL": ${LOG_LEVEL_SQL:info}
 
 server:
