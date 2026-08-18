@@ -425,6 +425,17 @@ class LocationServiceTest {
                     .andRespond(withSuccess(POI_SEARCH_RESPONSE, MediaType.APPLICATION_JSON));
         }
 
+        /**
+         * 검색 중심 좌표가 있는 상태.
+         * 최근 위치가 없으면 티맵을 아예 호출하지 않으므로, 검색 자체를 검증하는 테스트에는 전부 필요하다.
+         */
+        private void givenLastLocation() {
+            String latestJson = "{\"latest\":true}";
+            given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.of(latestJson));
+            given(objectMapper.readValue(latestJson, LocationReport.class)).willReturn(
+                    report(37.5665, 126.978, 10f, MovementStatus.STATIONARY, Instant.now()));
+        }
+
         @Nested
         @DisplayName("Context: 검색 결과가 존재하면")
         class Context_with_results {
@@ -433,10 +444,11 @@ class LocationServiceTest {
             @DisplayName("It : 페이지 정보와 장소 목록을 반환한다")
             void it_returns_places() {
                 //given
+                givenLastLocation();
                 expectPoiSearch();
 
                 //when
-                LocationSearchResponse response = locationService.searchLocation("화목순대국");
+                LocationSearchResponse response = locationService.searchLocation("화목순대국", ward);
 
                 //then
                 assertThat(response.totalCount()).isEqualTo(2);
@@ -450,10 +462,11 @@ class LocationServiceTest {
             @DisplayName("It : 중심점 좌표(noorLat/noorLon)와 도로명 주소를 매핑한다")
             void it_maps_center_coordinate_and_road_address() {
                 //given
+                givenLastLocation();
                 expectPoiSearch();
 
                 //when
-                LocationSearchInfo first = locationService.searchLocation("화목순대국").infos().getFirst();
+                LocationSearchInfo first = locationService.searchLocation("화목순대국", ward).infos().getFirst();
 
                 //then
                 assertThat(first.id()).isEqualTo("2874793");
@@ -468,10 +481,11 @@ class LocationServiceTest {
             @DisplayName("(부번이 0)It : 지번 주소에 부번을 붙이지 않는다")
             void it_omits_zero_second_no() {
                 //given
+                givenLastLocation();
                 expectPoiSearch();
 
                 //when
-                LocationSearchInfo first = locationService.searchLocation("화목순대국").infos().getFirst();
+                LocationSearchInfo first = locationService.searchLocation("화목순대국", ward).infos().getFirst();
 
                 //then : detailAddrName이 빈 값이라 뒤에 공백도 남지 않는다
                 assertThat(first.landAddress()).isEqualTo("서울 종로구 당주동 40");
@@ -481,10 +495,11 @@ class LocationServiceTest {
             @DisplayName("(부번이 있음)It : 지번 주소를 본번-부번으로 조합한다")
             void it_joins_first_and_second_no() {
                 //given
+                givenLastLocation();
                 expectPoiSearch();
 
                 //when
-                LocationSearchInfo second = locationService.searchLocation("화목순대국").infos().get(1);
+                LocationSearchInfo second = locationService.searchLocation("화목순대국", ward).infos().get(1);
 
                 //then
                 assertThat(second.landAddress()).isEqualTo("서울 영등포구 여의도동 44-14");
@@ -499,6 +514,7 @@ class LocationServiceTest {
             @DisplayName("It : 이중 인코딩 없이 한 번만 인코딩해 요청한다")
             void it_encodes_keyword_once() {
                 //given : 이중 인코딩되면 한 번 디코딩해도 %ED%99%94... 형태로 남는다
+                givenLastLocation();
                 tmapServer.expect(request -> {
                             String decoded = URLDecoder.decode(
                                     request.getURI().toString(), StandardCharsets.UTF_8);
@@ -507,7 +523,7 @@ class LocationServiceTest {
                         .andRespond(withSuccess(POI_SEARCH_RESPONSE, MediaType.APPLICATION_JSON));
 
                 //when
-                locationService.searchLocation("강남 스타벅스");
+                locationService.searchLocation("강남 스타벅스", ward);
 
                 //then
                 tmapServer.verify();
@@ -522,16 +538,87 @@ class LocationServiceTest {
             @DisplayName("It : 예외 없이 빈 결과를 반환한다")
             void it_returns_empty_result() {
                 //given : 티맵은 0건일 때 200이 아니라 204 No Content를 준다
+                givenLastLocation();
                 tmapServer.expect(requestTo(startsWith(BASE_URL + "/tmap/pois")))
                         .andRespond(withStatus(HttpStatus.NO_CONTENT));
 
                 //when
-                LocationSearchResponse response = locationService.searchLocation("asdfqwerzxcv");
+                LocationSearchResponse response = locationService.searchLocation("asdfqwerzxcv", ward);
 
                 //then
                 assertThat(response.totalCount()).isEqualTo(0);
                 assertThat(response.count()).isEqualTo(0);
                 assertThat(response.page()).isEqualTo(0);
+                assertThat(response.infos().isEmpty()).isTrue();
+                tmapServer.verify();
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 최근 위치가 있으면")
+        class Context_with_last_location {
+
+            @Test
+            @DisplayName("It : 그 좌표를 중심으로 반경순 정렬을 요청하고 center에 담아 돌려준다")
+            void it_searches_around_last_location() {
+                //given : 파라미터 이름이 하나라도 틀리면 티맵이 조용히 무시한다
+                givenLastLocation();
+                tmapServer.expect(requestTo(startsWith(BASE_URL + "/tmap/pois")))
+                        .andExpect(queryParam("centerLat", "37.5665"))
+                        .andExpect(queryParam("centerLon", "126.978"))
+                        .andExpect(queryParam("searchtypCd", "R"))
+                        .andRespond(withSuccess(POI_SEARCH_RESPONSE, MediaType.APPLICATION_JSON));
+
+                //when
+                LocationSearchResponse response = locationService.searchLocation("화목순대국", ward);
+
+                //then
+                assertThat(response.center()).isEqualTo(new CoordinateInfo(37.5665, 126.978));
+                tmapServer.verify();
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 최근 위치가 없으면")
+        class Context_with_no_last_location {
+
+            @Test
+            @DisplayName("It : 티맵을 호출하지 않고 center가 null인 빈 결과를 돌려준다")
+            void it_returns_empty_without_calling_tmap() {
+                //given : 30분 TTL이 지나면 위치는 그냥 사라진다. 오류가 아니라 빈 결과다
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.empty());
+
+                //when : 기대한 요청을 걸지 않았으므로 티맵을 부르면 여기서 바로 깨진다
+                LocationSearchResponse response = locationService.searchLocation("화목순대국", ward);
+
+                //then
+                assertThat(response.center()).isNull();
+                assertThat(response.totalCount()).isEqualTo(0);
+                assertThat(response.count()).isEqualTo(0);
+                assertThat(response.page()).isEqualTo(0);
+                assertThat(response.infos().isEmpty()).isTrue();
+                tmapServer.verify();
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 최근 위치 JSON을 읽지 못하면")
+        class Context_with_broken_last_location {
+
+            @Test
+            @DisplayName("It : 티맵 오류로 번지지 않고 center가 null인 빈 결과를 돌려준다")
+            void it_does_not_leak_as_tmap_error() {
+                //given : 역직렬화 실패를 TMAP_API_ERROR로 보고하면 원인 추적이 엉뚱한 곳으로 간다
+                String brokenJson = "{broken";
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.of(brokenJson));
+                given(objectMapper.readValue(brokenJson, LocationReport.class))
+                        .willThrow(new RuntimeException("deserialize failed"));
+
+                //when
+                LocationSearchResponse response = locationService.searchLocation("화목순대국", ward);
+
+                //then
+                assertThat(response.center()).isNull();
                 assertThat(response.infos().isEmpty()).isTrue();
                 tmapServer.verify();
             }
@@ -545,12 +632,13 @@ class LocationServiceTest {
             @DisplayName("It : TMAP_API_ERROR 오류 발생")
             void it_throws_tmap_api_error() {
                 //given
+                givenLastLocation();
                 tmapServer.expect(requestTo(startsWith(BASE_URL + "/tmap/pois")))
                         .andRespond(withServerError());
 
                 //when&then
                 BusinessException exception = assertThrows(BusinessException.class,
-                        () -> locationService.searchLocation("화목순대국"));
+                        () -> locationService.searchLocation("화목순대국", ward));
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.TMAP_API_ERROR);
             }
         }

@@ -104,26 +104,34 @@ public class LocationService {
     }
 
     //주소검색 - 티맵 api 사용
-    public LocationSearchResponse searchLocation(String keyword) {
+    public LocationSearchResponse searchLocation(String keyword, CurrentUser currentUser) {
+        //최근 위치 받아오기
+        CoordinateInfo center = getSearchCenter(currentUser.getId());
+        //현재 위치 정보 없으면 null로 응답
+        if (center == null) return new LocationSearchResponse(0,0,0, null, List.of());
         try {
             TmapPoiSearchResponse res = tmapRestClient.get()
-                    .uri(
-                            uriBuilder -> uriBuilder
-                                    .path(POI_SEARCH)
-                                    .queryParam("version", 1)
-                                    .queryParam("searchKeyword", keyword)
-                                    .queryParam("count", 10)
-                                    .build())
-                    .retrieve()  //응답 받아오기
+                    .uri(uriBuilder -> {
+                        return uriBuilder.path(POI_SEARCH)
+                                .queryParam("version", 1)
+                                .queryParam("searchKeyword", keyword)
+                                .queryParam("count", 10)
+                                .queryParam("centerLat", center.latitude())
+                                .queryParam("centerLon", center.longitude())
+                                .queryParam("searchtypCd", "R")
+                                .build();
+                    })
+                    .retrieve()
                     .body(TmapPoiSearchResponse.class);
+
             TmapPoiSearchResponse.SearchPoiInfo poiInfo = res.searchPoiInfo();
             List<Poi> pois = poiInfo.pois().poi();
             List<LocationSearchInfo> infos = pois.stream().map(LocationSearchInfo::from).toList();
             log.debug("Location search: keyword={} totalCount={} returned={}", keyword, poiInfo.totalCount(), infos.size());
-            return new LocationSearchResponse(poiInfo.totalCount(), poiInfo.count(), poiInfo.page(), infos);
+            return new LocationSearchResponse(poiInfo.totalCount(), poiInfo.count(), poiInfo.page(), center, infos);
         } catch (NullPointerException e) {
             log.info("TMap 호출 실패 keyword={}", keyword);
-            return new LocationSearchResponse(0,0,0, List.of());
+            return new LocationSearchResponse(0,0,0, center, List.of());
         } catch (Exception e) {
             log.error("TMap 호출 실패 type={}, cause={}", e.getClass().getName(), e.getCause(), e);
             throw new BusinessException(ErrorCode.TMAP_API_ERROR);
@@ -166,6 +174,21 @@ public class LocationService {
         return accuracy != null ? accuracy : 20.0;         // 기본 오차 20m
     }
 
-
+    /** 최근 위치가 없거나(30분 TTL 만료·첫 실행) 읽지 못하면 null — 호출부가 검색을 건너뛴다 */
+    private CoordinateInfo getSearchCenter(Long wardId) {
+        Optional<String> json = realtimeLocationRepository.getLastLocation(wardId);
+        if (json.isEmpty()) {
+            log.debug("검색 중심 좌표 없음 — wardId={}", wardId);
+            return null;
+        }
+        try {
+            LocationReport report = objectMapper.readValue(json.get(), LocationReport.class);
+            if (report.latitude() == null || report.longitude() == null) return null;
+            return new CoordinateInfo(report.latitude(), report.longitude());
+        } catch (Exception e) {
+            log.warn("최근 위치 파싱 실패 wardId={} message={}", wardId, e.getMessage());
+            return null;
+        }
+    }
 
 }

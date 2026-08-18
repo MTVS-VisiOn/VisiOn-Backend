@@ -39,11 +39,14 @@ public class LocationController implements LocationControllerSupporter{
         return ApiResult.ok(SuccessCode.LOCATION_READ, response);
     }
 
+    @Override
     @GetMapping("/search")
-    public ResponseEntity<ApiResult<LocationSearchResponse>> searchLocation(@RequestParam String keyword) {
+    @ApiUnauthorized
+    public ResponseEntity<ApiResult<LocationSearchResponse>> searchLocation(@RequestParam String keyword,
+                                                                            @AuthenticationPrincipal CurrentUser currentUser) {
         PreConditions.check(keyword == null || keyword.isBlank(), ErrorCode.VALIDATION_FAILED, "keyword는 필수값입니다.");
         PreConditions.check(keyword.length()>100, ErrorCode.VALIDATION_FAILED, "keyword는 100자 이하여야 합니다.");
-        LocationSearchResponse response = locationService.searchLocation(keyword);
+        LocationSearchResponse response = locationService.searchLocation(keyword, currentUser);
         return ApiResult.ok(SuccessCode.LOCATION_SEARCH_READ, response);
     }
 }

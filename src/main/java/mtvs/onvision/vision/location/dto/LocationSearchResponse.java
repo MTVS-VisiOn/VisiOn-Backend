@@ -6,6 +6,7 @@ public record LocationSearchResponse(
         Integer totalCount,
         Integer count,
         Integer page,
+        CoordinateInfo center,
         List<LocationSearchInfo> infos
 ) {
 }
