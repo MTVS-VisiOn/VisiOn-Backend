@@ -68,22 +68,39 @@ public class LocationService {
         return new LastLocationResponse(latitude, longitude, roadAddress, report.status().getMessage() ,report.recordedAt());
     }
 
+    /**
+     * 좌표를 주소로 바꾼다. 실패하면 예외를 던지지 않고 {@code null}을 준다.
+     * <p>
+     * 주소는 부가 정보이고 좌표는 이미 확보돼 있다. 여기서 던지면 TMap 장애 하나가
+     * 위치 조회 전체(500)와 장애물 알림 저장까지 같이 죽인다. {@code alerts.address}는
+     * nullable이라 주소 없이도 알림은 남는다.
+     */
     public String getRoadAddress(Double latitude, Double longitude) {
         //티맵 API로 주소 찾기
-        TmapReverseGeoCodingResponse res = tmapRestClient.get()
-                .uri(
-                        uriBuilder -> uriBuilder
-                                .path(REVERSE_GEOCODING)
-                                .queryParam("version",1)
-                                .queryParam("lat", latitude)
-                                .queryParam("lon", longitude)
-                                .queryParam("addressType","A10")
-                                .build())
-                .retrieve()  //응답 받아오기
-                .body(TmapReverseGeoCodingResponse.class);
-        String presentAddress = res.addressInfo().fullAddress();
-        log.debug("TMap reverse geocoding: lat={} lon={} fullAddress={}", latitude, longitude, presentAddress);
-        return presentAddress.substring(presentAddress.lastIndexOf(",") + 1);
+        try {
+            TmapReverseGeoCodingResponse res = tmapRestClient.get()
+                    .uri(
+                            uriBuilder -> uriBuilder
+                                    .path(REVERSE_GEOCODING)
+                                    .queryParam("version",1)
+                                    .queryParam("lat", latitude)
+                                    .queryParam("lon", longitude)
+                                    .queryParam("addressType","A10")
+                                    .build())
+                    .retrieve()  //응답 받아오기
+                    .body(TmapReverseGeoCodingResponse.class);
+            String presentAddress = res == null || res.addressInfo() == null ? null : res.addressInfo().fullAddress();
+            log.debug("TMap reverse geocoding: lat={} lon={} fullAddress={}", latitude, longitude, presentAddress);
+            if (presentAddress == null) {
+                log.warn("TMap 역지오코딩 주소 없음: lat={} lon={}", latitude, longitude);
+                return null;
+            }
+            return presentAddress.substring(presentAddress.lastIndexOf(",") + 1);
+        } catch (Exception e) {
+            log.warn("TMap 역지오코딩 실패: lat={} lon={} type={} message={}",
+                    latitude, longitude, e.getClass().getName(), e.getMessage());
+            return null;
+        }
     }
 
     //주소검색 - 티맵 api 사용

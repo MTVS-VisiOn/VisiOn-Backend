@@ -15,6 +15,9 @@ logging:
     root: info
     "mtvs.onvision.vision.presence": ${LOG_LEVEL_PRESENCE:info}
     "mtvs.onvision.vision.location": ${LOG_LEVEL_LOCATION:info}
+    "mtvs.onvision.vision.navigation": ${LOG_LEVEL_NAVIGATION:info}
+    "mtvs.onvision.vision.favorite": ${LOG_LEVEL_FAVORITE:info}
+    "mtvs.onvision.vision.command": ${LOG_LEVEL_COMMAND:info}
     "org.hibernate.SQL": ${LOG_LEVEL_SQL:info}
 
 server:
