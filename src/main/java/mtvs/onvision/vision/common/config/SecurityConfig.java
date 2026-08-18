@@ -26,6 +26,8 @@ public class SecurityConfig {
                 .httpBasic(basic -> basic.disable())
                 .formLogin(formLogin -> formLogin.disable())
                 .authorizeHttpRequests(auth ->auth
+                        .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
+                        .requestMatchers("/actuator/**").denyAll()
                         .requestMatchers("/api/users/signup", "/api/auth/login").anonymous()
                         .requestMatchers("/api/users/refresh").permitAll()
                         .requestMatchers("/api/users/guardian/register-code").hasAuthority("WARD")

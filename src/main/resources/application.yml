@@ -101,3 +101,12 @@ location:
     batch-size: 1000
     max-loops: 10   # 한 틱에 최대 10,000건. 유입이 이걸 넘으면 로그에 경고가 남는다
     enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health  #다루는 엔드포인트 설정
+  endpoint:
+    health:
+      show-details: never  #health 응답에 내역을 담을지
