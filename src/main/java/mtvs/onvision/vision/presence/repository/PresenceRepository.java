@@ -1,6 +1,7 @@
 package mtvs.onvision.vision.presence.repository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
@@ -13,6 +14,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Repository
 @RequiredArgsConstructor
 public class PresenceRepository {
@@ -27,7 +29,10 @@ public class PresenceRepository {
         redisTemplate.opsForValue().set(KEY_PREFIX+userId, json, Duration.ofSeconds(expiredTime));
     }
     public Optional<String> getLastHeartbeat(Long userId) {
-        return Optional.ofNullable(redisTemplate.opsForValue().get(KEY_PREFIX+userId));
+        String key = KEY_PREFIX + userId;
+        Optional<String> json = Optional.ofNullable(redisTemplate.opsForValue().get(key));
+        log.debug("Presence lookup: key={} hit={}", key, json.isPresent());
+        return json;
     }
 
     /** 정상 연결 상태를 갱신한다. 이미 있으면 score만 바뀐다 */

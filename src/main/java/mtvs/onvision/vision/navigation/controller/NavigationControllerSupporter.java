@@ -23,7 +23,7 @@ public interface NavigationControllerSupporter {
     @Operation(
             summary = "보행자·자동차 경로 검색",
             description = """
-                    피보호자만 가능. `mode`는 `WALK` 또는 `CAR`이고 `TRANSIT`을 보내면 400이다
+                    피보호자(WARD)·기기(DEVICE) 토큰 모두 가능. `mode`는 `WALK` 또는 `CAR`이고 `TRANSIT`을 보내면 400이다
                     (대중교통은 `POST /api/navigations/search/transit`).
 
                     응답은 **요약만** 나간다. 시각장애인 대상이라 지도를 실을 이유가 없고,
@@ -267,7 +267,7 @@ public interface NavigationControllerSupporter {
     @Operation(
             summary = "대중교통 경로 검색",
             description = """
-                    피보호자만 가능. `mode`는 `TRANSIT`이어야 하고 아니면 400이다.
+                    피보호자(WARD)·기기(DEVICE) 토큰 모두 가능. `mode`는 `TRANSIT`이어야 하고 아니면 400이다.
 
                     **후보를 여러 개 준다.** 보행자·자동차와 달리 사용자가 골라야 하므로
                     `index`(0부터)가 붙어 나가고, 선택할 때 그 값을 `POST /api/navigations`에 보낸다.
@@ -498,7 +498,7 @@ public interface NavigationControllerSupporter {
     @Operation(
             summary = "경로 선택",
             description = """
-                    피보호자만 가능. 검색으로 Redis에 담아둔 경로를 DB로 옮겨 **안내를 시작**한다.
+                    피보호자(WARD)·기기(DEVICE) 토큰 모두 가능. 검색으로 Redis에 담아둔 경로를 DB로 옮겨 **안내를 시작**한다.
 
                     `mode`는 어느 검색 결과를 고르는지를 가리킨다. 검색 때 쓴 값과 같아야 한다 —
                     `mode`마다 Redis 키가 따로라 `WALK`로 찾아놓고 `CAR`로 선택하면 다른 경로가 저장되거나
@@ -622,7 +622,7 @@ public interface NavigationControllerSupporter {
     @Operation(
             summary = "진행 중인 경로 조회",
             description = """
-                    피보호자와 보호자 모두 가능. **보호자가 호출하면 피보호자의 경로를 조회한다.**
+                    피보호자(WARD)·보호자(GUARDIAN)·기기(DEVICE) 토큰 모두 가능. **보호자가 호출하면 피보호자의 경로를 조회한다.**
                     진행 중인 경로는 한 사람당 하나뿐이라 id를 받지 않는다.
 
                     `report`는 **선택 시점에 저장해둔 경로 원문**이고 `mode`에 따라 모양이 다르다.
@@ -923,7 +923,7 @@ public interface NavigationControllerSupporter {
     @Operation(
             summary = "경로 완료",
             description = """
-                    피보호자만 가능. 진행 중인 경로의 상태를 `COMPLETED`로 바꾼다.
+                    피보호자(WARD)·기기(DEVICE) 토큰 모두 가능. 진행 중인 경로의 상태를 `COMPLETED`로 바꾼다.
                     행을 지우지 않으므로 나중에 이동 기록으로 쓸 수 있다.
 
                     진행 중인 경로는 하나뿐이라 id를 받지 않는다.
@@ -994,7 +994,7 @@ public interface NavigationControllerSupporter {
     @Operation(
             summary = "경로 취소",
             description = """
-                    피보호자만 가능. 진행 중인 경로의 상태를 `CANCELED`로 바꾼다.
+                    피보호자(WARD)·기기(DEVICE) 토큰 모두 가능. 진행 중인 경로의 상태를 `CANCELED`로 바꾼다.
 
                     새 경로를 선택하면 기존 경로가 자동으로 취소되므로, 이 API는
                     **다른 경로를 고르지 않고 그냥 그만둘 때** 쓴다.

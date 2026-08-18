@@ -157,7 +157,17 @@ public interface LocationControllerSupporter {
 
     @Operation(
             summary = "피보호자 장소 검색",
-            description = "피보호자만 가능",
+            description = """
+                    피보호자(WARD)와 기기(DEVICE) 토큰 모두 가능. 기기 토큰은 페어링한 피보호자의 id로 발급되므로 어느 쪽으로 불러도 같은 사람의 위치를 본다.
+
+                    검색 중심 좌표는 클라이언트가 보내지 않고, 서버가 해당 피보호자의 최근 위치(30분 이내)를 읽어 쓴다.
+
+                    최근 위치가 있으면 그 좌표를 기준으로 **거리순 정렬**해 검색하고, 사용한 좌표를 `center`에 담아 돌려준다.
+                    반경으로 걸러내지는 않으므로(티맵 `radius=0`, 전국) 먼 곳도 결과에 남는다.
+
+                    최근 위치가 없으면 **티맵을 호출하지 않고** `center`가 null인 빈 결과를 200으로 응답한다.
+                    오류가 아니므로 상태 코드로는 구분되지 않는다. `center`가 null이면 위치를 몰라 검색하지 않은 것이고,
+                    `center`가 있는데 `infos`가 비어 있으면 검색은 했으나 결과가 없는 것이다.""",
             extensions = @Extension(properties = @ExtensionProperty(name = "x-order", value = "3"))
     )
     @ApiResponses(value = {
@@ -180,6 +190,10 @@ public interface LocationControllerSupporter {
                                                                     "totalCount": 5,
                                                                     "count": 5,
                                                                     "page": 1,
+                                                                    "center": {
+                                                                        "latitude": 37.42827795,
+                                                                        "longitude": 127.09831958
+                                                                    },
                                                                     "infos": [
                                                                         {
                                                                             "id": "374619",
@@ -232,7 +246,7 @@ public interface LocationControllerSupporter {
                                                             """
                                             ),
                                             @ExampleObject(
-                                                    name = "결과 없음",
+                                                    name = "현재 위치를 몰라 검색하지 않음",
                                                     value = """
                                                     {
                                                         "success": true,
@@ -242,6 +256,27 @@ public interface LocationControllerSupporter {
                                                             "totalCount": 0,
                                                             "count": 0,
                                                             "page": 0,
+                                                            "center": null,
+                                                            "infos": []
+                                                        }
+                                                    }
+                                                    """
+                                            ),
+                                            @ExampleObject(
+                                                    name = "검색했으나 결과 없음",
+                                                    value = """
+                                                    {
+                                                        "success": true,
+                                                        "code": "LOCATION_SEARCH_READ",
+                                                        "message": "장소 검색이 정상적으로 조회되었습니다.",
+                                                        "data": {
+                                                            "totalCount": 0,
+                                                            "count": 0,
+                                                            "page": 0,
+                                                            "center": {
+                                                                "latitude": 37.42827795,
+                                                                "longitude": 127.09831958
+                                                            },
                                                             "infos": []
                                                         }
                                                     }
@@ -291,5 +326,6 @@ public interface LocationControllerSupporter {
             )
     })
     ResponseEntity<ApiResult<LocationSearchResponse>> searchLocation(
-            @Parameter(description = "검색 키워드", example = "왕남초등학교", required = true)String keyword);
+            @Parameter(description = "검색 키워드", example = "왕남초등학교", required = true)String keyword,
+            CurrentUser currentUser);
 }

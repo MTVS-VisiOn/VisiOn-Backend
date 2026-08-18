@@ -1,6 +1,7 @@
 package mtvs.onvision.vision.navigation.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
@@ -34,6 +35,7 @@ import java.util.regex.Pattern;
 
 import static mtvs.onvision.vision.common.util.AppTime.SEOUL;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class NavigationService {
@@ -51,6 +53,10 @@ public class NavigationService {
     //네비게이션 경로 찾기
     public NavigationSummary searchNavigation(NavigationPreRequest request, CurrentUser currentUser) {
         TransportMode mode = request.mode();
+        log.debug("Navigation search requested: userId={} role={} mode={} start=({},{}) end=({},{})",
+                currentUser.getId(), currentUser.getRole(), mode,
+                request.start().latitude(), request.start().longitude(),
+                request.end().latitude(), request.end().longitude());
         MultiValueMap<String, String> form = getStringStringMultiValueMap(request, mode);
         try {
             if (!(mode == TransportMode.WALK) && !(mode == TransportMode.CAR)) throw new BusinessException(ErrorCode.INVALID_TRANSFER);
@@ -109,6 +115,8 @@ public class NavigationService {
                 NavigationRouteReport report = new NavigationRouteReport(summary, steps);
                 String json = objectMapper.writeValueAsString(report);
                 navigationRepository.saveRoute(currentUser.getId(), mode.getPrefix(), json);
+                log.debug("Navigation search done: mode={} totalDistance={} totalTime={} steps={} redisPrefix={}",
+                        mode, totalDistance, totalTime, steps.size(), mode.getPrefix());
 
                 // 출력은 요약만
                 return summary;
@@ -160,6 +168,8 @@ public class NavigationService {
                 NavigationRouteReport report = new NavigationRouteReport(summary, steps);
                 String json = objectMapper.writeValueAsString(report);
                 navigationRepository.saveRoute(currentUser.getId(), mode.getPrefix(), json);
+                log.debug("Navigation search done: mode={} totalDistance={} totalTime={} steps={} redisPrefix={}",
+                        mode, fStart.totalDistance(), fStart.totalTime(), steps.size(), mode.getPrefix());
 
                 // 출력은 요약만
                 return summary;
@@ -168,6 +178,8 @@ public class NavigationService {
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
+            //스택을 여기서 안 남기면 TMap 실패의 원인이 어디에도 안 남는다
+            log.warn("Navigation search 실패: mode={} type={} message={}", mode, e.getClass().getName(), e.getMessage(), e);
             throw new BusinessException(ErrorCode.TMAP_API_ERROR, e.getMessage());
         }
     }
@@ -175,6 +187,10 @@ public class NavigationService {
     //대중교통 경로 검색
     public List<NavigationSummary> searchNavigationTransit(NavigationPreRequest request, CurrentUser currentUser) {
         TransportMode mode = request.mode();
+        log.debug("Navigation transit search requested: userId={} role={} start=({},{}) end=({},{})",
+                currentUser.getId(), currentUser.getRole(),
+                request.start().latitude(), request.start().longitude(),
+                request.end().latitude(), request.end().longitude());
         TmapTransitRequest req = TmapTransitRequest.from(request);
         try {
             TmapTransitResponse res = tmapRestClient.post()
@@ -204,10 +220,12 @@ public class NavigationService {
             navigationRepository.saveRoute(currentUser.getId(), mode.getPrefix(),
                     objectMapper.writeValueAsString(candidates));
 
+            log.debug("Navigation transit search done: candidates={} redisPrefix={}", summaries.size(), mode.getPrefix());
             return summaries;
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
+            log.warn("Navigation transit search 실패: type={} message={}", e.getClass().getName(), e.getMessage(), e);
             throw new BusinessException(ErrorCode.TMAP_API_ERROR, e.getMessage());
         }
     }
@@ -216,6 +234,7 @@ public class NavigationService {
     @Transactional
     public void saveRoute(RouteRequest request, CurrentUser currentUser) {
         TransportMode mode = request.mode();
+        log.debug("Route save requested: userId={} mode={} index={}", currentUser.getId(), mode, request.index());
         User ward = userService.currentUserToUser(currentUser.getId());
         Optional<Route> route = routeRepository.findByWardIdAndStatus(currentUser.getId(), RouteStatus.IN_PROGRESS);
         route.ifPresent(Route::canceled);
@@ -224,6 +243,7 @@ public class NavigationService {
             NavigationRouteReport report = objectMapper.readValue(json, NavigationRouteReport.class);
             Route newRoute = new Route(mode, report.summary(), json,ward);
             routeRepository.save(newRoute);
+            log.debug("Route saved: routeId={} wardId={} mode={}", newRoute.getId(), ward.getId(), mode);
         } else {
             //대중교통일때
             TransitRoute report = Arrays.stream(objectMapper.readValue(json, TransitRoute[].class))
@@ -232,6 +252,7 @@ public class NavigationService {
                     .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROUTE));
             Route newRoute = new Route(mode, report.summary(), objectMapper.writeValueAsString(report), ward);
             routeRepository.save(newRoute);
+            log.debug("Route saved: routeId={} wardId={} mode={} index={}", newRoute.getId(), ward.getId(), mode, request.index());
         }
     }
 
@@ -242,7 +263,10 @@ public class NavigationService {
         else wardId = userService.getWardIdFromGuardianId(currentUser.getId());
         Route route = routeRepository.findByWardIdAndStatus(wardId, RouteStatus.IN_PROGRESS)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROUTE));
-        return NavigationResponse.from(route, remainingDistanceOf(route, wardId));
+        Integer remaining = remainingDistanceOf(route, wardId);
+        log.debug("Route processing read: wardId={} routeId={} mode={} remainingDistanceM={}",
+                wardId, route.getId(), route.getMode(), remaining);
+        return NavigationResponse.from(route, remaining);
     }
 
     /**
@@ -281,6 +305,7 @@ public class NavigationService {
         Route route = routeRepository.findByWardIdAndStatus(currentUser.getId(), RouteStatus.IN_PROGRESS)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROUTE));
         route.completed();
+        log.debug("Route completed: wardId={} routeId={}", currentUser.getId(), route.getId());
     }
 
 
@@ -289,6 +314,7 @@ public class NavigationService {
         Route route = routeRepository.findByWardIdAndStatus(currentUser.getId(), RouteStatus.IN_PROGRESS)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROUTE));
         route.canceled();
+        log.debug("Route canceled: wardId={} routeId={}", currentUser.getId(), route.getId());
     }
 
 
@@ -301,6 +327,8 @@ public class NavigationService {
             TransportMode mode = route.getMode();
             String json = route.getReport();
             LocationReport location = lastLocationOf(wardId);
+            log.debug("Map route read: wardId={} routeId={} mode={} hasLocation={}",
+                    wardId, route.getId(), mode, location != null);
             if (mode.equals(TransportMode.WALK) || mode.equals(TransportMode.CAR)) {
                 NavigationRouteReport report = objectMapper.readValue(json, NavigationRouteReport.class);
                 return MapResponse.from(report, mode, route.getCreatedAt(), remainingDistance(report, location));
@@ -310,7 +338,11 @@ public class NavigationService {
                 return MapResponse.from(report, route.getCreatedAt(), remainingDistance(report, location));
             }
         }
-        else return null;
+        else {
+            //200 + data=null 로 나간다. 앱에서는 '진행 중 경로 없음'과 '서버 오류'가 구분되지 않는다
+            log.debug("Map route read: 진행 중 경로 없음 — guardianId={} wardId={}", currentUser.getId(), wardId);
+            return null;
+        }
     }
 
     /**
@@ -331,7 +363,9 @@ public class NavigationService {
         // createdAt은 DateTimeProvider가 KST 벽시계로 채우므로 그대로 비교할 수 있다
         LocalDateTime from = LocalDate.now(SEOUL).minusDays(6).atStartOfDay();
         Long wardId = currentUser.getRole()==UserRole.WARD? currentUser.getId() : userService.getWardIdFromGuardianId(currentUser.getId());
-        return routeRepository.findAllByWardIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(wardId, from);
+        List<RouteSummary> routes = routeRepository.findAllByWardIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(wardId, from);
+        log.debug("Route week list: wardId={} from={} count={}", wardId, from, routes.size());
+        return routes;
     }
 
 
