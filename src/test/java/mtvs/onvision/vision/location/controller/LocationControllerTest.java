@@ -8,6 +8,7 @@ import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.common.filter.JwtAuthenticationFilter;
 import mtvs.onvision.vision.common.response.SuccessCode;
 import mtvs.onvision.vision.location.domain.MovementStatus;
+import mtvs.onvision.vision.location.dto.CoordinateInfo;
 import mtvs.onvision.vision.location.dto.LastLocationResponse;
 import mtvs.onvision.vision.location.dto.LocationRequest;
 import mtvs.onvision.vision.location.dto.LocationSearchInfo;
@@ -33,8 +34,11 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -291,9 +295,10 @@ class LocationControllerTest {
             @DisplayName("It : 200 상태와 장소 목록을 반환한다")
             void it_return_200_ok_and_places() throws Exception {
                 //given
-                LocationSearchResponse response =
-                        new LocationSearchResponse(1, 1, 1, List.of(info()));
-                given(locationService.searchLocation("화목순대국")).willReturn(response);
+                LocationSearchResponse response = new LocationSearchResponse(
+                        1, 1, 1, new CoordinateInfo(37.5665, 126.978), List.of(info()));
+                given(locationService.searchLocation(eq("화목순대국"), any(CurrentUser.class)))
+                        .willReturn(response);
 
                 //when-then
                 mockMvc.perform(
@@ -321,8 +326,8 @@ class LocationControllerTest {
             @DisplayName("It : 200 상태와 빈 목록을 반환한다")
             void it_return_200_ok_and_empty_list() throws Exception {
                 //given : 결과 없음은 오류가 아니다
-                given(locationService.searchLocation("asdfqwerzxcv"))
-                        .willReturn(new LocationSearchResponse(0, 0, 0, List.of()));
+                given(locationService.searchLocation(eq("asdfqwerzxcv"), any(CurrentUser.class)))
+                        .willReturn(new LocationSearchResponse(0, 0, 0, null, List.of()));
 
                 //when-then
                 mockMvc.perform(
@@ -334,6 +339,82 @@ class LocationControllerTest {
                         .andExpect(jsonPath("$.data.totalCount").value(0))
                         .andExpect(jsonPath("$.data.infos").isEmpty())
                         .andDo(print());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 현재 위치를 알 수 있으면")
+        class Context_with_center {
+
+            @Test
+            @DisplayName("It : 검색에 사용한 center 좌표를 함께 내려준다")
+            void it_returns_center() throws Exception {
+                //given
+                LocationSearchResponse response = new LocationSearchResponse(
+                        1, 1, 1, new CoordinateInfo(37.5665, 126.978), List.of(info()));
+                given(locationService.searchLocation(eq("화목순대국"), any(CurrentUser.class)))
+                        .willReturn(response);
+
+                //when-then
+                mockMvc.perform(
+                                get("/api/locations/search")
+                                        .param("keyword", "화목순대국")
+                        )
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.data.center.latitude").value(37.5665))
+                        .andExpect(jsonPath("$.data.center.longitude").value(126.978))
+                        .andDo(print());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 현재 위치를 알 수 없으면")
+        class Context_with_no_center {
+
+            @Test
+            @DisplayName("It : 200 상태로 center가 null인 빈 결과를 반환한다")
+            void it_return_200_ok_with_null_center() throws Exception {
+                //given : 위치 없음은 오류가 아니다. 서비스가 티맵을 부르지 않고 빈 결과를 준다
+                LocationSearchResponse response =
+                        new LocationSearchResponse(0, 0, 0, null, List.of());
+                given(locationService.searchLocation(eq("화목순대국"), any(CurrentUser.class)))
+                        .willReturn(response);
+
+                //when-then
+                mockMvc.perform(
+                                get("/api/locations/search")
+                                        .param("keyword", "화목순대국")
+                        )
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.code").value(SuccessCode.LOCATION_SEARCH_READ.name()))
+                        .andExpect(jsonPath("$.data.totalCount").value(0))
+                        .andExpect(jsonPath("$.data.infos").isEmpty())
+                        .andExpect(jsonPath("$.data.center").doesNotExist())
+                        .andDo(print());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 로그인한 피보호자가 호출하면")
+        class Context_with_authenticated_ward {
+
+            @Test
+            @DisplayName("It : 그 사용자를 서비스로 그대로 넘긴다")
+            void it_passes_current_user() throws Exception {
+                //given : 어느 사용자의 최근 위치를 중심으로 삼을지가 여기서 정해진다
+                given(locationService.searchLocation(eq("화목순대국"), any(CurrentUser.class)))
+                        .willReturn(new LocationSearchResponse(0, 0, 0, null, List.of()));
+
+                //when
+                mockMvc.perform(
+                                get("/api/locations/search")
+                                        .param("keyword", "화목순대국")
+                        )
+                        .andExpect(status().isOk());
+
+                //then
+                verify(locationService).searchLocation(
+                        eq("화목순대국"), argThat(user -> user.getId().equals(wardId)));
             }
         }
 
@@ -419,7 +500,7 @@ class LocationControllerTest {
                 //given
                 doThrow(new BusinessException(ErrorCode.TMAP_API_ERROR))
                         .when(locationService)
-                        .searchLocation("화목순대국");
+                        .searchLocation(eq("화목순대국"), any(CurrentUser.class));
 
                 //when-then
                 mockMvc.perform(
