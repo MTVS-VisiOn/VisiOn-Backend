@@ -119,6 +119,7 @@ public class LocationService {
                                 .queryParam("centerLat", center.latitude())
                                 .queryParam("centerLon", center.longitude())
                                 .queryParam("searchtypCd", "R")
+                                .queryParam("radius", 0)        // 0 = 전국. 거리순 정렬만 쓰고 반경으로 거르지는 않는다
                                 .build();
                     })
                     .retrieve()

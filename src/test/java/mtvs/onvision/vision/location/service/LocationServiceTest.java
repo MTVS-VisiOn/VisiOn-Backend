@@ -559,14 +559,15 @@ class LocationServiceTest {
         class Context_with_last_location {
 
             @Test
-            @DisplayName("It : 그 좌표를 중심으로 반경순 정렬을 요청하고 center에 담아 돌려준다")
+            @DisplayName("It : 그 좌표를 중심으로 거리순 정렬(radius=0)을 요청하고 center에 담아 돌려준다")
             void it_searches_around_last_location() {
-                //given : 파라미터 이름이 하나라도 틀리면 티맵이 조용히 무시한다
+                //given : searchtypCd=R 이면 radius 가 필수다. 빠지면 티맵이 9401(필수 파라메터 없음)로 400을 준다
                 givenLastLocation();
                 tmapServer.expect(requestTo(startsWith(BASE_URL + "/tmap/pois")))
                         .andExpect(queryParam("centerLat", "37.5665"))
                         .andExpect(queryParam("centerLon", "126.978"))
                         .andExpect(queryParam("searchtypCd", "R"))
+                        .andExpect(queryParam("radius", "0"))
                         .andRespond(withSuccess(POI_SEARCH_RESPONSE, MediaType.APPLICATION_JSON));
 
                 //when
