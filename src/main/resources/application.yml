@@ -110,3 +110,6 @@ management:
   endpoint:
     health:
       show-details: never  #health 응답에 내역을 담을지
+vlm:
+  base-url: ${VLM_BASE_URL}
+  token: ${VLM_TOKEN}
