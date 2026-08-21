@@ -22,6 +22,7 @@ import mtvs.onvision.vision.common.filter.JwtAuthenticationFilter;
 import mtvs.onvision.vision.common.response.SuccessCode;
 import mtvs.onvision.vision.user.domain.UserRole;
 import mtvs.onvision.vision.user.dto.UserResponse;
+import mtvs.onvision.vision.user.dto.DeviceRefreshResponse;
 import mtvs.onvision.vision.user.dto.DeviceRegisterRequest;
 import mtvs.onvision.vision.user.dto.PairingDeviceResponse;
 import mtvs.onvision.vision.user.dto.RegisterResponse;
@@ -757,6 +758,8 @@ class UserControllerTest {
     class pairingDevice {
 
         String deviceAccessToken = "device.access.token";
+        String vlmBaseUrl = "https://vlm.example.com";
+        String vlmToken = "vlm-access-token";
         DeviceRegisterRequest request =
                 new DeviceRegisterRequest(registerCode, "Meta Quest 3", "7F2C");
 
@@ -769,7 +772,7 @@ class UserControllerTest {
             void it_return_200_ok_and_access_token() throws Exception {
                 //given
                 given(userService.pairingDevice(request))
-                        .willReturn(new PairingDeviceResponse(deviceAccessToken));
+                        .willReturn(new PairingDeviceResponse(deviceAccessToken, vlmBaseUrl, vlmToken));
 
                 //when-then : 인증 없이 호출된다. Quest는 이 시점에 토큰이 없다
                 mockMvc.perform(
@@ -783,6 +786,9 @@ class UserControllerTest {
                         .andExpect(jsonPath("$.code").value(SuccessCode.PAIRING_SUCCESS.name()))
                         .andExpect(jsonPath("$.message").value(SuccessCode.PAIRING_SUCCESS.getSuccessMessage()))
                         .andExpect(jsonPath("$.data.accessToken").value(deviceAccessToken))
+                        // Unity는 이 두 값이 없으면 장면 설명 서버에 붙지 못한다
+                        .andExpect(jsonPath("$.data.vlmBaseUrl").value(vlmBaseUrl))
+                        .andExpect(jsonPath("$.data.vlmToken").value(vlmToken))
                         .andDo(print());
             }
         }
@@ -863,7 +869,7 @@ class UserControllerTest {
             void it_return_200_ok_and_device_access_token() throws Exception {
                 //given
                 given(userService.getDeviceAccessToken(currentUser))
-                        .willReturn(new PairingDeviceResponse(reissuedToken));
+                        .willReturn(new DeviceRefreshResponse(reissuedToken));
 
                 //when-then
                 mockMvc.perform(
@@ -874,6 +880,9 @@ class UserControllerTest {
                         .andExpect(jsonPath("$.code").value(SuccessCode.PAIRING_SUCCESS.name()))
                         .andExpect(jsonPath("$.message").value(SuccessCode.PAIRING_SUCCESS.getSuccessMessage()))
                         .andExpect(jsonPath("$.data.accessToken").value(reissuedToken))
+                        // 재발급 경로는 VLM 접속 정보를 내려주지 않는다
+                        .andExpect(jsonPath("$.data.vlmBaseUrl").doesNotExist())
+                        .andExpect(jsonPath("$.data.vlmToken").doesNotExist())
                         .andDo(print());
             }
         }

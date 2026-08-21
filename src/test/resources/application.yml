@@ -74,3 +74,6 @@ init-data:
   password:
     ward: test
     guardian: test
+vlm:
+  base-url: test
+  token: test

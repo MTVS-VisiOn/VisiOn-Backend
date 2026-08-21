@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.response.ApiResult;
+import mtvs.onvision.vision.user.dto.DeviceRefreshResponse;
 import mtvs.onvision.vision.user.dto.DeviceRegisterRequest;
 import mtvs.onvision.vision.user.dto.PairingDeviceResponse;
 import mtvs.onvision.vision.user.dto.RegisterResponse;
@@ -289,6 +290,11 @@ public interface UserControllerSupporter {
 
                     `deviceName`·`deviceSerialTail`은 저장하지 않고 로그로만 남긴다.
                     `deviceSerialTail`은 실제 하드웨어 시리얼이 아닐 수 있어 **인증 수단으로 쓰지 않는다.**
+
+                    응답에는 VLM(장면 설명) 서버 접속 정보가 함께 담긴다.
+                    `vlmBaseUrl`·`vlmToken`은 백엔드 환경변수에서 읽어 그대로 내려준다.
+                    `vlmToken`은 **DEVICE 토큰과 별개의 VLM 전용 토큰**이며 서로 통용되지 않는다.
+                    `vlmBaseUrl`은 토큰 노출 방지를 위해 **HTTPS만 허용한다.**
                     """,
             extensions = @Extension(properties = @ExtensionProperty(name = "x-order", value = "5"))
     )
@@ -320,7 +326,9 @@ public interface UserControllerSupporter {
                                                         "code": "PAIRING_SUCCESS",
                                                         "message": "페어링 넘버가 확인되었습니다.",
                                                         "data": {
-                                                            "accessToken": "eyJhbGciOiJIUzI1NiJ9..."
+                                                            "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+                                                            "vlmBaseUrl": "https://vlm.example.com",
+                                                            "vlmToken": "vlm-access-token"
                                                         }
                                                     }
                                                     """
@@ -382,6 +390,9 @@ public interface UserControllerSupporter {
 
                     발급되는 토큰은 `POST /device/pairing/exchange`가 주는 것과 같은 DEVICE 권한 토큰이고
                     수명도 같다(12시간). refresh 토큰은 주지 않는다.
+
+                    **응답 필드는 `accessToken` 하나뿐이다.** 페어링 응답과 달리 `vlmBaseUrl`·`vlmToken`은
+                    내려주지 않는다. VLM 접속 정보는 페어링 시점에 한 번 받아 기기가 보관한다.
                     """,
             extensions = @Extension(properties = @ExtensionProperty(name = "x-order", value = "6"))
     )
@@ -409,7 +420,7 @@ public interface UserControllerSupporter {
             )
     })
     @SecurityRequirement(name = "Bearer Authentication")
-    ResponseEntity<ApiResult<PairingDeviceResponse>> getDeviceAccessToken(CurrentUser currentUser);
+    ResponseEntity<ApiResult<DeviceRefreshResponse>> getDeviceAccessToken(CurrentUser currentUser);
 
     @Operation(
             summary = "계정 정보 조회",

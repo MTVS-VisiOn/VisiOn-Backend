@@ -18,6 +18,7 @@ import mtvs.onvision.vision.auth.dto.RefreshRequest;
 import mtvs.onvision.vision.auth.dto.TokenBody;
 import mtvs.onvision.vision.auth.repository.RefreshTokenRepository;
 import mtvs.onvision.vision.auth.service.JwtTokenProvider;
+import mtvs.onvision.vision.common.config.properties.VlmProperties;
 import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.user.domain.Fid;
@@ -26,6 +27,7 @@ import mtvs.onvision.vision.user.domain.User;
 import mtvs.onvision.vision.user.domain.RegisterType;
 import mtvs.onvision.vision.user.domain.UserRole;
 import mtvs.onvision.vision.user.dto.UserResponse;
+import mtvs.onvision.vision.user.dto.DeviceRefreshResponse;
 import mtvs.onvision.vision.user.dto.DeviceRegisterRequest;
 import mtvs.onvision.vision.user.dto.PairingDeviceResponse;
 import mtvs.onvision.vision.user.dto.RegisterResponse;
@@ -78,6 +80,9 @@ class UserServiceTest {
 
     @Mock
     private FidRepository fidRepository;
+
+    @Mock
+    private VlmProperties vlmProperties;
 
     Long userId = 1L;
     Long wardId = 2L;
@@ -805,6 +810,8 @@ class UserServiceTest {
         String deviceName = "Meta Quest 3";
         String deviceSerialTail = "7F2C";
         String deviceAccessToken = "device.access.token";
+        String vlmBaseUrl = "https://vlm.example.com";
+        String vlmToken = "vlm-access-token";
         DeviceRegisterRequest request =
                 new DeviceRegisterRequest(registerCode, deviceName, deviceSerialTail);
 
@@ -822,12 +829,19 @@ class UserServiceTest {
                 given(userRepository.findByIdAndDeletedAtIsNull(wardId)).willReturn(Optional.of(ward));
                 given(jwtTokenProvider.issueDeviceToken(wardId, ward.getEmail(), UserRole.WARD))
                         .willReturn(deviceAccessToken);
+                given(vlmProperties.getBaseUrl()).willReturn(vlmBaseUrl);
+                given(vlmProperties.getToken()).willReturn(vlmToken);
 
                 //when
                 PairingDeviceResponse response = userService.pairingDevice(request);
 
                 //then : 보호자 저장소가 아니라 DEVICE 저장소를 봐야 한다
                 assertThat(response.accessToken()).isEqualTo(deviceAccessToken);
+
+                // DEVICE 토큰과 VLM 토큰은 분리돼 있다. 같은 값이면 분리가 깨진 것이다
+                assertThat(response.vlmBaseUrl()).isEqualTo(vlmBaseUrl);
+                assertThat(response.vlmToken()).isEqualTo(vlmToken);
+                assertThat(response.vlmToken()).isNotEqualTo(response.accessToken());
                 verify(registerCodeRepository, never())
                         .getUserId(eq(RegisterType.GUARDIAN), anyString());
 
@@ -899,11 +913,14 @@ class UserServiceTest {
                         .willReturn(reissuedToken);
 
                 //when
-                PairingDeviceResponse response = userService.getDeviceAccessToken(wardUser);
+                DeviceRefreshResponse response = userService.getDeviceAccessToken(wardUser);
 
                 //then : 페어링 코드를 거치지 않는 재발급 경로다. 등록 코드 저장소를 보지 않는다
                 assertThat(response.accessToken()).isEqualTo(reissuedToken);
                 verifyNoInteractions(registerCodeRepository);
+
+                // 재발급은 VLM 접속 정보를 다시 내려주지 않는다
+                verifyNoInteractions(vlmProperties);
                 verify(jwtTokenProvider, never()).issueAccessToken(anyLong(), anyString(), any(UserRole.class));
             }
         }
