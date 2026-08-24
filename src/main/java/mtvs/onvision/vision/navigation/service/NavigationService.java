@@ -320,7 +320,9 @@ public class NavigationService {
 
     @Transactional(readOnly = true)
     public MapResponse getMapRoute(CurrentUser currentUser) {
-        Long wardId = userService.getWardIdFromGuardianId(currentUser.getId());
+        Long wardId = currentUser.getRole() == UserRole.WARD
+                ? currentUser.getId()
+                : userService.getWardIdFromGuardianId(currentUser.getId());
         Optional<Route> opRoute = routeRepository.findByWardIdAndStatus(wardId, RouteStatus.IN_PROGRESS);
         if (opRoute.isPresent()) {
             Route route = opRoute.get();
@@ -340,7 +342,7 @@ public class NavigationService {
         }
         else {
             //200 + data=null 로 나간다. 앱에서는 '진행 중 경로 없음'과 '서버 오류'가 구분되지 않는다
-            log.debug("Map route read: 진행 중 경로 없음 — guardianId={} wardId={}", currentUser.getId(), wardId);
+            log.debug("Map route read: 진행 중 경로 없음 — callerId={} wardId={}", currentUser.getId(), wardId);
             return null;
         }
     }

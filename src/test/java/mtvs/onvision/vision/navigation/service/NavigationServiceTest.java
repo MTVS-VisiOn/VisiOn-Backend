@@ -682,6 +682,25 @@ class NavigationServiceTest {
         }
 
         @Nested
+        @DisplayName("Context: 호출자가 WARD면")
+        class Context_with_ward {
+
+            @Test
+            @DisplayName("It : 피보호자 조회를 거치지 않고 본인 id를 쓴다")
+            void it_uses_own_id() {
+                //given : DEVICE 토큰도 role은 WARD라 같은 분기를 탄다
+                given(routeRepository.findByWardIdAndStatus(wardId, RouteStatus.IN_PROGRESS))
+                        .willReturn(Optional.of(route(TransportMode.WALK, walkSummary(), walkReportJsonWithPath())));
+
+                //when
+                navigationService.getMapRoute(ward);
+
+                //then
+                verify(userService, never()).getWardIdFromGuardianId(anyLong());
+            }
+        }
+
+        @Nested
         @DisplayName("Context: 호출자가 GUARDIAN이면")
         class Context_with_guardian {
 
