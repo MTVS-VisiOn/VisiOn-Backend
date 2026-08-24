@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import mtvs.onvision.vision.auth.dto.*;
 import mtvs.onvision.vision.auth.repository.RefreshTokenRepository;
 import mtvs.onvision.vision.auth.service.JwtTokenProvider;
+import mtvs.onvision.vision.common.config.properties.VlmProperties;
 import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.common.util.PreConditions;
@@ -38,6 +39,7 @@ public class UserService implements UserDetailsService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final RegisterCodeRepository registerCodeRepository;
     private final FidRepository fidRepository;
+    private final VlmProperties vlmProperties;
 
     // I·O·Q·Z 제외 — 사람이 읽어서 전달하는 코드다
     private static final char[] CODE_ALPHABET = "ABCDEFGHJKLMNPRSTUVWXY23456789".toCharArray();
@@ -214,7 +216,7 @@ public class UserService implements UserDetailsService {
         log.info("Device paired: wardId={}, deviceName={}, deviceSerialTail={}", wardId, request.deviceName(), request.deviceSerialTail());
         registerCodeRepository.delete(RegisterType.DEVICE, request.code());
         String token = jwtTokenProvider.issueDeviceToken(wardId, user.getEmail(), user.getRole());
-        return new PairingDeviceResponse(token);
+        return new PairingDeviceResponse(token, vlmProperties.getBaseUrl(), vlmProperties.getToken());
     }
 
 
@@ -236,8 +238,8 @@ public class UserService implements UserDetailsService {
         return code.toString();
     }
 
-    public PairingDeviceResponse getDeviceAccessToken(CurrentUser currentUser) {
+    public DeviceRefreshResponse getDeviceAccessToken(CurrentUser currentUser) {
         String token = jwtTokenProvider.issueDeviceToken(currentUser.getId(), currentUser.getEmail(), currentUser.getRole());
-        return new PairingDeviceResponse(token);
+        return new DeviceRefreshResponse(token);
     }
 }
