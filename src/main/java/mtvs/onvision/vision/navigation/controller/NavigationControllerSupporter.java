@@ -1065,7 +1065,11 @@ public interface NavigationControllerSupporter {
     @Operation(
             summary = "지도 표시용 경로 조회",
             description = """
+                    피보호자(WARD)·보호자(GUARDIAN) 토큰 모두 가능. **보호자가 호출하면 피보호자의 경로를 조회한다.**
+                    기기(DEVICE)는 막혀 있다 — Quest는 턴바이턴이 필요해 `/processing`을 쓴다.
+
                     보호자 화면의 지도에 목적지와 경로선을 그리기 위한 조회 API.
+                    피보호자 앱도 활성 경로 감지에 이 API를 쓴다.
 
                     `/processing`과 달리 턴바이턴 안내 정보를 빼고 **지도에 필요한 값만** 내보낸다.
                     `path`는 구간별 좌표를 하나로 이어붙인 것이며 `{latitude, longitude}` 객체 배열이다.
@@ -1169,7 +1173,7 @@ public interface NavigationControllerSupporter {
             ),
             @ApiResponse(
                     responseCode = "403",
-                    description = "피보호자 권한으로 실행했을때",
+                    description = "기기(DEVICE) 토큰으로 실행했을때",
                     content = {
                             @Content(
                                     mediaType = MediaType.APPLICATION_JSON_VALUE,
@@ -1188,7 +1192,7 @@ public interface NavigationControllerSupporter {
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "보호자-피보호자 관계를 찾을 수 없을때",
+                    description = "보호자가 호출했는데 연결된 피보호자가 없을때. 피보호자 호출에서는 발생하지 않는다",
                     content = {
                             @Content(
                                     mediaType = MediaType.APPLICATION_JSON_VALUE,
