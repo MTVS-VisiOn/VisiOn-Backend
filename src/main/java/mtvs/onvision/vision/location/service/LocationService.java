@@ -8,7 +8,6 @@ import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.common.util.GeoUtils;
 import mtvs.onvision.vision.location.domain.MovementStatus;
 import mtvs.onvision.vision.location.dto.*;
-import mtvs.onvision.vision.location.repository.LocationHistoryRepository;
 import mtvs.onvision.vision.location.repository.RealtimeLocationRepository;
 import mtvs.onvision.vision.user.service.UserService;
 import org.springframework.stereotype.Service;
@@ -24,7 +23,6 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class LocationService {
-    private final LocationHistoryRepository locationHistoryRepository;
     private final RealtimeLocationRepository realtimeLocationRepository;
     private final UserService userService;
     private final ObjectMapper objectMapper;
@@ -154,27 +152,35 @@ public class LocationService {
         if (center == null) return new LocationSearchResponse(0,0,0, null, List.of());
         try {
             TmapPoiSearchResponse res = tmapRestClient.get()
-                    .uri(uriBuilder -> {
-                        return uriBuilder.path(POI_SEARCH)
-                                .queryParam("version", 1)
-                                .queryParam("searchKeyword", keyword)
-                                .queryParam("count", 10)
-                                .queryParam("centerLat", center.latitude())
-                                .queryParam("centerLon", center.longitude())
-                                .queryParam("searchtypCd", "R")
-                                .queryParam("radius", 0)        // 0 = 전국. 거리순 정렬만 쓰고 반경으로 거르지는 않는다
-                                .build();
-                    })
+                    .uri(uriBuilder -> uriBuilder.path(POI_SEARCH)
+                            .queryParam("version", 1)
+                            .queryParam("searchKeyword", keyword)
+                            .queryParam("count", 10)
+                            .queryParam("centerLat", center.latitude())
+                            .queryParam("centerLon", center.longitude())
+                            .queryParam("searchtypCd", "R")
+                            .queryParam("radius", 0)        // 0 = 전국. 거리순 정렬만 쓰고 반경으로 거르지는 않는다
+                            .build())
                     .retrieve()
                     .body(TmapPoiSearchResponse.class);
 
-            TmapPoiSearchResponse.SearchPoiInfo poiInfo = res.searchPoiInfo();
-            List<Poi> pois = poiInfo.pois().poi();
+            //티맵은 0건일 때 200이 아니라 204를 주므로 body가 통째로 null이다. 오류가 아니라 정상 경로다
+            TmapPoiSearchResponse.SearchPoiInfo poiInfo = res == null ? null : res.searchPoiInfo();
+            TmapPoiSearchResponse.Pois container = poiInfo == null ? null : poiInfo.pois();
+            List<Poi> pois = container == null ? null : container.poi();
+            if (pois == null) {
+                log.debug("Location search: keyword={} 결과 없음 (204 또는 빈 응답)", keyword);
+                return new LocationSearchResponse(0, 0, 0, center, List.of());
+            }
+
             List<LocationSearchInfo> infos = pois.stream().map(LocationSearchInfo::from).toList();
             log.debug("Location search: keyword={} totalCount={} returned={}", keyword, poiInfo.totalCount(), infos.size());
             return new LocationSearchResponse(poiInfo.totalCount(), poiInfo.count(), poiInfo.page(), center, infos);
         } catch (NullPointerException e) {
-            log.info("TMap 호출 실패 keyword={}", keyword);
+            //응답 껍데기는 위에서 걸렀으므로 여기 오는 것은 POI 하나가 깨진 경우다.
+            //LocationSearchInfo.from이 newAddressList().newAddress().getFirst()를 무방비로 타서,
+            //도로명 주소가 없는 POI가 하나만 섞여도 검색 결과가 통째로 빈다 — 개선 대상
+            log.info("TMap 응답 파싱 실패 keyword={}", keyword);
             return new LocationSearchResponse(0,0,0, center, List.of());
         } catch (Exception e) {
             log.error("TMap 호출 실패 type={}, cause={}", e.getClass().getName(), e.getCause(), e);
@@ -255,7 +261,7 @@ public class LocationService {
      */
     private long stationaryConfirmSec(double errorRadius) {
         long needed = (long) Math.ceil(errorRadius / WALK_MIN_MPS);
-        return Math.max(STATIONARY_CONFIRM_MIN_SEC, Math.min(STATIONARY_CONFIRM_MAX_SEC, needed));
+        return Math.clamp(needed, STATIONARY_CONFIRM_MIN_SEC, STATIONARY_CONFIRM_MAX_SEC);
     }
 
     private MovementStatus bySpeed(float mps) {

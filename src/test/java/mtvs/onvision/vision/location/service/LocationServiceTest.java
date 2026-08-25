@@ -5,7 +5,6 @@ import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.location.domain.MovementStatus;
 import mtvs.onvision.vision.location.dto.*;
-import mtvs.onvision.vision.location.repository.LocationHistoryRepository;
 import mtvs.onvision.vision.location.repository.RealtimeLocationRepository;
 import mtvs.onvision.vision.user.domain.UserRole;
 import mtvs.onvision.vision.user.service.UserService;
@@ -42,9 +41,6 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 @ExtendWith(MockitoExtension.class)
 @DisplayName("LocationService의")
 class LocationServiceTest {
-
-    @Mock
-    private LocationHistoryRepository locationHistoryRepository;
 
     @Mock
     private RealtimeLocationRepository realtimeLocationRepository;
@@ -88,7 +84,6 @@ class LocationServiceTest {
         RestClient tmapRestClient = builder.build();
 
         locationService = new LocationService(
-                locationHistoryRepository,
                 realtimeLocationRepository,
                 userService,
                 objectMapper,
