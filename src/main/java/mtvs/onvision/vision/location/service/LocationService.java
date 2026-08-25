@@ -42,6 +42,22 @@ public class LocationService {
     private static final long STATIONARY_CONFIRM_MAX_SEC = 120;
     /** 보고 간격이 이보다 벌어지면 그 사이에 무슨 일이 있었는지 알 수 없다 */
     private static final long REPORT_GAP_LIMIT_SEC = 300;
+    /**
+     * 차량으로 확정하기까지 필요한 연속 판정 횟수.
+     *
+     * 2026-08-25 실기기 검증에서 오판 3건은 연속 1·1·2회로 끝났고, 실제 버스 탑승 2건은
+     * 연속 5회·3회였다. GPS가 튄 것은 몇 초 만에 제자리로 돌아오지만 차량은 계속 간다.
+     */
+    private static final int VEHICLE_CONFIRM_COUNT = 3;
+    /**
+     * 이 시간을 넘겨 잰 속도는 판정 근거로 쓰지 않는다.
+     *
+     * 앵커에서 잰 거리를 경과 시간으로 나누면 평균 속도가 나오는데, 그 사이 보고가 끊겼거나
+     * 단말이 같은 좌표만 되풀이해 보냈다면 실제로는 마지막 몇 초에 몰아서 이동한 것일 수 있다.
+     * 2026-08-25 검증에서 버스가 187m를 갔는데 앵커가 102초 묵어 있어 1.83 m/s(보행)로 계산됐다.
+     * 같은 날 정상 판정의 앵커 나이는 전부 46초 이하였다.
+     */
+    private static final long SPEED_BASELINE_MAX_SEC = 60;
 
     public void receiveLocation(LocationRequest request, CurrentUser currentUser) {
         log.debug("Location write requested: userId={} role={} tokenType={} lat={} lon={} accuracy={} recordedAt={}",
@@ -160,6 +176,10 @@ public class LocationService {
      * 나왔다 — accuracy 3m대에 3초 간격이면 반경 6m를 넘으려면 시속 7.9km(달리기)가 필요했다.
      *
      * 앵커를 반경 밖으로 나갈 때까지 들고 가므로 보고 주기와 무관하게 같은 결과가 나온다.
+     *
+     * 차량 판정만은 한 번의 속도 계산으로 확정하지 않는다. GPS가 한두 보고 동안 수십 m 튀면
+     * 걷는 중에도 시속 30~40km가 찍히기 때문이다. 연속 VEHICLE_CONFIRM_COUNT회를 채우기
+     * 전까지는 "움직이고 있다"까지만 인정해 ON_FOOT으로 내보낸다.
      */
     private Movement classifyMovement(LocationRequest report, LocationReport previous, Long wardId) {
         if (previous == null) {
@@ -184,10 +204,13 @@ public class LocationService {
 
         //오차 반경을 벗어났다 — 실제로 움직인 것이므로 속도로 판별하고 기준점을 옮긴다
         if (distance > errorRadius) {
-            MovementStatus status = bySpeed((float) (distance / Math.max(sinceAnchor, 1)));
-            log.debug("Movement classify: 앵커 이탈 — wardId={} distance={} errorRadius={} sinceAnchor={}s status={}",
-                    wardId, distance, errorRadius, sinceAnchor, status);
-            return new Movement(status, MovementAnchor.of(report));
+            boolean resolvable = sinceAnchor <= SPEED_BASELINE_MAX_SEC;
+            MovementStatus measured = bySpeed((float) (distance / Math.max(sinceAnchor, 1)));
+            int vehicleStreak = nextVehicleStreak(anchor.vehicleStreak(), measured, resolvable);
+            MovementStatus status = publish(measured, vehicleStreak);
+            log.debug("Movement classify: 앵커 이탈 — wardId={} distance={} errorRadius={} sinceAnchor={}s measured={} vehicleStreak={} status={}",
+                    wardId, distance, errorRadius, sinceAnchor, measured, vehicleStreak, status);
+            return new Movement(status, MovementAnchor.of(report, vehicleStreak));
         }
 
         //반경 안이지만 시간이 충분히 지났다 — 걷고 있었다면 진작 벗어났을 거리다
@@ -219,6 +242,33 @@ public class LocationService {
         if (mps < WALK_MIN_MPS) return MovementStatus.STATIONARY;
         if (mps < VEHICLE_MIN_MPS) return MovementStatus.ON_FOOT;
         return MovementStatus.IN_VEHICLE;
+    }
+
+    /**
+     * 연속으로 차량 속도가 나온 횟수를 갱신한다.
+     *
+     * 속도를 신뢰할 수 없는 구간에서는 올리지도 내리지도 않는다. 근거가 없다는 것이지 반대
+     * 근거가 생긴 것이 아니기 때문이다. 여기서 0으로 밀면 보고가 한 번 끊길 때마다 달리던
+     * 차가 도보로 떨어진다 — 2026-08-25 검증에서 실제로 그렇게 나왔다.
+     */
+    private int nextVehicleStreak(int current, MovementStatus measured, boolean resolvable) {
+        if (!resolvable) return current;
+        return measured == MovementStatus.IN_VEHICLE ? current + 1 : 0;
+    }
+
+    /**
+     * 실제로 내보낼 상태.
+     *
+     * 차량 속도가 나왔지만 아직 연속 횟수를 못 채웠으면 ON_FOOT으로 낮춘다. 오차 반경을 벗어난
+     * 것은 사실이라 움직이고 있는 것은 맞고, 다만 차량인지가 아직 확실하지 않을 뿐이다.
+     *
+     * 반대로 이미 차량으로 확정된 뒤에 보행 속도가 한 번 나왔다고 바로 내려오지도 않는다.
+     * 그 판정이 믿을 만한 구간에서 나왔다면 연속 횟수가 이미 0으로 밀려 여기까지 오지 않는다.
+     */
+    private MovementStatus publish(MovementStatus measured, int vehicleStreak) {
+        if (vehicleStreak >= VEHICLE_CONFIRM_COUNT) return MovementStatus.IN_VEHICLE;
+        if (measured == MovementStatus.IN_VEHICLE) return MovementStatus.ON_FOOT;
+        return measured;
     }
 
     /** 최근 위치를 읽는다. 없으면 null — 첫 보고이거나 30분 TTL이 지난 경우다 */
