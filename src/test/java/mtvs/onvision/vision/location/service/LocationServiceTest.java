@@ -104,6 +104,11 @@ class LocationServiceTest {
         return new LocationReport(wardId, lat, lon, accuracy, status, recordedAt);
     }
 
+    private LocationReport report(Double lat, Double lon, Float accuracy, MovementStatus status,
+                                  Instant recordedAt, MovementAnchor anchor) {
+        return new LocationReport(wardId, lat, lon, accuracy, status, recordedAt, anchor);
+    }
+
     /** receiveLocation이 저장하려고 만든 LocationReport를 꺼낸다 */
     private LocationReport captureSavedReport() {
         ArgumentCaptor<LocationReport> captor = ArgumentCaptor.forClass(LocationReport.class);
@@ -270,6 +275,147 @@ class LocationServiceTest {
 
                 //then
                 assertThat(captureSavedReport().status()).isEqualTo(MovementStatus.UNKNOWN);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 실제 운영 간격(3초)으로 보행 속도만큼 이동하면")
+        class Context_with_walking_at_report_interval {
+
+            /**
+             * 이 테스트가 이 파일에 있는 이유.
+             *
+             * 기존 케이스는 전부 30~60초 간격 픽스처였고, 실제 운영 간격인 3초를 태우는 케이스가
+             * 하나도 없었다. 3초 동안 걸어서 움직이는 거리는 시속 5km라도 4.2m라서 오차 반경
+             * (accuracy 3m대면 6m)을 못 넘는다. 그래서 테스트는 전부 녹색인데 실기기에서는
+             * 어떤 속도로 걸어도 STATIONARY만 나왔다 (2026-08-24 검증).
+             */
+            @Test
+            @DisplayName("It : 앵커를 들고 가 누적 변위로 ON_FOOT을 판별한다")
+            void it_classify_on_foot_with_anchor() {
+                //given : 앵커는 6초 전. 직전 보고(3초 전)는 아직 반경 안이라 판정이 보류된 상태였다
+                Instant now = Instant.now();
+                String previousJson = "{\"previous\":true}";
+                // 앵커에서 위도 0.0001도 ≈ 11.1m, 6초 → 약 1.85 m/s. 오차 반경 합은 6m
+                MovementAnchor anchor = new MovementAnchor(37.5, 127.0, 3f, now.minusSeconds(6));
+                LocationReport previous = report(37.50005, 127.0, 3f, MovementStatus.STATIONARY, now.minusSeconds(3), anchor);
+                LocationRequest request = request(37.5001, 127.0, 3f, now);
+
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.of(previousJson));
+                given(objectMapper.readValue(previousJson, LocationReport.class)).willReturn(previous);
+
+                //when
+                locationService.receiveLocation(request, ward);
+
+                //then
+                assertThat(captureSavedReport().status()).isEqualTo(MovementStatus.ON_FOOT);
+            }
+
+            @Test
+            @DisplayName("It : 아직 오차 반경 안이면 직전 판정을 유지하고 앵커를 그대로 넘긴다")
+            void it_keeps_previous_status_and_anchor() {
+                //given : 3초 동안 4.4m. 오차 반경 6m 안이라 아직 판정할 근거가 없다
+                Instant now = Instant.now();
+                Instant anchorAt = now.minusSeconds(3);
+                String previousJson = "{\"previous\":true}";
+                MovementAnchor anchor = new MovementAnchor(37.5, 127.0, 3f, anchorAt);
+                LocationReport previous = report(37.5, 127.0, 3f, MovementStatus.ON_FOOT, anchorAt, anchor);
+                LocationRequest request = request(37.50004, 127.0, 3f, now);
+
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.of(previousJson));
+                given(objectMapper.readValue(previousJson, LocationReport.class)).willReturn(previous);
+
+                //when
+                locationService.receiveLocation(request, ward);
+
+                //then : 걷는 중에 3초마다 STATIONARY로 튀지 않는다. 앵커가 유지돼야 다음 보고에서 누적된다
+                LocationReport saved = captureSavedReport();
+                assertThat(saved.status()).isEqualTo(MovementStatus.ON_FOOT);
+                assertThat(saved.anchor().recordedAt()).isEqualTo(anchorAt);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 오차 반경 안에서 확정 시간이 지나면")
+        class Context_with_anchor_held_long_enough {
+
+            @Test
+            @DisplayName("It : STATIONARY로 확정하고 앵커를 옮긴다")
+            void it_confirm_stationary() {
+                //given : 21초 동안 2.2m. 걷고 있었다면 진작 반경을 벗어났을 시간이다
+                Instant now = Instant.now();
+                String previousJson = "{\"previous\":true}";
+                MovementAnchor anchor = new MovementAnchor(37.5, 127.0, 3f, now.minusSeconds(21));
+                LocationReport previous = report(37.5, 127.0, 3f, MovementStatus.ON_FOOT, now.minusSeconds(3), anchor);
+                LocationRequest request = request(37.50002, 127.0, 3f, now);
+
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.of(previousJson));
+                given(objectMapper.readValue(previousJson, LocationReport.class)).willReturn(previous);
+
+                //when
+                locationService.receiveLocation(request, ward);
+
+                //then
+                LocationReport saved = captureSavedReport();
+                assertThat(saved.status()).isEqualTo(MovementStatus.STATIONARY);
+                assertThat(saved.anchor().recordedAt()).isEqualTo(now);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 오차 반경이 커서 아직 반경을 벗어날 시간이 안 됐으면")
+        class Context_with_large_error_radius {
+
+            /**
+             * 정지 확정 시간을 20초로 못박으면, 오차 반경이 클 때 반경을 벗어나기도 전에
+             * 정지가 먼저 확정된다. accuracy 15m(반경 30m)에서 시속 4.8km로 걸으면 30m를
+             * 벗어나는 데 23초가 걸리는데, 20초에 STATIONARY로 잘라버린다.
+             * 실기기 실외 정지 샘플이 13.826m였으므로 이 구간은 실제로 밟힌다.
+             */
+            @Test
+            @DisplayName("It : 정지로 확정하지 않고 직전 판정을 유지한다")
+            void it_waits_longer_when_radius_is_large() {
+                //given : 21초 동안 28m. 반경 30m 안이지만 비례 확정 시간(30/0.3 = 100초)에는 한참 못 미친다
+                Instant now = Instant.now();
+                String previousJson = "{\"previous\":true}";
+                MovementAnchor anchor = new MovementAnchor(37.5, 127.0, 15f, now.minusSeconds(21));
+                LocationReport previous = report(37.5002, 127.0, 15f, MovementStatus.ON_FOOT, now.minusSeconds(3), anchor);
+                LocationRequest request = request(37.5002518, 127.0, 15f, now);
+
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.of(previousJson));
+                given(objectMapper.readValue(previousJson, LocationReport.class)).willReturn(previous);
+
+                //when
+                locationService.receiveLocation(request, ward);
+
+                //then
+                LocationReport saved = captureSavedReport();
+                assertThat(saved.status()).isEqualTo(MovementStatus.ON_FOOT);
+                assertThat(saved.anchor().recordedAt()).isEqualTo(now.minusSeconds(21));
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 앵커가 없는 옛 형식이 latest 키에 남아 있으면")
+        class Context_with_legacy_report {
+
+            @Test
+            @DisplayName("It : 직전 보고를 기준점으로 삼아 판별한다")
+            void it_falls_back_to_previous_point() {
+                //given : 배포 직후에는 앵커 없는 값이 남아 있다. 위도 0.0004도 ≈ 44m, 30초 → 약 1.48 m/s
+                Instant now = Instant.now();
+                String previousJson = "{\"previous\":true}";
+                LocationReport previous = report(37.5, 127.0, 5f, MovementStatus.STATIONARY, now.minusSeconds(30));
+                LocationRequest request = request(37.5004, 127.0, 5f, now);
+
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.of(previousJson));
+                given(objectMapper.readValue(previousJson, LocationReport.class)).willReturn(previous);
+
+                //when
+                locationService.receiveLocation(request, ward);
+
+                //then
+                assertThat(captureSavedReport().status()).isEqualTo(MovementStatus.ON_FOOT);
             }
         }
     }
