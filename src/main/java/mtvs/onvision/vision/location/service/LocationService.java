@@ -16,6 +16,7 @@ import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -58,6 +59,20 @@ public class LocationService {
      * 같은 날 정상 판정의 앵커 나이는 전부 46초 이하였다.
      */
     private static final long SPEED_BASELINE_MAX_SEC = 60;
+    /**
+     * 방금 전까지 차량이었다면 재확정에 필요한 연속 판정 횟수.
+     *
+     * 2026-08-25 퇴근시간대 재검증에서 정체 구간이 통째로 빠졌다. 실제로는 버스 안이었던
+     * 4분 51초가 ON_FOOT으로 나갔는데, 서행으로 속도가 보행 수준까지 떨어진 데다 신호 정차가
+     * 잦아 3연속을 채우기 전에 계속 횟수가 0으로 밀렸기 때문이다.
+     *
+     * 그렇다고 {@link #VEHICLE_CONFIRM_COUNT}를 낮추면 처음 타는 순간의 오판이 늘어난다.
+     * 그래서 진입 문턱은 3으로 두고 재진입만 완화한다 — 같은 날 오판 3건은 모두 하차 직후
+     * 180초 안에 났지만 전부 연속 1회로 끝났으므로 2에서는 걸러진다.
+     */
+    private static final int VEHICLE_REENTRY_COUNT = 2;
+    /** 하차 뒤 이 시간 안에 다시 차량 속도가 나오면 같은 이동으로 본다 */
+    private static final long VEHICLE_REENTRY_SEC = 180;
 
     public void receiveLocation(LocationRequest request, CurrentUser currentUser) {
         log.debug("Location write requested: userId={} role={} tokenType={} lat={} lon={} accuracy={} recordedAt={}",
@@ -207,18 +222,23 @@ public class LocationService {
             boolean resolvable = sinceAnchor <= SPEED_BASELINE_MAX_SEC;
             MovementStatus measured = bySpeed((float) (distance / Math.max(sinceAnchor, 1)));
             int vehicleStreak = nextVehicleStreak(anchor.vehicleStreak(), measured, resolvable);
-            MovementStatus status = publish(measured, vehicleStreak);
-            log.debug("Movement classify: 앵커 이탈 — wardId={} distance={} errorRadius={} sinceAnchor={}s measured={} vehicleStreak={} status={}",
-                    wardId, distance, errorRadius, sinceAnchor, measured, vehicleStreak, status);
-            return new Movement(status, MovementAnchor.of(report, vehicleStreak));
+            int confirmCount = confirmCountFor(anchor.vehicleExitAt(), report.recordedAt());
+            MovementStatus status = publish(measured, vehicleStreak, confirmCount);
+            Instant vehicleExitAt = nextVehicleExitAt(anchor.vehicleExitAt(), previous.status(), status, report.recordedAt());
+            log.debug("Movement classify: 앵커 이탈 — wardId={} distance={} errorRadius={} sinceAnchor={}s measured={} vehicleStreak={} confirmCount={} status={}",
+                    wardId, distance, errorRadius, sinceAnchor, measured, vehicleStreak, confirmCount, status);
+            return new Movement(status, MovementAnchor.of(report, vehicleStreak, vehicleExitAt));
         }
 
         //반경 안이지만 시간이 충분히 지났다 — 걷고 있었다면 진작 벗어났을 거리다
         long confirmSec = stationaryConfirmSec(errorRadius);
         if (sinceAnchor >= confirmSec) {
+            //정지로 확정되면 차량에서도 내려온 것이다. 하차 시각을 남겨 재출발 때 재진입 문턱을 낮춘다
+            Instant vehicleExitAt = nextVehicleExitAt(anchor.vehicleExitAt(), previous.status(),
+                    MovementStatus.STATIONARY, report.recordedAt());
             log.debug("Movement classify: 정지 확정 — wardId={} distance={} errorRadius={} sinceAnchor={}s confirmSec={}",
                     wardId, distance, errorRadius, sinceAnchor, confirmSec);
-            return new Movement(MovementStatus.STATIONARY, MovementAnchor.of(report));
+            return new Movement(MovementStatus.STATIONARY, MovementAnchor.of(report, 0, vehicleExitAt));
         }
 
         //아직 판정할 근거가 없다. 기준점을 그대로 들고 가며 직전 판정을 유지한다
@@ -265,10 +285,35 @@ public class LocationService {
      * 반대로 이미 차량으로 확정된 뒤에 보행 속도가 한 번 나왔다고 바로 내려오지도 않는다.
      * 그 판정이 믿을 만한 구간에서 나왔다면 연속 횟수가 이미 0으로 밀려 여기까지 오지 않는다.
      */
-    private MovementStatus publish(MovementStatus measured, int vehicleStreak) {
-        if (vehicleStreak >= VEHICLE_CONFIRM_COUNT) return MovementStatus.IN_VEHICLE;
+    private MovementStatus publish(MovementStatus measured, int vehicleStreak, int confirmCount) {
+        if (vehicleStreak >= confirmCount) return MovementStatus.IN_VEHICLE;
         if (measured == MovementStatus.IN_VEHICLE) return MovementStatus.ON_FOOT;
         return measured;
+    }
+
+    /**
+     * 이번 보고에서 차량으로 확정하는 데 필요한 연속 횟수.
+     *
+     * 처음 타는 것과 방금 내렸다 다시 타는 것은 근거의 무게가 다르다. 하차 직후라면 아직 차 안일
+     * 가능성이 남아 있으므로 문턱을 낮춘다. 하차 이력이 없거나 오래됐으면 원래대로 3회를 채워야 한다.
+     */
+    private int confirmCountFor(Instant vehicleExitAt, Instant now) {
+        if (vehicleExitAt == null) return VEHICLE_CONFIRM_COUNT;
+        long sinceExit = Duration.between(vehicleExitAt, now).getSeconds();
+        boolean recent = sinceExit >= 0 && sinceExit <= VEHICLE_REENTRY_SEC;
+        return recent ? VEHICLE_REENTRY_COUNT : VEHICLE_CONFIRM_COUNT;
+    }
+
+    /**
+     * 마지막으로 차량에서 내려온 시각을 갱신한다.
+     *
+     * 차량으로 확정된 동안에는 {@code null}이다. 아직 내려오지 않았기 때문이고, 그래야 다음에
+     * 내려올 때 그 시각이 정확히 기록된다.
+     */
+    private Instant nextVehicleExitAt(Instant current, MovementStatus previous, MovementStatus status, Instant now) {
+        if (status == MovementStatus.IN_VEHICLE) return null;
+        if (previous == MovementStatus.IN_VEHICLE) return now;
+        return current;
     }
 
     /** 최근 위치를 읽는다. 없으면 null — 첫 보고이거나 30분 TTL이 지난 경우다 */
