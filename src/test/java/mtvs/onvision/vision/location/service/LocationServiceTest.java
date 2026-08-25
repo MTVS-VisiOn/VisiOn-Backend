@@ -230,17 +230,24 @@ class LocationServiceTest {
         }
 
         @Nested
-        @DisplayName("Context: 차량 속도만큼 이동했으면")
-        class Context_with_vehicle_distance {
+        @DisplayName("Context: 차량 속도가 나왔지만 아직 연속 판정이 모자라면")
+        class Context_with_unconfirmed_vehicle {
 
+            /**
+             * 이 케이스가 생긴 이유.
+             *
+             * 2026-08-25 실기기 검증에서 걷는 중에 IN_VEHICLE이 세 번 나왔다. 전부 GPS가 한두
+             * 보고 동안 20~40m 튄 것이었고(그 순간 accuracy도 두 배가 됐다), 시속 17~37km가
+             * 찍혔다. 한 번의 속도 계산으로 확정하면 보호자 화면에 "차량 이동중"이 뜬다.
+             */
             @Test
-            @DisplayName("It : IN_VEHICLE로 판별한다")
-            void it_classify_in_vehicle() {
-                //given
+            @DisplayName("It : 확정하지 않고 ON_FOOT으로 내보내되 연속 횟수는 올린다")
+            void it_does_not_confirm_on_first_hit() {
+                //given : 위도 0.01도 ≈ 1111m, 30초 → 약 37 m/s
                 Instant now = Instant.now();
                 String previousJson = "{\"previous\":true}";
-                // 위도 0.01도 ≈ 1111m, 30초 → 약 37 m/s
-                LocationReport previous = report(37.5, 127.0, 5f, MovementStatus.STATIONARY, now.minusSeconds(30));
+                MovementAnchor anchor = new MovementAnchor(37.5, 127.0, 5f, now.minusSeconds(30), 0);
+                LocationReport previous = report(37.5, 127.0, 5f, MovementStatus.ON_FOOT, now.minusSeconds(3), anchor);
                 LocationRequest request = request(37.51, 127.0, 5f, now);
 
                 given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.of(previousJson));
@@ -250,7 +257,143 @@ class LocationServiceTest {
                 locationService.receiveLocation(request, ward);
 
                 //then
-                assertThat(captureSavedReport().status()).isEqualTo(MovementStatus.IN_VEHICLE);
+                LocationReport saved = captureSavedReport();
+                assertThat(saved.status()).isEqualTo(MovementStatus.ON_FOOT);
+                assertThat(saved.anchor().vehicleStreak()).isEqualTo(1);
+            }
+
+            @Test
+            @DisplayName("It : 연속 2회까지도 확정하지 않는다")
+            void it_does_not_confirm_on_second_hit() {
+                //given : 오판 3건 중 가장 길게 이어진 것이 2회였다 (2026-08-25 14:14)
+                Instant now = Instant.now();
+                String previousJson = "{\"previous\":true}";
+                MovementAnchor anchor = new MovementAnchor(37.5, 127.0, 5f, now.minusSeconds(30), 1);
+                LocationReport previous = report(37.5, 127.0, 5f, MovementStatus.ON_FOOT, now.minusSeconds(3), anchor);
+                LocationRequest request = request(37.51, 127.0, 5f, now);
+
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.of(previousJson));
+                given(objectMapper.readValue(previousJson, LocationReport.class)).willReturn(previous);
+
+                //when
+                locationService.receiveLocation(request, ward);
+
+                //then
+                LocationReport saved = captureSavedReport();
+                assertThat(saved.status()).isEqualTo(MovementStatus.ON_FOOT);
+                assertThat(saved.anchor().vehicleStreak()).isEqualTo(2);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 차량 속도가 연속 3회 나오면")
+        class Context_with_confirmed_vehicle {
+
+            /** 실제 버스 탑승 2건은 연속 5회·3회였다 (2026-08-25 15:03, 15:06) */
+            @Test
+            @DisplayName("It : IN_VEHICLE로 확정한다")
+            void it_confirms_in_vehicle() {
+                //given
+                Instant now = Instant.now();
+                String previousJson = "{\"previous\":true}";
+                MovementAnchor anchor = new MovementAnchor(37.5, 127.0, 5f, now.minusSeconds(30), 2);
+                LocationReport previous = report(37.5, 127.0, 5f, MovementStatus.ON_FOOT, now.minusSeconds(3), anchor);
+                LocationRequest request = request(37.51, 127.0, 5f, now);
+
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.of(previousJson));
+                given(objectMapper.readValue(previousJson, LocationReport.class)).willReturn(previous);
+
+                //when
+                locationService.receiveLocation(request, ward);
+
+                //then
+                LocationReport saved = captureSavedReport();
+                assertThat(saved.status()).isEqualTo(MovementStatus.IN_VEHICLE);
+                assertThat(saved.anchor().vehicleStreak()).isEqualTo(3);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 차량 확정 뒤 믿을 만한 구간에서 보행 속도가 나오면")
+        class Context_with_vehicle_exit {
+
+            @Test
+            @DisplayName("It : 연속 횟수를 0으로 되돌리고 ON_FOOT으로 내려온다")
+            void it_resets_streak_and_drops_to_on_foot() {
+                //given : 위도 0.0004도 ≈ 44m, 30초 → 약 1.48 m/s
+                Instant now = Instant.now();
+                String previousJson = "{\"previous\":true}";
+                MovementAnchor anchor = new MovementAnchor(37.5, 127.0, 5f, now.minusSeconds(30), 3);
+                LocationReport previous = report(37.5, 127.0, 5f, MovementStatus.IN_VEHICLE, now.minusSeconds(3), anchor);
+                LocationRequest request = request(37.5004, 127.0, 5f, now);
+
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.of(previousJson));
+                given(objectMapper.readValue(previousJson, LocationReport.class)).willReturn(previous);
+
+                //when
+                locationService.receiveLocation(request, ward);
+
+                //then
+                LocationReport saved = captureSavedReport();
+                assertThat(saved.status()).isEqualTo(MovementStatus.ON_FOOT);
+                assertThat(saved.anchor().vehicleStreak()).isEqualTo(0);
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 앵커가 60초를 넘겨 묵어 속도를 신뢰할 수 없으면")
+        class Context_with_stale_anchor {
+
+            /**
+             * 2026-08-25 15:06 실기기 재현.
+             *
+             * 버스 안에서 GPS를 놓치자 단말이 100초 동안 같은 좌표만 되풀이해 보냈다. 그동안
+             * 앵커가 묶여 있다가 다음 픽스에서 187m를 한 번에 받았고, 102초로 나누니 1.83 m/s가
+             * 나와 달리는 버스가 도보로 떨어졌다. 평균 속도는 그 사이 무슨 일이 있었는지 말해주지
+             * 못한다 — 마지막 몇 초에 몰아서 이동했을 수도 있다.
+             */
+            @Test
+            @DisplayName("It : 이미 확정된 차량 판정을 뒤집지 않는다")
+            void it_keeps_confirmed_vehicle() {
+                //given : 위도 0.00168도 ≈ 187m, 102초 → 약 1.83 m/s (보행 속도로 계산된다)
+                Instant now = Instant.now();
+                String previousJson = "{\"previous\":true}";
+                MovementAnchor anchor = new MovementAnchor(37.5, 127.0, 5f, now.minusSeconds(102), 3);
+                LocationReport previous = report(37.5, 127.0, 5f, MovementStatus.IN_VEHICLE, now.minusSeconds(30), anchor);
+                LocationRequest request = request(37.50168, 127.0, 5f, now);
+
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.of(previousJson));
+                given(objectMapper.readValue(previousJson, LocationReport.class)).willReturn(previous);
+
+                //when
+                locationService.receiveLocation(request, ward);
+
+                //then
+                LocationReport saved = captureSavedReport();
+                assertThat(saved.status()).isEqualTo(MovementStatus.IN_VEHICLE);
+                assertThat(saved.anchor().vehicleStreak()).isEqualTo(3);
+            }
+
+            @Test
+            @DisplayName("It : 쌓아둔 연속 횟수를 0으로 밀지 않는다")
+            void it_does_not_reset_streak() {
+                //given : 확정 직전(2회)에 보고가 끊겼다. 여기서 0으로 밀면 처음부터 다시 세야 한다
+                Instant now = Instant.now();
+                String previousJson = "{\"previous\":true}";
+                MovementAnchor anchor = new MovementAnchor(37.5, 127.0, 5f, now.minusSeconds(102), 2);
+                LocationReport previous = report(37.5, 127.0, 5f, MovementStatus.ON_FOOT, now.minusSeconds(30), anchor);
+                LocationRequest request = request(37.50168, 127.0, 5f, now);
+
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.of(previousJson));
+                given(objectMapper.readValue(previousJson, LocationReport.class)).willReturn(previous);
+
+                //when
+                locationService.receiveLocation(request, ward);
+
+                //then
+                LocationReport saved = captureSavedReport();
+                assertThat(saved.status()).isEqualTo(MovementStatus.ON_FOOT);
+                assertThat(saved.anchor().vehicleStreak()).isEqualTo(2);
             }
         }
 
@@ -297,7 +440,7 @@ class LocationServiceTest {
                 Instant now = Instant.now();
                 String previousJson = "{\"previous\":true}";
                 // 앵커에서 위도 0.0001도 ≈ 11.1m, 6초 → 약 1.85 m/s. 오차 반경 합은 6m
-                MovementAnchor anchor = new MovementAnchor(37.5, 127.0, 3f, now.minusSeconds(6));
+                MovementAnchor anchor = new MovementAnchor(37.5, 127.0, 3f, now.minusSeconds(6), 0);
                 LocationReport previous = report(37.50005, 127.0, 3f, MovementStatus.STATIONARY, now.minusSeconds(3), anchor);
                 LocationRequest request = request(37.5001, 127.0, 3f, now);
 
@@ -318,7 +461,7 @@ class LocationServiceTest {
                 Instant now = Instant.now();
                 Instant anchorAt = now.minusSeconds(3);
                 String previousJson = "{\"previous\":true}";
-                MovementAnchor anchor = new MovementAnchor(37.5, 127.0, 3f, anchorAt);
+                MovementAnchor anchor = new MovementAnchor(37.5, 127.0, 3f, anchorAt, 0);
                 LocationReport previous = report(37.5, 127.0, 3f, MovementStatus.ON_FOOT, anchorAt, anchor);
                 LocationRequest request = request(37.50004, 127.0, 3f, now);
 
@@ -345,7 +488,7 @@ class LocationServiceTest {
                 //given : 21초 동안 2.2m. 걷고 있었다면 진작 반경을 벗어났을 시간이다
                 Instant now = Instant.now();
                 String previousJson = "{\"previous\":true}";
-                MovementAnchor anchor = new MovementAnchor(37.5, 127.0, 3f, now.minusSeconds(21));
+                MovementAnchor anchor = new MovementAnchor(37.5, 127.0, 3f, now.minusSeconds(21), 0);
                 LocationReport previous = report(37.5, 127.0, 3f, MovementStatus.ON_FOOT, now.minusSeconds(3), anchor);
                 LocationRequest request = request(37.50002, 127.0, 3f, now);
 
@@ -378,7 +521,7 @@ class LocationServiceTest {
                 //given : 21초 동안 28m. 반경 30m 안이지만 비례 확정 시간(30/0.3 = 100초)에는 한참 못 미친다
                 Instant now = Instant.now();
                 String previousJson = "{\"previous\":true}";
-                MovementAnchor anchor = new MovementAnchor(37.5, 127.0, 15f, now.minusSeconds(21));
+                MovementAnchor anchor = new MovementAnchor(37.5, 127.0, 15f, now.minusSeconds(21), 0);
                 LocationReport previous = report(37.5002, 127.0, 15f, MovementStatus.ON_FOOT, now.minusSeconds(3), anchor);
                 LocationRequest request = request(37.5002518, 127.0, 15f, now);
 
