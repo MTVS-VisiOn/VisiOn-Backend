@@ -32,15 +32,27 @@ public class LocationService {
     private final String REVERSE_GEOCODING = "/tmap/geo/reversegeocoding";
     private final String POI_SEARCH = "/tmap/pois";
 
+    /** 이 아래 속도는 정지로 본다. 보호대상자의 느린 보행(시속 1.08km)까지 이동으로 잡으려고 낮춰 잡았다 */
+    private static final float WALK_MIN_MPS = 0.3f;
+    /** 이 위 속도는 차량으로 본다. 시속 10.08km */
+    private static final float VEHICLE_MIN_MPS = 2.8f;
+    /** 정지 확정까지 기다리는 최소 시간 */
+    private static final long STATIONARY_CONFIRM_MIN_SEC = 20;
+    /** 정지 확정까지 기다리는 최대 시간. 실내처럼 오차가 수백 m면 비례 계산이 26분까지 늘어난다 */
+    private static final long STATIONARY_CONFIRM_MAX_SEC = 120;
+    /** 보고 간격이 이보다 벌어지면 그 사이에 무슨 일이 있었는지 알 수 없다 */
+    private static final long REPORT_GAP_LIMIT_SEC = 300;
+
     public void receiveLocation(LocationRequest request, CurrentUser currentUser) {
         log.debug("Location write requested: userId={} role={} tokenType={} lat={} lon={} accuracy={} recordedAt={}",
                 currentUser.getId(), currentUser.getRole(), currentUser.getTokenType(),
                 request.latitude(), request.longitude(), request.accuracy(), request.recordedAt());
-        MovementStatus status = classifyMovement(request, currentUser.getId());
-        LocationReport report = LocationReport.from(request, currentUser.getId(),status);
+        Movement movement = classifyMovement(request, readPrevious(currentUser.getId()), currentUser.getId());
+        LocationReport report = LocationReport.from(request, currentUser.getId(), movement.status(), movement.anchor());
         String json = objectMapper.writeValueAsString(report);
         realtimeLocationRepository.saveLocation(currentUser.getId(), json);
-        log.debug("Location write stored: key=location:latest:{} status={}", currentUser.getId(), status);
+        log.debug("Location write stored: key=location:latest:{} status={} anchorAt={}",
+                currentUser.getId(), movement.status(), movement.anchor().recordedAt());
     }
 
     public LastLocationResponse getLastLocation(CurrentUser currentUser) {
@@ -139,37 +151,85 @@ public class LocationService {
         }
     }
 
-    //이동 상태 판별하기
-    private MovementStatus classifyMovement(LocationRequest report, Long wardId) {
-        Optional<String> preJson  = realtimeLocationRepository.getLastLocation(wardId);
-        if (preJson.isEmpty()) {
+    /**
+     * 이동 상태를 판별한다.
+     *
+     * 직전 보고가 아니라 <b>앵커</b>(마지막으로 판정을 내린 지점)와 비교한다. 보고는 3초 간격인데
+     * 그 사이 걸어서 움직이는 거리는 GPS 오차 반경보다 작아서, 직전 보고와만 비교하면 어떤 보행
+     * 속도로도 반경을 못 넘어 영원히 STATIONARY가 된다. 2026-08-24 실기기 검증에서 실제로 그렇게
+     * 나왔다 — accuracy 3m대에 3초 간격이면 반경 6m를 넘으려면 시속 7.9km(달리기)가 필요했다.
+     *
+     * 앵커를 반경 밖으로 나갈 때까지 들고 가므로 보고 주기와 무관하게 같은 결과가 나온다.
+     */
+    private Movement classifyMovement(LocationRequest report, LocationReport previous, Long wardId) {
+        if (previous == null) {
             log.debug("Movement classify: 직전 좌표 없음 — wardId={} (첫 보고이거나 latest 키 TTL 만료)", wardId);
-            return MovementStatus.UNKNOWN;
+            return new Movement(MovementStatus.UNKNOWN, MovementAnchor.of(report));
         }
 
-        LocationReport preReport = objectMapper.readValue(preJson.get(), LocationReport.class);
         //값이 0 이전이거나 5분이 넘어간경우 알수 없음
-        long dtSec = Duration.between(preReport.recordedAt(), report.recordedAt()).getSeconds();
-        if (dtSec <= 0 || dtSec > 300) {
-            log.debug("Movement classify: 간격 이상 — wardId={} dtSec={} (0 이하면 시각 역전, 300 초과면 보고 끊김)", wardId, dtSec);
-            return MovementStatus.UNKNOWN;
+        long dtSec = Duration.between(previous.recordedAt(), report.recordedAt()).getSeconds();
+        if (dtSec <= 0 || dtSec > REPORT_GAP_LIMIT_SEC) {
+            log.debug("Movement classify: 간격 이상 — wardId={} dtSec={} (0 이하면 시각 역전, {} 초과면 보고 끊김)",
+                    wardId, dtSec, REPORT_GAP_LIMIT_SEC);
+            return new Movement(MovementStatus.UNKNOWN, MovementAnchor.of(report));
         }
 
-        double distance = GeoUtils.distanceMeters(report.latitude(), report.longitude(), preReport.latitude(), preReport.longitude());
+        //앵커가 없는 옛 형식(이 필드가 생기기 전에 저장된 값)은 직전 보고 자체를 기준점으로 쓴다
+        MovementAnchor anchor = previous.anchor() != null ? previous.anchor() : MovementAnchor.of(previous);
 
-        //오차 반경 안이면 멈춤으로 간주
-        double errorRadius = nvl(preReport.accuracy()) + nvl(report.accuracy());
-        if (distance <= errorRadius) return MovementStatus.STATIONARY;
+        double distance = GeoUtils.distanceMeters(report.latitude(), report.longitude(), anchor.latitude(), anchor.longitude());
+        double errorRadius = nvl(anchor.accuracy()) + nvl(report.accuracy());
+        long sinceAnchor = Duration.between(anchor.recordedAt(), report.recordedAt()).getSeconds();
 
-        //아니라면 속도로 판별
-        return bySpeed((float) (distance/dtSec));
+        //오차 반경을 벗어났다 — 실제로 움직인 것이므로 속도로 판별하고 기준점을 옮긴다
+        if (distance > errorRadius) {
+            MovementStatus status = bySpeed((float) (distance / Math.max(sinceAnchor, 1)));
+            log.debug("Movement classify: 앵커 이탈 — wardId={} distance={} errorRadius={} sinceAnchor={}s status={}",
+                    wardId, distance, errorRadius, sinceAnchor, status);
+            return new Movement(status, MovementAnchor.of(report));
+        }
+
+        //반경 안이지만 시간이 충분히 지났다 — 걷고 있었다면 진작 벗어났을 거리다
+        long confirmSec = stationaryConfirmSec(errorRadius);
+        if (sinceAnchor >= confirmSec) {
+            log.debug("Movement classify: 정지 확정 — wardId={} distance={} errorRadius={} sinceAnchor={}s confirmSec={}",
+                    wardId, distance, errorRadius, sinceAnchor, confirmSec);
+            return new Movement(MovementStatus.STATIONARY, MovementAnchor.of(report));
+        }
+
+        //아직 판정할 근거가 없다. 기준점을 그대로 들고 가며 직전 판정을 유지한다
+        return new Movement(previous.status(), anchor);
     }
 
-    private MovementStatus bySpeed(Float mps) {
-        if (mps < 0.5) return MovementStatus.STATIONARY;
-        if (mps < 2.8) return MovementStatus.ON_FOOT;
+    /**
+     * 오차 반경 안에 머무를 때 정지로 확정하기까지 기다리는 시간.
+     *
+     * 가장 느린 보행({@link #WALK_MIN_MPS})이라도 이 시간이면 반경을 벗어났을 만큼 기다린다.
+     * 고정값으로 두면 오차 반경이 클 때 반경을 벗어나기도 전에 정지가 먼저 확정된다 —
+     * accuracy 15m(반경 30m)면 시속 4.8km로 걸어도 21초에 STATIONARY로 잘못 판정됐다.
+     * 실기기 실외 정지 샘플이 13.8m였으므로 이 구간은 실제로 밟힌다.
+     */
+    private long stationaryConfirmSec(double errorRadius) {
+        long needed = (long) Math.ceil(errorRadius / WALK_MIN_MPS);
+        return Math.max(STATIONARY_CONFIRM_MIN_SEC, Math.min(STATIONARY_CONFIRM_MAX_SEC, needed));
+    }
+
+    private MovementStatus bySpeed(float mps) {
+        if (mps < WALK_MIN_MPS) return MovementStatus.STATIONARY;
+        if (mps < VEHICLE_MIN_MPS) return MovementStatus.ON_FOOT;
         return MovementStatus.IN_VEHICLE;
     }
+
+    /** 최근 위치를 읽는다. 없으면 null — 첫 보고이거나 30분 TTL이 지난 경우다 */
+    private LocationReport readPrevious(Long wardId) {
+        return realtimeLocationRepository.getLastLocation(wardId)
+                .map(json -> objectMapper.readValue(json, LocationReport.class))
+                .orElse(null);
+    }
+
+    /** 판정 결과와, 다음 판정이 기준으로 삼을 앵커 */
+    private record Movement(MovementStatus status, MovementAnchor anchor) {}
 
     private double nvl(Float accuracy) {
         return accuracy != null ? accuracy : 20.0;         // 기본 오차 20m
