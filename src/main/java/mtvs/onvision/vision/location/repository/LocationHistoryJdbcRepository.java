@@ -19,7 +19,7 @@ import static mtvs.onvision.vision.common.util.AppTime.SEOUL;
 
 /**
  * 위치 이력 배치 INSERT.
- *
+ * <p>
  * JPA를 쓰지 않는 이유가 둘이다.
  * 1. `ON CONFLICT DO NOTHING`을 JPQL로 표현할 수 없다. 재시도로 들어온 중복 하나 때문에
  *    배치 전체가 유니크 제약 위반으로 롤백된다

@@ -13,7 +13,7 @@ import java.util.List;
 
 /**
  * Redis 버퍼에 쌓인 위치를 DB로 옮긴다.
- *
+ * <p>
  * 위치는 3초 간격으로 들어와서 건별 INSERT를 하면 쓰기가 계속 붙는다.
  * `receiveLocation`은 Redis에 넣기만 하고, 실제 저장은 여기서 배치로 몰아친다.
  */
@@ -34,11 +34,11 @@ public class LocationHistoryService {
 
     /**
      * 버퍼가 빌 때까지 배치로 옮겨 담는다.
-     *
+     * <p>
      * **트랜잭션을 걸지 않는다.** 삽입이 터지면 처리 중 큐가 남아 다음 주기에 통째로 재시도되고,
      * 이미 들어간 행은 `ON CONFLICT`가 걸러낸다. 그래서 "커밋됐는지"를 알 필요가 없고
      * `TransactionSynchronization`도 필요 없다.
-     *
+     * <p>
      * 한 틱에 한 배치만 넣으면 유입량이 배치 크기를 넘는 순간 버퍼가 영원히 안 줄어든다.
      * 그래서 비워질 때까지 돌리되, 한 틱이 무한정 도는 것을 `maxLoops`로 막는다.
      */
