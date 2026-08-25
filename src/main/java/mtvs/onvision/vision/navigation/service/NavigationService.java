@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
+import mtvs.onvision.vision.common.util.GeoUtils;
 import mtvs.onvision.vision.location.dto.LocationReport;
 import mtvs.onvision.vision.location.repository.RealtimeLocationRepository;
 import mtvs.onvision.vision.navigation.domain.Route;
@@ -57,7 +58,11 @@ public class NavigationService {
                 currentUser.getId(), currentUser.getRole(), mode,
                 request.start().latitude(), request.start().longitude(),
                 request.end().latitude(), request.end().longitude());
-        MultiValueMap<String, String> form = getStringStringMultiValueMap(request, mode);
+        // 티맵에 보내는 출발 좌표는 요청값이 아니라 기기가 마지막으로 보고한 위치다
+        List<Double> requestedStart = startCoordinate(request, currentUser.getId());
+        // 목적지는 보행자 입구점 우선. 규칙은 LocationInfo.routingCoordinate 한 곳에만 둔다
+        List<Double> requestedEnd = request.end().routingCoordinate(mode);
+        MultiValueMap<String, String> form = getStringStringMultiValueMap(request, mode, requestedStart, requestedEnd);
         try {
             if (!(mode == TransportMode.WALK) && !(mode == TransportMode.CAR)) throw new BusinessException(ErrorCode.INVALID_TRANSFER);
             if (mode == TransportMode.WALK) {
@@ -86,6 +91,7 @@ public class NavigationService {
                 Integer totalDistance = fStart.totalDistance();
                 Integer totalTime = fStart.totalTime();
                 List<RouteFeature> features = raw.stream().map(RouteFeature::from).toList();
+                List<Double> snappedStart = snappedStartOf(features);
 
                 List<RouteFeature> lines = features.stream()
                         .filter(f -> f.type() == GeometryType.LINE_STRING)
@@ -112,11 +118,15 @@ public class NavigationService {
                 List<RouteStep> steps = toSteps(features, mode);
 
                 //경로 redis 저장
-                NavigationRouteReport report = new NavigationRouteReport(summary, steps);
+                NavigationRouteReport report = new NavigationRouteReport(
+                        summary, requestedStart, snappedStart, snapDistanceM(requestedStart, snappedStart),
+                        requestedEnd, steps);
+                verifyRoutePath(report, mode);
                 String json = objectMapper.writeValueAsString(report);
                 navigationRepository.saveRoute(currentUser.getId(), mode.getPrefix(), json);
-                log.debug("Navigation search done: mode={} totalDistance={} totalTime={} steps={} redisPrefix={}",
-                        mode, totalDistance, totalTime, steps.size(), mode.getPrefix());
+                log.debug("Navigation search done: mode={} totalDistance={} totalTime={} steps={} pathPoints={} snapDistanceM={} entrance={} redisPrefix={}",
+                        mode, totalDistance, totalTime, steps.size(), report.routePath().size(),
+                        report.snapDistanceM(), usesEntrance(request.end(), requestedEnd), mode.getPrefix());
 
                 // 출력은 요약만
                 return summary;
@@ -145,6 +155,7 @@ public class NavigationService {
 
                 // 여기서 한 번 정규화
                 List<RouteFeature> features = raw.stream().map(RouteFeature::from).toList();
+                List<Double> snappedStart = snappedStartOf(features);
 
                 // 자동차 facilityType은 "구간 안에 그게 있음"이라 개수를 세지 않는다.
                 // 고속도로 9982m가 통째로 교량으로 온 실측이 근거.
@@ -165,11 +176,15 @@ public class NavigationService {
                 List<RouteStep> steps = toSteps(features, mode);
 
                 //경로 redis 저장
-                NavigationRouteReport report = new NavigationRouteReport(summary, steps);
+                NavigationRouteReport report = new NavigationRouteReport(
+                        summary, requestedStart, snappedStart, snapDistanceM(requestedStart, snappedStart),
+                        requestedEnd, steps);
+                verifyRoutePath(report, mode);
                 String json = objectMapper.writeValueAsString(report);
                 navigationRepository.saveRoute(currentUser.getId(), mode.getPrefix(), json);
-                log.debug("Navigation search done: mode={} totalDistance={} totalTime={} steps={} redisPrefix={}",
-                        mode, fStart.totalDistance(), fStart.totalTime(), steps.size(), mode.getPrefix());
+                log.debug("Navigation search done: mode={} totalDistance={} totalTime={} steps={} pathPoints={} snapDistanceM={} entrance={} redisPrefix={}",
+                        mode, fStart.totalDistance(), fStart.totalTime(), steps.size(), report.routePath().size(),
+                        report.snapDistanceM(), usesEntrance(request.end(), requestedEnd), mode.getPrefix());
 
                 // 출력은 요약만
                 return summary;
@@ -371,18 +386,89 @@ public class NavigationService {
     }
 
 
-    private @NonNull MultiValueMap<String, String> getStringStringMultiValueMap(NavigationPreRequest request, TransportMode mode) {
+    private @NonNull MultiValueMap<String, String> getStringStringMultiValueMap(NavigationPreRequest request, TransportMode mode,
+                                                                               List<Double> start, List<Double> end) {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-        form.add("startX", String.valueOf(request.start().longitude()));   // X가 경도
-        form.add("startY", String.valueOf(request.start().latitude()));
-        form.add("endX",   String.valueOf(request.end().longitude()));
-        form.add("endY",   String.valueOf(request.end().latitude()));
+        form.add("startX", String.valueOf(start.getLast()));    // X가 경도
+        form.add("startY", String.valueOf(start.getFirst()));
+        form.add("endX",   String.valueOf(end.getLast()));
+        form.add("endY",   String.valueOf(end.getFirst()));
         form.add("startName", request.start().name());                      // 원문 그대로
         form.add("endName",   request.end().name());
         form.add("searchOption", mode.getOption());  //대중교통이 아닐 경우에만 추가
         form.add("reqCoordType", "WGS84GEO");
         form.add("resCoordType", "WGS84GEO");
         return form;
+    }
+
+    /**
+     * 티맵에 보낼 출발 좌표 [위도, 경도].
+     *
+     * 요청의 출발지는 사용자가 화면에서 고른 값이라 실제 서 있는 자리와 수십 m 어긋날 수 있다.
+     * 기기가 보고한 최신 위치가 있으면 그것을 쓰고, 없으면 요청 좌표로 폴백한다.
+     * 장소검색 중심 좌표(`LocationService.getSearchCenter`)와 같은 출처·같은 규칙이다.
+     *
+     * 최신 위치는 `redis.expired.location`(30분)이 지나면 사라진다. 읽기가 실패해도
+     * 길안내를 막지 않는다 — 폴백이 있는데 502로 올릴 이유가 없다.
+     */
+    private List<Double> startCoordinate(NavigationPreRequest request, Long wardId) {
+        List<Double> requested = List.of(request.start().latitude(), request.start().longitude());
+        try {
+            LocationReport last = lastLocationOf(wardId);
+            if (last == null || last.latitude() == null || last.longitude() == null) return requested;
+            return List.of(last.latitude(), last.longitude());
+        } catch (Exception e) {
+            log.warn("최신 위치를 읽지 못해 요청 출발 좌표를 쓴다: wardId={} message={}", wardId, e.getMessage());
+            return requested;
+        }
+    }
+
+    /** 목적지로 중심점이 아니라 보행자 입구점을 썼는지. 로그에만 쓴다 */
+    private boolean usesEntrance(LocationInfo end, List<Double> requestedEnd) {
+        return !requestedEnd.equals(List.of(end.latitude(), end.longitude()));
+    }
+
+    /**
+     * 티맵이 보정해 돌려준 출발 좌표. 첫 Point가 출발 안내점이다
+     * (실측 — `SP`/`S`는 정확히 1개이고 features 맨 앞에 온다).
+     */
+    private List<Double> snappedStartOf(List<RouteFeature> features) {
+        return features.stream()
+                .filter(f -> f.type() == GeometryType.POINT)
+                .findFirst()
+                .map(f -> toLatLng(f.coordinates()))
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_TMAP_ROUTE));
+    }
+
+    /** 요청 좌표와 티맵 보정 좌표 사이 거리(m). GPS 오차 수준이라 소수 첫째 자리까지만 의미가 있다 */
+    private Double snapDistanceM(List<Double> requested, List<Double> snapped) {
+        if (requested == null || snapped == null) return null;
+        double distance = GeoUtils.distanceMeters(
+                requested.getFirst(), requested.getLast(), snapped.getFirst(), snapped.getLast());
+        return Math.round(distance * 10) / 10.0;
+    }
+
+    /**
+     * 폴리라인이 실제로 만들어졌는지 확인한다. 좌표가 2개 미만이면 클라이언트가 경로 형상을
+     * 그릴 수 없으므로 빈 배열을 응답하지 않고 여기서 끊는다.
+     *
+     * 중간 step 하나가 비는 것은 502로 올리지 않는다 — 티맵이 LineString 없이 Point를 연달아
+     * 주는 경우가 있는지 실측이 없어서, 경로 전체를 버리는 쪽이 더 위험하다. 로그만 남긴다.
+     * 마지막 step(EP)은 뒤 구간이 없어 비는 것이 정상이다.
+     */
+    private void verifyRoutePath(NavigationRouteReport report, TransportMode mode) {
+        List<RouteStep> steps = report.report();
+        if (report.routePath().size() < 2) {
+            log.warn("Navigation 경로 폴리라인이 비어 있다: mode={} steps={}", mode, steps.size());
+            throw new BusinessException(ErrorCode.TMAP_API_ERROR);
+        }
+        List<Integer> empty = steps.subList(0, steps.size() - 1).stream()
+                .filter(step -> step.pathToNext() == null || step.pathToNext().isEmpty())
+                .map(RouteStep::sequence)
+                .toList();
+        if (!empty.isEmpty()) {
+            log.warn("Navigation step의 pathToNext가 비어 있다: mode={} sequences={}", mode, empty);
+        }
     }
 
     //횡단보도 세기

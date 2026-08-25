@@ -11,6 +11,8 @@ public record Poi(
         String name,
         Double noorLat,
         Double noorLon,
+        Double pnsLat,             // 보행자 입구점. 티맵 2025-05 추가분이라 옛 POI엔 없을 수 있다
+        Double pnsLon,
         String upperAddrName,
         String middleAddrName,
         String lowerAddrName,

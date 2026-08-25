@@ -24,9 +24,9 @@ public record MapResponse(
     public static MapResponse from(NavigationRouteReport report, TransportMode mode, LocalDateTime departureTime,
                                    Integer remainingDistanceM) {
         NavigationSummary summary = report.summary();
-        List<Map<String, Double>> path = report.report().stream()
-                .flatMap(r -> r.pathToNext().stream())
-                .map(p -> Map.of("latitude", p.get(0), "longitude", p.get(1)))
+        // 폴리라인 조립은 NavigationRouteReport.routePath 한 곳에서만 한다
+        List<Map<String, Double>> path = report.routePath().stream()
+                .map(p -> Map.of("latitude", p.getFirst(), "longitude", p.getLast()))
                 .toList();
         return new MapResponse(summary.destinationName(), summary.destinationRoadAddress(), summary.destinationCoordinate().get(0),summary.destinationCoordinate().get(1),
                 summary.totalDistance(), remainingDistanceM, summary.totalTime()/60, departureTime.atZone(SEOUL).toInstant(), mode, path);

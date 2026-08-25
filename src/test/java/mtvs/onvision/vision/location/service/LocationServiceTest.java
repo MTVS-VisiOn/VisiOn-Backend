@@ -670,6 +670,8 @@ class LocationServiceTest {
                           "telNo": "02-723-8313",
                           "noorLat": "37.57120358",
                           "noorLon": "126.97471568",
+                          "pnsLat": "37.57104000",
+                          "pnsLon": "126.97480000",
                           "upperAddrName": "서울",
                           "middleAddrName": "종로구",
                           "lowerAddrName": "당주동",
@@ -689,6 +691,8 @@ class LocationServiceTest {
                           "telNo": "02-780-8191",
                           "noorLat": "37.51934772",
                           "noorLon": "126.93149886",
+                          "pnsLat": "0.0",
+                          "pnsLon": "0.0",
                           "upperAddrName": "서울",
                           "middleAddrName": "영등포구",
                           "lowerAddrName": "여의도동",
@@ -764,6 +768,37 @@ class LocationServiceTest {
                 assertThat(first.noorLat()).isEqualTo(37.57120358);
                 assertThat(first.noorLon()).isEqualTo(126.97471568);
                 assertThat(first.roadAddress()).isEqualTo("서울 종로구 새문안로5길 11");
+            }
+
+            @Test
+            @DisplayName("(보행자 입구점)It : pnsLat/pnsLon을 중심점과 따로 매핑한다")
+            void it_maps_entrance_coordinate() {
+                //given : 길안내 목적지는 중심점이 아니라 이 좌표로 간다
+                givenLastLocation();
+                expectPoiSearch();
+
+                //when
+                LocationSearchInfo first = locationService.searchLocation("화목순대국", ward).infos().getFirst();
+
+                //then
+                assertThat(first.pnsLat()).isEqualTo(37.57104000);
+                assertThat(first.pnsLon()).isEqualTo(126.97480000);
+            }
+
+            @Test
+            @DisplayName("(입구점이 0.0)It : 좌표가 아니므로 null로 내린다")
+            void it_drops_zero_entrance_coordinate() {
+                //given : 티맵은 값 없음을 "0.0"으로 채워 보내는 자리가 있다(nearPoiX/nearPoiY 실측)
+                givenLastLocation();
+                expectPoiSearch();
+
+                //when
+                LocationSearchInfo second = locationService.searchLocation("화목순대국", ward).infos().getLast();
+
+                //then : 0.0을 그대로 넘기면 클라이언트가 아프리카 앞바다를 목적지로 보낸다
+                assertThat(second.pnsLat()).isNull();
+                assertThat(second.pnsLon()).isNull();
+                assertThat(second.noorLat()).isEqualTo(37.51934772);
             }
 
             @Test

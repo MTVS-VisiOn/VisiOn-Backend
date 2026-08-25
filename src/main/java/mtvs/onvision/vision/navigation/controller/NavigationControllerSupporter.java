@@ -629,12 +629,29 @@ public interface NavigationControllerSupporter {
 
                     | mode | report 구조 |
                     |---|---|
-                    | `WALK`·`CAR` | `{ summary, report: [RouteStep] }` |
+                    | `WALK`·`CAR` | `{ summary, requestedStart, snappedStart, snapDistanceM, requestedEnd, routePath, report: [RouteStep] }` |
                     | `TRANSIT` | `{ summary, legs: [TransitLeg] }` |
 
                     보행자·자동차의 `report[]`는 **step 하나가 "안내점 + 그 다음 구간"을 통째로 갖는다.**
                     `pathToNext`를 순서대로 이으면 폴리라인이고, `facility`가 `횡단보도`·`계단`인 step의
                     좌표가 마커다.
+
+                    **`routePath`는 그 폴리라인을 서버가 미리 이어둔 것**이다. 경로 형상만 그릴 거면
+                    `report[]`를 순회하지 말고 이것만 쓰면 된다. 구간 경계에서 겹치는 좌표는 제거돼 있다.
+
+                    `requestedStart`는 티맵에 보낸 출발 좌표(기기의 최신 GPS, 없으면 요청 좌표),
+                    `snappedStart`는 티맵이 보행로 위로 옮긴 실제 안내 시작 좌표다.
+                    `snapDistanceM`은 둘 사이 거리(m)이며 **이 값이 크면 안내가 사용자가 서 있는 자리에서
+                    시작하지 않는다는 뜻**이다.
+
+                    `requestedEnd`는 **실제로 경로를 계산한 목적지 좌표**다. `WALK`에서 요청의 `end`에
+                    보행자 입구점(`pnsLat`/`pnsLon`)이 실려 있으면 중심점이 아니라 그쪽으로 가므로,
+                    요약의 `destinationCoordinate`(장소의 중심점)와 다를 수 있다. **안내 종료 판정은 이 좌표로 한다.**
+
+                    `CAR`는 입구점을 쓰지 않아 `destinationCoordinate`와 항상 같다 — 주차장 POI의 입구점이
+                    주차장이 아니라 본관 보행자 출입구를 가리키기 때문이다. **필드는 두 모드 모두 나간다.**
+
+                    위 네 필드는 `TRANSIT`에 없다.
 
                     대중교통의 `legs[]`는 **도보 leg와 대중교통 leg의 모양이 다르다.**
                     도보는 `steps`에 안내문이 있고 `path`가 비어 있다(`steps[].path`를 이어야 한다).
@@ -834,6 +851,16 @@ public interface NavigationControllerSupporter {
                                                                             "destinationRoadAddress": "서울 서초구 강남대로 213",
                                                                             "destinationCoordinate": [37.479103, 127.037476]
                                                                         },
+                                                                        "requestedStart": [37.504600, 127.024750],
+                                                                        "snappedStart": [37.504585, 127.024798],
+                                                                        "snapDistanceM": 4.6,
+                                                                        "requestedEnd": [37.479050, 127.037510],
+                                                                        "routePath": [
+                                                                            [37.504562, 127.024810],
+                                                                            [37.504390, 127.024230],
+                                                                            [37.503790, 127.024490],
+                                                                            [37.503500, 127.024630]
+                                                                        ],
                                                                         "report": [
                                                                             {
                                                                                 "sequence": 0,
