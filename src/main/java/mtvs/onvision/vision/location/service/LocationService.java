@@ -176,12 +176,6 @@ public class LocationService {
             List<LocationSearchInfo> infos = pois.stream().map(LocationSearchInfo::from).toList();
             log.debug("Location search: keyword={} totalCount={} returned={}", keyword, poiInfo.totalCount(), infos.size());
             return new LocationSearchResponse(poiInfo.totalCount(), poiInfo.count(), poiInfo.page(), center, infos);
-        } catch (NullPointerException e) {
-            //응답 껍데기는 위에서 걸렀으므로 여기 오는 것은 POI 하나가 깨진 경우다.
-            //LocationSearchInfo.from이 newAddressList().newAddress().getFirst()를 무방비로 타서,
-            //도로명 주소가 없는 POI가 하나만 섞여도 검색 결과가 통째로 빈다 — 개선 대상
-            log.info("TMap 응답 파싱 실패 keyword={}", keyword);
-            return new LocationSearchResponse(0,0,0, center, List.of());
         } catch (Exception e) {
             log.error("TMap 호출 실패 type={}, cause={}", e.getClass().getName(), e.getCause(), e);
             throw new BusinessException(ErrorCode.TMAP_API_ERROR);
