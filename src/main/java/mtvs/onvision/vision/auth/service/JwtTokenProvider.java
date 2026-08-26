@@ -112,7 +112,7 @@ public class JwtTokenProvider {
         String email = claims.getPayload().get("email", String.class);
         UserRole role = UserRole.of(claims.getPayload().get("role", String.class));
         TokenType type = TokenType.of(claims.getPayload().get("type", String.class));
-        log.info("User ::: email : {}, role : {}, type : {}", email, role, type);
+        log.debug("User ::: email : {}, role : {}, type : {}", email, role, type);
         return new TokenBody(Long.parseLong(sub),email, role, type);
     }
 

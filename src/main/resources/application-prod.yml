@@ -18,6 +18,7 @@ logging:
     "mtvs.onvision.vision.navigation": ${LOG_LEVEL_NAVIGATION:info}
     "mtvs.onvision.vision.favorite": ${LOG_LEVEL_FAVORITE:info}
     "mtvs.onvision.vision.command": ${LOG_LEVEL_COMMAND:info}
+    "mtvs.onvision.vision.auth": ${LOG_LEVEL_AUTH:info}
     "org.hibernate.SQL": ${LOG_LEVEL_SQL:info}
 
 server:
