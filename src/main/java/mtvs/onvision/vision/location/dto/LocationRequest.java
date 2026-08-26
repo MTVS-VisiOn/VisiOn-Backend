@@ -5,6 +5,7 @@ import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
 
@@ -42,6 +43,26 @@ public record LocationRequest(
                 description = "측정 시간",
                 requiredMode = Schema.RequiredMode.REQUIRED
         )
-        Instant recordedAt        // 측정된 시각
+        Instant recordedAt,       // 측정된 시각
+
+        @Size(max = 64)
+        @Schema(
+                examples = "38b4ef33-9724-42f5-95ca-b7bd021ef889",
+                description = """
+                        이 GPS 샘플의 식별자. 측정할 때 하나 만들어 두고, 같은 측정값을
+                        다시 보낼 때는 **같은 값을 유지한다.**
+
+                        서버는 같은 `sampleId`가 다시 오면 재측정이 아니라 재전송으로 보고
+                        저장하지 않는다. 측정 시각만으로는 구분할 수 없기 때문이다 —
+                        재전송 때 시각을 전송 시각으로 다시 찍는 구현이 실제로 관측됐다.
+
+                        선택값이다. 없으면 좌표 동일성으로 대신 판정한다"""
+        )
+        String sampleId
 ) {
+
+    /** `sampleId`를 붙이기 전 호출부(테스트 픽스처 등)용. */
+    public LocationRequest(Double latitude, Double longitude, Float accuracy, Instant recordedAt) {
+        this(latitude, longitude, accuracy, recordedAt, null);
+    }
 }

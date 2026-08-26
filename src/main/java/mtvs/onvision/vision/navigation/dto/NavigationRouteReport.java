@@ -3,6 +3,7 @@ package mtvs.onvision.vision.navigation.dto;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -13,12 +14,19 @@ import java.util.List;
  * 옮겨 돌려준 첫 안내점 좌표다. 둘이 벌어진 거리(`snapDistanceM`)가 크면 안내가 실제 서 있는
  * 자리가 아닌 곳에서 시작한다는 뜻이라, 클라이언트가 판단할 수 있게 같이 내보낸다.
  *
+ * `startSource`·`startAccuracy`·`startRecordedAt`은 그 출발 좌표가 어디서 왔고 얼마나 믿을 만한지다.
+ * 요청에 실려 온 값을 그대로 썼으면 `REQUEST`, 그것이 문턱을 못 넘어 서버 저장 위치로 폴백했으면
+ * `SERVER_CACHE`다. 폴백이 잦으면 앱의 위치 보고가 끊기고 있다는 신호다.
+ *
  * `requestedEnd`는 endX/endY로 보낸 **실제 목적지 좌표**다. 보행자 입구점이 있으면 중심점이 아니라
  * 그쪽으로 가므로, 요약의 `destinationCoordinate`(장소의 중심점)와 다를 수 있다.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record NavigationRouteReport(
         NavigationSummary summary,
+        StartSource startSource,       // 출발 좌표의 출처. REQUEST | SERVER_CACHE
+        Float startAccuracy,           // 출발 좌표의 반경 오차(m). 모르면 null
+        Instant startRecordedAt,       // 출발 좌표의 측정 시각. 모르면 null
         List<Double> requestedStart,   // [위도, 경도]. 티맵에 보낸 출발 좌표
         List<Double> snappedStart,     // [위도, 경도]. 티맵이 보정한 출발 좌표
         Double snapDistanceM,          // 두 좌표 사이 거리(m)
@@ -27,7 +35,18 @@ public record NavigationRouteReport(
 ) {
     /** 보정 좌표가 없는 호출부(테스트 픽스처 등)용. */
     public NavigationRouteReport(NavigationSummary summary, List<RouteStep> report) {
-        this(summary, null, null, null, null, report);
+        this(summary, null, null, null, null, null, null, null, report);
+    }
+
+    /**
+     * 출발 좌표 출처를 남기기 전에 만들어진 호출부용.
+     * <p>
+     * 저장된 옛 JSON은 이 세 필드가 없어 역직렬화 때 null이 된다. 같은 모양을 코드에서도 만들 수 있게 둔다.
+     */
+    public NavigationRouteReport(NavigationSummary summary, List<Double> requestedStart,
+                                 List<Double> snappedStart, Double snapDistanceM,
+                                 List<Double> requestedEnd, List<RouteStep> report) {
+        this(summary, null, null, null, requestedStart, snappedStart, snapDistanceM, requestedEnd, report);
     }
 
     /**

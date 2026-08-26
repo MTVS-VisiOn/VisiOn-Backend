@@ -7,6 +7,7 @@ public record LastLocationResponse(
         Double longitude,
         String address,
         String status,
-        Instant recordedAt
+        Instant recordedAt,
+        Float accuracy
 ) {
 }

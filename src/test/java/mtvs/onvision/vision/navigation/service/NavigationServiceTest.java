@@ -149,6 +149,61 @@ class NavigationServiceTest {
     }
 
     @Nested
+    @DisplayName("Describe: searchNavigation 메서드는")
+    class Describe_with_searchNavigation {
+
+        private NavigationPreRequest requestWith(Float accuracy, Instant recordedAt) {
+            LocationInfo start = new LocationInfo("현재 위치", "현재 위치", 37.504585, 127.024798,
+                    "서울 강남구 강남대로 지하 476", null);
+            LocationInfo end = new LocationInfo("말죽거리공원사거리", "말죽거리공원사거리", 37.479103, 127.037476,
+                    "서울 서초구 강남대로 213", null);
+            return new NavigationPreRequest(TransportMode.WALK, start, end, "sample-1", accuracy, recordedAt);
+        }
+
+        @Nested
+        @DisplayName("Context: 요청 좌표도 저장 좌표도 못 믿을 때")
+        class Context_with_low_confidence {
+
+            @Test
+            @DisplayName("It : 티맵을 부르지 않고 LOW_CONFIDENCE_LOCATION을 던진다")
+            void it_throws_low_confidence() {
+                //given — 정확도 100m는 문턱(30m) 밖이고, 저장된 위치도 없다
+                NavigationPreRequest request = requestWith(100f, Instant.now());
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.empty());
+
+                //when&then
+                BusinessException thrown = assertThrows(BusinessException.class,
+                        () -> navigationService.searchNavigation(request, ward));
+                assertThat(thrown.getErrorCode()).isEqualTo(ErrorCode.LOW_CONFIDENCE_LOCATION);
+                verifyNoInteractions(tmapRestClient);
+            }
+
+            @Test
+            @DisplayName("It : 정확도가 없어도(null) 신뢰하지 않는다")
+            void it_rejects_null_accuracy() {
+                //given
+                NavigationPreRequest request = requestWith(null, Instant.now());
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.empty());
+
+                //when&then
+                assertThrows(BusinessException.class, () -> navigationService.searchNavigation(request, ward));
+            }
+
+            @Test
+            @DisplayName("It : 측정 시각이 20초를 넘으면 신뢰하지 않는다")
+            void it_rejects_stale_request_coordinate() {
+                //given — 정확도는 좋지만 오래됐다
+                NavigationPreRequest request = requestWith(5f, Instant.now().minusSeconds(60));
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.empty());
+
+                //when&then
+                assertThrows(BusinessException.class, () -> navigationService.searchNavigation(request, ward));
+            }
+        }
+    }
+
+
+    @Nested
     @DisplayName("Describe: saveRoute 메서드는")
     class Describe_with_saveRoute {
 
@@ -486,7 +541,7 @@ class NavigationServiceTest {
                 given(routeRepository.findByWardIdAndStatus(wardId, RouteStatus.IN_PROGRESS))
                         .willReturn(Optional.of(existingRoute()));
                 LocationReport location = new LocationReport(
-                        wardId, 37.503900, 127.025200, 5.0f, MovementStatus.ON_FOOT, Instant.parse("2026-08-03T07:20:00Z"));
+                        wardId, 37.503900, 127.025200, 5.0f, MovementStatus.ON_FOOT, Instant.now());
                 given(realtimeLocationRepository.getLastLocation(wardId))
                         .willReturn(Optional.of(fixtureMapper.writeValueAsString(location)));
                 given(routeProgressCalculator.remainingDistance(
@@ -753,7 +808,7 @@ class NavigationServiceTest {
                 //given
                 givenRoute();
                 LocationReport location = new LocationReport(
-                        wardId, 37.503900, 127.025200, 5.0f, MovementStatus.ON_FOOT, Instant.parse("2026-08-03T07:20:00Z"));
+                        wardId, 37.503900, 127.025200, 5.0f, MovementStatus.ON_FOOT, Instant.now());
                 given(realtimeLocationRepository.getLastLocation(wardId))
                         .willReturn(Optional.of(fixtureMapper.writeValueAsString(location)));
                 given(routeProgressCalculator.remainingDistance(
@@ -773,7 +828,7 @@ class NavigationServiceTest {
                 //given
                 givenRoute();
                 LocationReport location = new LocationReport(
-                        wardId, 37.600000, 127.100000, 5.0f, MovementStatus.ON_FOOT, Instant.parse("2026-08-03T07:20:00Z"));
+                        wardId, 37.600000, 127.100000, 5.0f, MovementStatus.ON_FOOT, Instant.now());
                 given(realtimeLocationRepository.getLastLocation(wardId))
                         .willReturn(Optional.of(fixtureMapper.writeValueAsString(location)));
                 given(routeProgressCalculator.remainingDistance(

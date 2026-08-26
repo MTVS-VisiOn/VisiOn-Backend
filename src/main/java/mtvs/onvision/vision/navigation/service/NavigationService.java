@@ -6,6 +6,7 @@ import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
 import mtvs.onvision.vision.common.util.GeoUtils;
+import mtvs.onvision.vision.location.domain.MovementStatus;
 import mtvs.onvision.vision.location.dto.LocationReport;
 import mtvs.onvision.vision.location.repository.RealtimeLocationRepository;
 import mtvs.onvision.vision.navigation.domain.Route;
@@ -28,6 +29,8 @@ import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -46,6 +49,17 @@ public class NavigationService {
     private final RouteRepository routeRepository;
 
     private static final Pattern DISTANCE_TAIL = Pattern.compile("\\d+m 이동$");
+
+    /** 경로 출발점으로 쓸 수 있는 반경 오차 상한(m). 실측 실외 15건이 전부 12m 이하, 픽스 없음이 55~117m다 */
+    private static final float START_ACCURACY_MAX_M = 30f;
+    /** 요청에 실려 온 좌표의 수명(초). 클라이언트가 요청 직전에 측정한 값이라 짧게 잡는다 */
+    private static final long REQUEST_MAX_AGE_SEC = 20;
+    /** 저장 좌표가 정지 상태일 때의 수명(초). 정지 중 보고 간격이 58~62초라 그 1.5배로 둔다 */
+    private static final long CACHE_MAX_AGE_STATIONARY_SEC = 90;
+    /** 저장 좌표가 이동 중일 때의 수명(초). 보행 중 보고 간격은 3~5초다 */
+    private static final long CACHE_MAX_AGE_MOVING_SEC = 30;
+    /** 폰 시계가 서버보다 앞설 때 오차로 봐주는 상한(초). 실측 스큐는 ±1.2초다 */
+    private static final long CLOCK_SKEW_TOLERANCE_SEC = 5;
     private final UserService userService;
     private final RealtimeLocationRepository realtimeLocationRepository;
     private final RouteProgressCalculator routeProgressCalculator;
@@ -58,13 +72,15 @@ public class NavigationService {
                 currentUser.getId(), currentUser.getRole(), mode,
                 request.start().latitude(), request.start().longitude(),
                 request.end().latitude(), request.end().longitude());
-        // 티맵에 보내는 출발 좌표는 요청값이 아니라 기기가 마지막으로 보고한 위치다
-        List<Double> requestedStart = startCoordinate(request, currentUser.getId());
+        // 이동수단 검증이 먼저다. 출발 좌표 판정보다 뒤에 두면 잘못된 mode에 위치 오류가 나간다
+        if (mode != TransportMode.WALK && mode != TransportMode.CAR) throw new BusinessException(ErrorCode.INVALID_TRANSFER);
+        // 출발 좌표는 요청값 → 저장 위치 → 409 순으로 정한다. 규칙은 resolveStart 한 곳에만 둔다
+        StartOrigin startOrigin = resolveStart(request, wardIdOf(currentUser));
+        List<Double> requestedStart = startOrigin.coordinate();
         // 목적지는 보행자 입구점 우선. 규칙은 LocationInfo.routingCoordinate 한 곳에만 둔다
         List<Double> requestedEnd = request.end().routingCoordinate(mode);
         MultiValueMap<String, String> form = getStringStringMultiValueMap(request, mode, requestedStart, requestedEnd);
         try {
-            if (!(mode == TransportMode.WALK) && !(mode == TransportMode.CAR)) throw new BusinessException(ErrorCode.INVALID_TRANSFER);
             if (mode == TransportMode.WALK) {
                 //티맵에서 경로찾기
                 TmapPedestrianResponse res = tmapRestClient.post()
@@ -119,14 +135,16 @@ public class NavigationService {
 
                 //경로 redis 저장
                 NavigationRouteReport report = new NavigationRouteReport(
-                        summary, requestedStart, snappedStart, snapDistanceM(requestedStart, snappedStart),
+                        summary, startOrigin.source(), startOrigin.accuracy(), startOrigin.recordedAt(),
+                        requestedStart, snappedStart, snapDistanceM(requestedStart, snappedStart),
                         requestedEnd, steps);
                 verifyRoutePath(report, mode);
                 String json = objectMapper.writeValueAsString(report);
                 navigationRepository.saveRoute(currentUser.getId(), mode.getPrefix(), json);
-                log.debug("Navigation search done: mode={} totalDistance={} totalTime={} steps={} pathPoints={} snapDistanceM={} entrance={} redisPrefix={}",
+                log.debug("Navigation search done: mode={} totalDistance={} totalTime={} steps={} pathPoints={} snapDistanceM={} startSource={} startAccuracy={} entrance={} redisPrefix={}",
                         mode, totalDistance, totalTime, steps.size(), report.routePath().size(),
-                        report.snapDistanceM(), usesEntrance(request.end(), requestedEnd), mode.getPrefix());
+                        report.snapDistanceM(), startOrigin.source(), startOrigin.accuracy(),
+                        usesEntrance(request.end(), requestedEnd), mode.getPrefix());
 
                 // 출력은 요약만
                 return summary;
@@ -177,14 +195,16 @@ public class NavigationService {
 
                 //경로 redis 저장
                 NavigationRouteReport report = new NavigationRouteReport(
-                        summary, requestedStart, snappedStart, snapDistanceM(requestedStart, snappedStart),
+                        summary, startOrigin.source(), startOrigin.accuracy(), startOrigin.recordedAt(),
+                        requestedStart, snappedStart, snapDistanceM(requestedStart, snappedStart),
                         requestedEnd, steps);
                 verifyRoutePath(report, mode);
                 String json = objectMapper.writeValueAsString(report);
                 navigationRepository.saveRoute(currentUser.getId(), mode.getPrefix(), json);
-                log.debug("Navigation search done: mode={} totalDistance={} totalTime={} steps={} pathPoints={} snapDistanceM={} entrance={} redisPrefix={}",
+                log.debug("Navigation search done: mode={} totalDistance={} totalTime={} steps={} pathPoints={} snapDistanceM={} startSource={} startAccuracy={} entrance={} redisPrefix={}",
                         mode, fStart.totalDistance(), fStart.totalTime(), steps.size(), report.routePath().size(),
-                        report.snapDistanceM(), usesEntrance(request.end(), requestedEnd), mode.getPrefix());
+                        report.snapDistanceM(), startOrigin.source(), startOrigin.accuracy(),
+                        usesEntrance(request.end(), requestedEnd), mode.getPrefix());
 
                 // 출력은 요약만
                 return summary;
@@ -253,6 +273,10 @@ public class NavigationService {
         User ward = userService.currentUserToUser(currentUser.getId());
         Optional<Route> route = routeRepository.findByWardIdAndStatus(currentUser.getId(), RouteStatus.IN_PROGRESS);
         route.ifPresent(Route::canceled);
+        // 취소를 먼저 내보낸다. Hibernate는 flush에서 INSERT를 UPDATE보다 앞세우므로
+        // 그냥 두면 새 경로 INSERT가 아직 IN_PROGRESS인 기존 행과 유니크 인덱스에서 부딪힌다(V2_7).
+        // 재탐색은 이 경로를 반복해서 타므로 상시 재현된다
+        routeRepository.flush();
         String json = navigationRepository.getRoute(currentUser.getId(), mode.getPrefix()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ROUTE));
         if (mode.equals(TransportMode.WALK) || mode.equals(TransportMode.CAR)) {
             NavigationRouteReport report = objectMapper.readValue(json, NavigationRouteReport.class);
@@ -291,7 +315,7 @@ public class NavigationService {
      * 안내 중에 반복 호출되는 API라 부담이 되면 계산 결과를 Redis에 짧게 캐시하는 쪽을 봐야 한다.
      */
     private Integer remainingDistanceOf(Route route, Long wardId) {
-        LocationReport location = lastLocationOf(wardId);
+        LocationReport location = usableLastLocationOf(wardId);
         if (location == null) return null;
 
         String json = route.getReport();
@@ -343,7 +367,7 @@ public class NavigationService {
             Route route = opRoute.get();
             TransportMode mode = route.getMode();
             String json = route.getReport();
-            LocationReport location = lastLocationOf(wardId);
+            LocationReport location = usableLastLocationOf(wardId);
             log.debug("Map route read: wardId={} routeId={} mode={} hasLocation={}",
                     wardId, route.getId(), mode, location != null);
             if (mode.equals(TransportMode.WALK) || mode.equals(TransportMode.CAR)) {
@@ -402,24 +426,106 @@ public class NavigationService {
     }
 
     /**
-     * 티맵에 보낼 출발 좌표 [위도, 경도].
+     * 티맵에 보낼 출발 좌표와 그 출처.
      *
-     * 요청의 출발지는 사용자가 화면에서 고른 값이라 실제 서 있는 자리와 수십 m 어긋날 수 있다.
-     * 기기가 보고한 최신 위치가 있으면 그것을 쓰고, 없으면 요청 좌표로 폴백한다.
-     * 장소검색 중심 좌표(`LocationService.getSearchCenter`)와 같은 출처·같은 규칙이다.
+     * <p><b>요청 좌표 → 저장 좌표 → 실패</b> 순이다. 순서를 고정한 이유가 있다 — 서버가 「더 정확해
+     * 보이는 쪽」을 임의로 고르면, 클라이언트가 월드를 정렬한 기준 좌표와 안내 시작점이 어긋난다.
+     * 요청 좌표가 문턱을 넘으면 저장 좌표가 더 좋아 보여도 요청 좌표를 쓴다.
      *
-     * 최신 위치는 `redis.expired.location`(30분)이 지나면 사라진다. 읽기가 실패해도
-     * 길안내를 막지 않는다 — 폴백이 있는데 502로 올릴 이유가 없다.
+     * <p>둘 다 못 넘으면 경로를 만들지 않고 {@link ErrorCode#LOW_CONFIDENCE_LOCATION}을 던진다.
+     * 나쁜 좌표로 만든 경로는 음성 안내와 화면이 어긋나므로, 틀린 경로보다 「위치 확인 중」이 낫다.
+     * 2026-08-26 실측에서 accuracy 100m짜리 재전송 좌표로 경로가 만들어져 실제 위치에서
+     * 218m 떨어진 곳에서 안내가 시작됐다.
+     *
+     * <p>저장 좌표의 수명을 이동 상태로 나눈 이유 — 고정값으로는 못 맞춘다. 90초는 보행 중
+     * 90m 오차이고, 30초는 정지 중 상시 만료다(실측 보고 간격 58~62초). 판정이 틀릴 때는
+     * 정지 확정이 늦는 쪽이라 오차 방향이 안전하다.
      */
-    private List<Double> startCoordinate(NavigationPreRequest request, Long wardId) {
-        List<Double> requested = List.of(request.start().latitude(), request.start().longitude());
+    private StartOrigin resolveStart(NavigationPreRequest request, Long wardId) {
+        Instant now = Instant.now();
+
+        Long age = ageSeconds(request.startRecordedAt(), now);
+        if (trustworthy(request.startAccuracy(), age, REQUEST_MAX_AGE_SEC)) {
+            return new StartOrigin(List.of(request.start().latitude(), request.start().longitude()),
+                    StartSource.REQUEST, request.startAccuracy(), request.startRecordedAt());
+        }
+        log.info("출발 좌표 — 요청값을 쓰지 않는다: wardId={} accuracy={} ageSec={}",
+                wardId, request.startAccuracy(), age);
+
+        LocationReport last = lastLocationSafely(wardId);
+        if (last != null && last.latitude() != null && last.longitude() != null) {
+            Long lastAge = ageSeconds(last.recordedAt(), now);
+            long limit = last.status() == MovementStatus.STATIONARY
+                    ? CACHE_MAX_AGE_STATIONARY_SEC : CACHE_MAX_AGE_MOVING_SEC;
+            if (trustworthy(last.accuracy(), lastAge, limit)) {
+                log.info("출발 좌표 — 저장 위치로 폴백: wardId={} accuracy={} ageSec={} status={}",
+                        wardId, last.accuracy(), lastAge, last.status());
+                return new StartOrigin(List.of(last.latitude(), last.longitude()),
+                        StartSource.SERVER_CACHE, last.accuracy(), last.recordedAt());
+            }
+            log.info("출발 좌표 — 저장 위치도 못 쓴다: wardId={} accuracy={} ageSec={} status={} limitSec={}",
+                    wardId, last.accuracy(), lastAge, last.status(), limit);
+        }
+        throw new BusinessException(ErrorCode.LOW_CONFIDENCE_LOCATION);
+    }
+
+    /**
+     * 좌표를 경로 출발점으로 쓸 수 있는지. 정확도와 나이를 모두 넘겨야 한다.
+     *
+     * <p>{@code accuracy}가 없거나 0 이하이면 「오차 0」이 아니라 「정확도 없음」이므로 불신한다.
+     * 나이를 모르면({@code age == null}) 측정 시각이 없거나 시계가 5초 넘게 미래인 경우다.
+     */
+    private boolean trustworthy(Float accuracy, Long ageSec, long limitSec) {
+        if (accuracy == null || accuracy <= 0f || accuracy > START_ACCURACY_MAX_M) return false;
+        return ageSec != null && ageSec <= limitSec;
+    }
+
+    /**
+     * 측정 시각부터 지금까지의 초. 못 믿을 값이면 {@code null}.
+     *
+     * <p>폰 시계가 서버보다 앞선 보고가 실측된다(2026-08-26 관측 +1.1초). 그 정도는 시계 오차로
+     * 보고 0초로 클램프하되, {@link #CLOCK_SKEW_TOLERANCE_SEC}를 넘는 미래 시각은 불신한다.
+     * 무제한으로 클램프하면 시계가 크게 틀어진 단말의 좌표가 영원히 「방금 측정됨」이 된다.
+     */
+    private Long ageSeconds(Instant recordedAt, Instant now) {
+        if (recordedAt == null) return null;
+        long age = Duration.between(recordedAt, now).getSeconds();
+        if (age >= 0) return age;
+        return -age <= CLOCK_SKEW_TOLERANCE_SEC ? 0L : null;
+    }
+
+    /**
+     * 남은 거리 계산에 쓸 수 있는 최신 위치. 못 믿을 좌표면 {@code null}이고 남은 거리도 null이 된다.
+     * <p>
+     * 경로 출발점과 같은 문턱을 태운다. 정확도 100m짜리 재전송 좌표로 남은 거리를 재면
+     * 가만히 서 있어도 수십 m씩 튄다.
+     */
+    private LocationReport usableLastLocationOf(Long wardId) {
+        LocationReport last = lastLocationOf(wardId);
+        if (last == null) return null;
+        Long age = ageSeconds(last.recordedAt(), Instant.now());
+        long limit = last.status() == MovementStatus.STATIONARY
+                ? CACHE_MAX_AGE_STATIONARY_SEC : CACHE_MAX_AGE_MOVING_SEC;
+        if (trustworthy(last.accuracy(), age, limit)) return last;
+        log.debug("남은 거리 계산 생략 — wardId={} accuracy={} ageSec={} status={}",
+                wardId, last.accuracy(), age, last.status());
+        return null;
+    }
+
+    /** 피보호자 id. 보호자가 호출하면 자기 id가 아니라 피보호자 id로 최신 위치를 찾아야 한다 */
+    private Long wardIdOf(CurrentUser currentUser) {
+        return currentUser.getRole() == UserRole.WARD
+                ? currentUser.getId()
+                : userService.getWardIdFromGuardianId(currentUser.getId());
+    }
+
+    /** 최신 위치 읽기 실패가 길안내를 막지 않게 한다. 폴백 대상일 뿐이라 502로 올릴 이유가 없다 */
+    private LocationReport lastLocationSafely(Long wardId) {
         try {
-            LocationReport last = lastLocationOf(wardId);
-            if (last == null || last.latitude() == null || last.longitude() == null) return requested;
-            return List.of(last.latitude(), last.longitude());
+            return lastLocationOf(wardId);
         } catch (Exception e) {
-            log.warn("최신 위치를 읽지 못해 요청 출발 좌표를 쓴다: wardId={} message={}", wardId, e.getMessage());
-            return requested;
+            log.warn("최신 위치를 읽지 못했다: wardId={} message={}", wardId, e.getMessage());
+            return null;
         }
     }
 

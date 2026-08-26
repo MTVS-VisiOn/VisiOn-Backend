@@ -49,6 +49,7 @@ public enum ErrorCode {
     /*Navigation*/
     NOT_FOUND_TMAP_ROUTE(HttpStatus.NOT_FOUND, "티맵에서 경로를 찾을 수 없습니다."),
     INVALID_LOCATION(HttpStatus.BAD_REQUEST, "잘못된 장소가 입력되었습니다."),
+    LOW_CONFIDENCE_LOCATION(HttpStatus.CONFLICT, "현재 위치의 신뢰도가 낮아 경로를 만들 수 없습니다."),
     INVALID_TRANSFER(HttpStatus.BAD_REQUEST, "잘못된 이동수단이 입력되었습니다."),
     NOT_IN_SERVICE(HttpStatus.NOT_FOUND, "지금은 운행 중인 대중교통이 없습니다."),
     INVALID_TRANSIT_INDEX(HttpStatus.BAD_REQUEST, "대중교통 경로의 인덱스가 없습니다."),

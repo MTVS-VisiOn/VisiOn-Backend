@@ -61,17 +61,22 @@ class RouteRepositoryTest extends PostgresContainerSupport {
      * `createdAt`은 `@CreatedDate`라 persist 시점에 감사 리스너가 덮어쓰고, `updatable = false`라
      * JPA UPDATE 문에서도 빠진다. 그래서 필드를 바꿔 flush해도 DB에 반영되지 않는다.
      * 네이티브 쿼리로 직접 넣어야 한다.
+     * <p>
+     * 상태는 <b>persist 전에</b> 맞춘다. `Route` 생성자가 항상 `IN_PROGRESS`로 시작하므로
+     * 나중에 바꾸면 INSERT가 잠깐 `IN_PROGRESS`로 나가고, 같은 피보호자의 진행 중 경로가
+     * 이미 있으면 유니크 인덱스(V2_7)에 걸린다.
      */
     private void persistRouteAt(User ward, String destinationName, RouteStatus status, LocalDateTime createdAt) {
         Route route = new Route(TransportMode.WALK, summary(destinationName), "{}", ward);
+        if (status == RouteStatus.COMPLETED) route.completed();
+        else if (status == RouteStatus.CANCELED) route.canceled();
         entityManager.persist(route);
         entityManager.flush();
 
         entityManager.getEntityManager()
-                .createNativeQuery("update routes set created_at = ?1, status = ?2 where id = ?3")
+                .createNativeQuery("update routes set created_at = ?1 where id = ?2")
                 .setParameter(1, createdAt)
-                .setParameter(2, status.name())
-                .setParameter(3, route.getId())
+                .setParameter(2, route.getId())
                 .executeUpdate();
         entityManager.clear();
     }

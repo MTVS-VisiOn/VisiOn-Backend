@@ -629,7 +629,7 @@ public interface NavigationControllerSupporter {
 
                     | mode | report 구조 |
                     |---|---|
-                    | `WALK`·`CAR` | `{ summary, requestedStart, snappedStart, snapDistanceM, requestedEnd, routePath, report: [RouteStep] }` |
+                    | `WALK`·`CAR` | `{ summary, startSource, startAccuracy, startRecordedAt, requestedStart, snappedStart, snapDistanceM, requestedEnd, routePath, report: [RouteStep] }` |
                     | `TRANSIT` | `{ summary, legs: [TransitLeg] }` |
 
                     보행자·자동차의 `report[]`는 **step 하나가 "안내점 + 그 다음 구간"을 통째로 갖는다.**
@@ -639,10 +639,27 @@ public interface NavigationControllerSupporter {
                     **`routePath`는 그 폴리라인을 서버가 미리 이어둔 것**이다. 경로 형상만 그릴 거면
                     `report[]`를 순회하지 말고 이것만 쓰면 된다. 구간 경계에서 겹치는 좌표는 제거돼 있다.
 
-                    `requestedStart`는 티맵에 보낸 출발 좌표(기기의 최신 GPS, 없으면 요청 좌표),
+                    `requestedStart`는 티맵에 보낸 출발 좌표,
                     `snappedStart`는 티맵이 보행로 위로 옮긴 실제 안내 시작 좌표다.
                     `snapDistanceM`은 둘 사이 거리(m)이며 **이 값이 크면 안내가 사용자가 서 있는 자리에서
                     시작하지 않는다는 뜻**이다.
+
+                    `startSource`는 그 출발 좌표가 어디서 왔는지다.
+
+                    | 값 | 뜻 |
+                    |---|---|
+                    | `REQUEST` | 요청에 실려 온 좌표를 그대로 썼다 |
+                    | `SERVER_CACHE` | 요청 좌표가 문턱을 못 넘어 서버에 저장된 최신 위치로 폴백했다 |
+
+                    `startAccuracy`(m)와 `startRecordedAt`은 그 좌표의 반경 오차와 측정 시각이다.
+                    `SERVER_CACHE`가 자주 나오면 앱의 위치 보고가 끊기고 있다는 신호다.
+
+                    **둘 다 문턱을 못 넘으면 경로를 만들지 않고 409 `LOW_CONFIDENCE_LOCATION`을 준다.**
+                    나쁜 좌표로 만든 경로는 음성 안내와 화면이 어긋나므로, 틀린 경로보다 「위치 확인 중」이 낫다.
+                    이때는 위치를 다시 받아 재시도하면 된다 — 요청을 고칠 문제가 아니라 잠시 뒤 풀리는 상태다.
+
+                    판정 기준은 정확도 30m 이하(`0`·음수·누락은 불신), 나이는 요청 좌표 20초 ·
+                    저장 좌표는 이동 상태에 따라 정지 90초 / 이동 30초다.
 
                     `requestedEnd`는 **실제로 경로를 계산한 목적지 좌표**다. `WALK`에서 요청의 `end`에
                     보행자 입구점(`pnsLat`/`pnsLon`)이 실려 있으면 중심점이 아니라 그쪽으로 가므로,
@@ -851,6 +868,9 @@ public interface NavigationControllerSupporter {
                                                                             "destinationAddress": "서울 서초구 강남대로 213",
                                                                             "destinationCoordinate": [37.479103, 127.037476]
                                                                         },
+                                                                        "startSource": "REQUEST",
+                                                                        "startAccuracy": 8.2,
+                                                                        "startRecordedAt": "2026-08-26T07:35:29.900Z",
                                                                         "requestedStart": [37.504600, 127.024750],
                                                                         "snappedStart": [37.504585, 127.024798],
                                                                         "snapDistanceM": 4.6,

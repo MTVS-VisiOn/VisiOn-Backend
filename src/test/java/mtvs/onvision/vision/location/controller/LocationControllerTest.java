@@ -232,7 +232,7 @@ class LocationControllerTest {
                 //given
                 LastLocationResponse response = new LastLocationResponse(
                         37.501274, 127.039585, "경기도 부천시 원미구 부일로 123",
-                        MovementStatus.ON_FOOT.getMessage(), Instant.parse("2026-08-04T05:32:10.123Z"));
+                        MovementStatus.ON_FOOT.getMessage(), Instant.parse("2026-08-04T05:32:10.123Z"), 8.2f);
                 given(locationService.getLastLocation(any(CurrentUser.class))).willReturn(response);
 
                 //when-then

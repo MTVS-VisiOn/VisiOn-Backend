@@ -17,6 +17,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Slf4j
@@ -76,7 +77,14 @@ public class LocationService {
         log.debug("Location write requested: userId={} role={} tokenType={} lat={} lon={} accuracy={} recordedAt={}",
                 currentUser.getId(), currentUser.getRole(), currentUser.getTokenType(),
                 request.latitude(), request.longitude(), request.accuracy(), request.recordedAt());
-        Movement movement = classifyMovement(request, readPrevious(currentUser.getId()), currentUser.getId());
+        LocationReport previous = readPrevious(currentUser.getId());
+        String skip = skipReason(request, previous);
+        if (skip != null) {
+            log.info("Location write skipped: userId={} reason={} keptRecordedAt={}",
+                    currentUser.getId(), skip, previous.recordedAt());
+            return;
+        }
+        Movement movement = classifyMovement(request, previous, currentUser.getId());
         LocationReport report = LocationReport.from(request, currentUser.getId(), movement.status(), movement.anchor());
         String json = objectMapper.writeValueAsString(report);
         realtimeLocationRepository.saveLocation(currentUser.getId(), json);
@@ -106,7 +114,7 @@ public class LocationService {
         log.debug("Location read: wardId={} lat={} lon={} status={} recordedAt={} roadAddress={}",
                 wardId, latitude, longitude, report.
                         status(), report.recordedAt(), roadAddress);
-        return new LastLocationResponse(latitude, longitude, roadAddress, report.status().getMessage() ,report.recordedAt());
+        return new LastLocationResponse(latitude, longitude, roadAddress, report.status().getMessage(), report.recordedAt(), report.accuracy());
     }
 
     /**
@@ -314,6 +322,33 @@ public class LocationService {
         if (status == MovementStatus.IN_VEHICLE) return null;
         if (previous == MovementStatus.IN_VEHICLE) return now;
         return current;
+    }
+
+    /**
+     * 저장하지 않고 버려야 할 보고인지. 버릴 이유가 있으면 그 이유를, 아니면 {@code null}을 준다.
+     * <p>
+     * 두 가지를 막는다.
+     * <ul>
+     *   <li><b>재전송</b> — GNSS 픽스가 없는 동안 앱이 같은 좌표를 30초 간격으로 다시 보낸다.
+     *       실측(2026-08-26 16:35~16:38)에서 같은 좌표 6건이 accuracy만 55.6 → 97.6 → 100.0으로
+     *       올라갔다. <b>측정 시각으로는 못 거른다 — 재전송마다 전송 시각으로 다시 찍혀 서버에는
+     *       늘 「방금 측정됨」으로 보인다.</b>
+     *   <li><b>순서 역전</b> — 같은 샘플이 BLE(→Quest→경로요청)와 직접 보고 두 경로로 나가면서
+     *       지연 차이로 오래된 것이 나중에 도착할 수 있다. 덮어쓰면 최신 위치가 뒤로 감기고
+     *       이동 판정 앵커까지 오염된다. 측정 시각이 <b>같은</b> 것도 버린다 — 시각을 보존한 재전송이
+     *       그렇게 도착한다.
+     * </ul>
+     * 좌표 동일성 판정은 {@code sampleId}가 없을 때만 쓴다. 실제 새 픽스가 이전과 소수점까지
+     * 같을 확률은 무시할 수 있지만, 식별자가 있으면 추정할 이유가 없다.
+     */
+    private String skipReason(LocationRequest request, LocationReport previous) {
+        if (previous == null) return null;
+        if (request.sampleId() != null && request.sampleId().equals(previous.sampleId())) return "same-sample";
+        if (previous.recordedAt() != null && !request.recordedAt().isAfter(previous.recordedAt())) return "not-newer";
+        if (request.sampleId() == null
+                && Objects.equals(request.latitude(), previous.latitude())
+                && Objects.equals(request.longitude(), previous.longitude())) return "same-coordinate";
+        return null;
     }
 
     /** 최근 위치를 읽는다. 없으면 null — 첫 보고이거나 30분 TTL이 지난 경우다 */

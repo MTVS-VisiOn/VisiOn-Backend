@@ -31,6 +31,9 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.queryParam;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -146,6 +149,78 @@ class LocationServiceTest {
                 //then
                 verify(realtimeLocationRepository).saveLocation(org.mockito.ArgumentMatchers.eq(wardId),
                         org.mockito.ArgumentMatchers.any());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 같은 GPS 샘플이 다시 오면")
+        class Context_with_resent_sample {
+
+            @Test
+            @DisplayName("It : 저장하지 않는다 — 재측정이 아니라 재전송이다")
+            void it_skips_same_sample() {
+                //given
+                Instant measured = Instant.now();
+                String previousJson = "{\"previous\":true}";
+                LocationReport previous = new LocationReport(
+                        wardId, 37.5, 127.0, 30f, MovementStatus.STATIONARY, measured, null, "sample-1");
+                // 정확도만 키워 30초 뒤 다시 보낸 경우. 좌표도 시각도 새것처럼 보이지만 같은 샘플이다
+                LocationRequest request = new LocationRequest(
+                        37.5001, 127.0, 100f, measured.plusSeconds(30), "sample-1");
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.of(previousJson));
+                given(objectMapper.readValue(previousJson, LocationReport.class)).willReturn(previous);
+
+                //when
+                locationService.receiveLocation(request, ward);
+
+                //then
+                verify(realtimeLocationRepository, never()).saveLocation(anyLong(), anyString());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 측정 시각이 저장된 것보다 새롭지 않으면")
+        class Context_with_not_newer_report {
+
+            @Test
+            @DisplayName("It : 저장하지 않는다 — 순서 역전이거나 시각을 보존한 재전송이다")
+            void it_skips_not_newer() {
+                //given
+                Instant measured = Instant.now();
+                String previousJson = "{\"previous\":true}";
+                LocationReport previous = report(37.5, 127.0, 10f, MovementStatus.ON_FOOT, measured);
+                LocationRequest request = request(37.6, 127.0, 10f, measured);
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.of(previousJson));
+                given(objectMapper.readValue(previousJson, LocationReport.class)).willReturn(previous);
+
+                //when
+                locationService.receiveLocation(request, ward);
+
+                //then
+                verify(realtimeLocationRepository, never()).saveLocation(anyLong(), anyString());
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: sampleId 없이 직전과 같은 좌표가 오면")
+        class Context_with_same_coordinate {
+
+            @Test
+            @DisplayName("It : 저장하지 않는다 — 식별자가 없을 때의 재전송 판정이다")
+            void it_skips_same_coordinate() {
+                //given
+                Instant measured = Instant.now();
+                String previousJson = "{\"previous\":true}";
+                LocationReport previous = report(37.5, 127.0, 30f, MovementStatus.STATIONARY, measured);
+                LocationRequest request = request(37.5, 127.0, 100f, measured.plusSeconds(30));
+                given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.of(previousJson));
+                given(objectMapper.readValue(previousJson, LocationReport.class)).willReturn(previous);
+
+                //when
+                locationService.receiveLocation(request, ward);
+
+                //then
+                verify(realtimeLocationRepository, never()).saveLocation(anyLong(), anyString());
             }
         }
 
