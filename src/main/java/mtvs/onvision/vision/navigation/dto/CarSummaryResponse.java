@@ -12,10 +12,10 @@ public record CarSummaryResponse(
         Integer totalFare,           //통행료(원)
         Integer taxiFare,            //택시 예상요금(원)
         String startingName,
-        String startingRoadAddress,
+        String startingAddress,
         List<Double> startingCoordinate,
         String destinationName,
-        String destinationRoadAddress,
+        String destinationAddress,
         List<Double> destinationCoordinate
 ) implements NavigationSummary {
 }

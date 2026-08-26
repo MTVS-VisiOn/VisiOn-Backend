@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Redis 버퍼를 주기적으로 비운다. 트리거만 하고 조율은 서비스가 한다.
- *
+ * <p>
  * 스케줄러를 서비스와 분리한 이유는 테스트에서 주기를 기다리지 않고 `flush()`를 직접 부르기 위해서,
  * 그리고 `location.flush.enabled=false`로 스케줄만 끄기 위해서다.
  */

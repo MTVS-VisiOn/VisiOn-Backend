@@ -16,7 +16,7 @@ public class JpaConfig {
 
     /**
      * 감사 시각을 KST 벽시계로 고정한다.
-     *
+     * <p>
      * 기본 제공자(`CurrentDateTimeProvider`)는 `LocalDateTime.now()`라 JVM 기본 시간대를 탄다.
      * 배포 컨테이너에는 TZ 설정이 없어 UTC이고 개발 PC는 KST라, 같은 `createdAt` 컬럼에
      * 의미가 다른 값이 섞인다. 하루 경계로 조회하는 API가 여기에 걸린다.

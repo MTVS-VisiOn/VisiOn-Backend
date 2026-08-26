@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * `ON CONFLICT DO NOTHING`이 실제로 중복을 흡수하는지 확인한다.
- *
+ * <p>
  * 재시도가 정상 경로라(LMOVE + 커밋 후 삭제) 이 동작이 깨지면 유니크 제약 위반으로
  * 배치 전체가 롤백되고, 버퍼가 영영 안 비워진다. 조용히 밀리는 종류의 고장이다.
  */

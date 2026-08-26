@@ -8,7 +8,7 @@ import java.util.List;
 
 /**
  * 대중교통 경로검색(POST /transit/routes) 응답.
- *
+ * <p>
  * 최상위 키가 3종이고 셋이 같이 오지 않는다.
  *   metaData : 성공
  *   result   : API 층 오류. 11·12·13·14는 HTTP 200으로 온다
@@ -164,7 +164,7 @@ public record TmapTransitResponse(
     /**
      * 도보 상세. 보행자 API와 달리 description의 거리가 step.distance와 전부 일치해서
      * withRealDistance가 필요 없다. facilityType이 없어 횡단보도·계단을 코드로는 못 잡는다.
-     *
+     * <p>
      * ⚠ Σsteps.distance != leg.distance 인 경우가 있다(11개 중 8개, 최대 405m).
      *   대중교통이 보행자 API의 LineString을 Point마다 하나씩만 쓰고 나머지를 버려서 생긴다.
      */

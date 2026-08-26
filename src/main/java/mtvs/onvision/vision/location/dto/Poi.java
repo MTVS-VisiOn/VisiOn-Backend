@@ -26,6 +26,7 @@ public record Poi(
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record NewAddress(
+            String roadName,          // 비어 있으면 도로명 주소가 없는 POI다
             String fullAddressRoad
     ) {}
 }
