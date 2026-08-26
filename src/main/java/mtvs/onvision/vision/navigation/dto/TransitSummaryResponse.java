@@ -21,10 +21,10 @@ public record TransitSummaryResponse(
         Integer totalFare,           // 원
         List<LegSummary> legs,       // 무엇을 타는지. 이게 없으면 후보를 고를 수 없다
         String startingName,         // 출발지
-        String startingRoadAddress,  // 출발지 도로 주소
+        String startingAddress,  // 출발지 주소
         List<Double> startingCoordinate,   // 출발지 좌표
         String destinationName,      // 도착지
-        String destinationRoadAddress,     // 도착지 도로 주소
+        String destinationAddress,     // 도착지 주소
         List<Double> destinationCoordinate // 도착지 좌표
 ) implements NavigationSummary {
 

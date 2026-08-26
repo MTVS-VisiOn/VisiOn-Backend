@@ -773,7 +773,7 @@ class LocationServiceTest {
                           "secondNo": "0",
                           "newAddressList": {
                             "newAddress": [
-                              { "fullAddressRoad": "서울 종로구 새문안로5길 11" }
+                              { "roadName": "새문안로5길", "fullAddressRoad": "서울 종로구 새문안로5길 11" }
                             ]
                           }
                         },
@@ -792,7 +792,7 @@ class LocationServiceTest {
                           "secondNo": "14",
                           "newAddressList": {
                             "newAddress": [
-                              { "fullAddressRoad": "서울 영등포구 여의대방로 383" }
+                              { "roadName": "여의대방로", "fullAddressRoad": "서울 영등포구 여의대방로 383" }
                             ]
                           }
                         }

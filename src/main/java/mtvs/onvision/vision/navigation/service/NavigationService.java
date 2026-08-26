@@ -103,9 +103,9 @@ public class NavigationService {
                         totalDistance, totalTime, crosswalkCount,
                         stairCount, overpassCount, underpassCount,
                         (start.nickname() == null || start.nickname().isBlank())? start.name(): start.nickname(),
-                        start.roadAddress(), List.of(start.latitude(), start.longitude()),
+                        start.address(), List.of(start.latitude(), start.longitude()),
                         (end.nickname() == null || end.nickname().isBlank())? end.name(): end.nickname(),
-                        end.roadAddress(),List.of(end.latitude(), end.longitude())
+                        end.address(),List.of(end.latitude(), end.longitude())
                 );
 
                 // RoutStep 생성
@@ -156,9 +156,9 @@ public class NavigationService {
                         fStart.totalDistance(), fStart.totalTime(),
                         fStart.totalFare(), fStart.taxiFare(),
                         (start.nickname() == null || start.nickname().isBlank())? start.name(): start.nickname(),
-                        start.roadAddress(), List.of(start.latitude(), start.longitude()),
+                        start.address(), List.of(start.latitude(), start.longitude()),
                         (end.nickname() == null || end.nickname().isBlank())? end.name(): end.nickname(),
-                        end.roadAddress(),List.of(end.latitude(), end.longitude())
+                        end.address(),List.of(end.latitude(), end.longitude())
                 );
 
                 // RoutStep 생성
@@ -580,9 +580,9 @@ public class NavigationService {
                 itinerary.transferCount(), totalFare,
                 legs.stream().map(this::toLegSummary).toList(),
                 (start.nickname() == null || start.nickname().isBlank()) ? start.name() : start.nickname(),
-                start.roadAddress(), List.of(start.latitude(), start.longitude()),
+                start.address(), List.of(start.latitude(), start.longitude()),
                 (end.nickname() == null || end.nickname().isBlank()) ? end.name() : end.nickname(),
-                end.roadAddress(), List.of(end.latitude(), end.longitude())
+                end.address(), List.of(end.latitude(), end.longitude())
         );
     }
 

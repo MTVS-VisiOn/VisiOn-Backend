@@ -28,7 +28,7 @@ public record MapResponse(
                 .flatMap(r -> r.pathToNext().stream())
                 .map(p -> Map.of("latitude", p.get(0), "longitude", p.get(1)))
                 .toList();
-        return new MapResponse(summary.destinationName(), summary.destinationRoadAddress(), summary.destinationCoordinate().get(0),summary.destinationCoordinate().get(1),
+        return new MapResponse(summary.destinationName(), summary.destinationAddress(), summary.destinationCoordinate().get(0),summary.destinationCoordinate().get(1),
                 summary.totalDistance(), remainingDistanceM, summary.totalTime()/60, departureTime.atZone(SEOUL).toInstant(), mode, path);
     }
 
@@ -40,7 +40,7 @@ public record MapResponse(
                         : leg.path().stream())                                    // 대중교통 leg
                 .map(p -> Map.of("latitude", p.get(0), "longitude", p.get(1)))
                 .toList();
-        return new MapResponse(summary.destinationName(), summary.destinationRoadAddress(), summary.destinationCoordinate().get(0),summary.destinationCoordinate().get(1),
+        return new MapResponse(summary.destinationName(), summary.destinationAddress(), summary.destinationCoordinate().get(0),summary.destinationCoordinate().get(1),
                 summary.totalDistance(), remainingDistanceM, summary.totalTime()/60, departureTime.atZone(SEOUL).toInstant(), TransportMode.TRANSIT, path);
     }
 }

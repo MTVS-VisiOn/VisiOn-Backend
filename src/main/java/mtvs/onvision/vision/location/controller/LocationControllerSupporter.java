@@ -211,7 +211,7 @@ public interface LocationControllerSupporter {
                                                                             "noorLat": 37.42794467,
                                                                             "noorLon": 127.09904175,
                                                                             "landAddress": "경기 성남시 수정구 고등동 456-1",
-                                                                            "roadAddress": "경기 성남시 수정구"
+                                                                            "roadAddress": null
                                                                         },
                                                                         {
                                                                             "id": "7935140",
@@ -220,7 +220,7 @@ public interface LocationControllerSupporter {
                                                                             "noorLat": 37.42836128,
                                                                             "noorLon": 127.09843068,
                                                                             "landAddress": "경기 성남시 수정구 고등동 461",
-                                                                            "roadAddress": "경기 성남시 수정구"
+                                                                            "roadAddress": null
                                                                         },
                                                                         {
                                                                             "id": "11776453",
