@@ -458,7 +458,7 @@ class NavigationServiceTest {
                 //then
                 assertThat(response.start().latitude()).isEqualTo(37.504585);
                 assertThat(response.start().longitude()).isEqualTo(127.024798);
-                assertThat(response.start().roadAddress()).isEqualTo("서울 강남구 강남대로 지하 476");
+                assertThat(response.start().address()).isEqualTo("서울 강남구 강남대로 지하 476");
                 assertThat(response.end().latitude()).isEqualTo(37.479103);
                 assertThat(response.end().longitude()).isEqualTo(127.037476);
             }

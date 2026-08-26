@@ -10,11 +10,11 @@ import java.time.Instant;
 
 /**
  * 피보호자의 위치 이력.
- *
+ * <p>
  * **저장은 JPA가 하지 않는다.** Redis 버퍼를 비우는 경로가 `LocationHistoryJdbcRepository`의
  * 배치 INSERT이고, 재시도 멱등성을 위해 `ON CONFLICT DO NOTHING`을 쓰는데 JPA로는 표현할 수 없다.
  * 이 엔티티는 조회용이며 `ddl-auto: validate`가 컬럼을 맞춰보는 대상이기도 하다.
- *
+ * <p>
  * append-only라 `BaseEntity`가 아니라 `HistoryEntity`(created_at만)를 상속한다.
  */
 @Entity

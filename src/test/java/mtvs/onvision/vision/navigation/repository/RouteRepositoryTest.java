@@ -57,7 +57,7 @@ class RouteRepositoryTest extends PostgresContainerSupport {
 
     /**
      * 과거 경로를 심는다.
-     *
+     * <p>
      * `createdAt`은 `@CreatedDate`라 persist 시점에 감사 리스너가 덮어쓰고, `updatable = false`라
      * JPA UPDATE 문에서도 빠진다. 그래서 필드를 바꿔 flush해도 DB에 반영되지 않는다.
      * 네이티브 쿼리로 직접 넣어야 한다.

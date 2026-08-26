@@ -109,9 +109,9 @@ public class NavigationService {
                         totalDistance, totalTime, crosswalkCount,
                         stairCount, overpassCount, underpassCount,
                         (start.nickname() == null || start.nickname().isBlank())? start.name(): start.nickname(),
-                        start.roadAddress(), List.of(start.latitude(), start.longitude()),
+                        start.address(), List.of(start.latitude(), start.longitude()),
                         (end.nickname() == null || end.nickname().isBlank())? end.name(): end.nickname(),
-                        end.roadAddress(),List.of(end.latitude(), end.longitude())
+                        end.address(),List.of(end.latitude(), end.longitude())
                 );
 
                 // RoutStep 생성
@@ -167,9 +167,9 @@ public class NavigationService {
                         fStart.totalDistance(), fStart.totalTime(),
                         fStart.totalFare(), fStart.taxiFare(),
                         (start.nickname() == null || start.nickname().isBlank())? start.name(): start.nickname(),
-                        start.roadAddress(), List.of(start.latitude(), start.longitude()),
+                        start.address(), List.of(start.latitude(), start.longitude()),
                         (end.nickname() == null || end.nickname().isBlank())? end.name(): end.nickname(),
-                        end.roadAddress(),List.of(end.latitude(), end.longitude())
+                        end.address(),List.of(end.latitude(), end.longitude())
                 );
 
                 // RoutStep 생성
@@ -286,7 +286,7 @@ public class NavigationService {
 
     /**
      * 남은 거리를 구하려고 저장된 경로 JSON을 한 번 더 파싱한다.
-     *
+     * <p>
      * `/processing`은 `report`를 `@JsonRawValue`로 그대로 흘려보내서 원래는 파싱이 필요 없었다.
      * 안내 중에 반복 호출되는 API라 부담이 되면 계산 결과를 Redis에 짧게 캐시하는 쪽을 봐야 한다.
      */
@@ -364,7 +364,7 @@ public class NavigationService {
 
     /**
      * 남은 거리 계산용 현재 좌표. 없으면 null이고 남은 거리도 null이 된다.
-     *
+     * <p>
      * `LocationService.getLastLocation`을 쓰지 않는 이유는 그쪽이 좌표마다 티맵 역지오코딩을 부르기 때문이다.
      * 여기서는 주소가 필요 없고, 지도 갱신 주기마다 외부 API를 때릴 이유가 없다.
      */
@@ -666,9 +666,9 @@ public class NavigationService {
                 itinerary.transferCount(), totalFare,
                 legs.stream().map(this::toLegSummary).toList(),
                 (start.nickname() == null || start.nickname().isBlank()) ? start.name() : start.nickname(),
-                start.roadAddress(), List.of(start.latitude(), start.longitude()),
+                start.address(), List.of(start.latitude(), start.longitude()),
                 (end.nickname() == null || end.nickname().isBlank()) ? end.name() : end.nickname(),
-                end.roadAddress(), List.of(end.latitude(), end.longitude())
+                end.address(), List.of(end.latitude(), end.longitude())
         );
     }
 

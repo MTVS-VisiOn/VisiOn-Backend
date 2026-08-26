@@ -65,11 +65,11 @@ public class Route extends BaseEntity {
 
     public Route (TransportMode mode, NavigationSummary summary, String json, User ward) {
         this.startingName = summary.startingName();
-        this.startingAddress = summary.startingRoadAddress();
+        this.startingAddress = summary.startingAddress();
         this.startingLat = summary.startingCoordinate().getFirst();
         this.startingLon = summary.startingCoordinate().getLast();
         this.destinationName = summary.destinationName();
-        this.destinationAddress = summary.destinationRoadAddress();
+        this.destinationAddress = summary.destinationAddress();
         this.destinationLat = summary.destinationCoordinate().getFirst();
         this.destinationLon = summary.destinationCoordinate().getLast();
         this.status = RouteStatus.IN_PROGRESS;

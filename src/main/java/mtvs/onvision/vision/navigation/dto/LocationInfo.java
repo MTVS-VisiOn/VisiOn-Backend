@@ -50,10 +50,13 @@ public record LocationInfo(
         @Size(max = 100)
         @Schema(
                 examples = "서울 강남구 강남대로 지하 476",
-                description = "도로명 주소",
+                description = """
+                        표시용 주소. 도로명 주소가 있으면 그 값을, 없으면 지번 주소를 보낸다.
+                        티맵이 도로명 없는 POI에 도로명을 주지 않으므로 장소검색 응답의
+                        roadAddress는 null일 수 있다 — 그때 landAddress를 대신 넣는다""",
                 requiredMode = Schema.RequiredMode.REQUIRED
         )
-        String roadAddress,
+        String address,
 
         @Schema(
                 examples = "3",

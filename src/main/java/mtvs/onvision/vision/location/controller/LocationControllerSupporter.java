@@ -230,7 +230,7 @@ public interface LocationControllerSupporter {
                                                                             "pnsLat": null,
                                                                             "pnsLon": null,
                                                                             "landAddress": "경기 성남시 수정구 고등동 456-1",
-                                                                            "roadAddress": "경기 성남시 수정구"
+                                                                            "roadAddress": null
                                                                         },
                                                                         {
                                                                             "id": "7935140",
@@ -241,7 +241,7 @@ public interface LocationControllerSupporter {
                                                                             "pnsLat": 37.42828000,
                                                                             "pnsLon": 127.09851000,
                                                                             "landAddress": "경기 성남시 수정구 고등동 461",
-                                                                            "roadAddress": "경기 성남시 수정구"
+                                                                            "roadAddress": null
                                                                         },
                                                                         {
                                                                             "id": "11776453",

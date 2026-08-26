@@ -56,7 +56,7 @@ public interface NavigationControllerSupporter {
                                                     "nickname": "신논현역",
                                                     "latitude": 37.504585,
                                                     "longitude": 127.024798,
-                                                    "roadAddress": "서울 강남구 강남대로 지하 476",
+                                                    "address": "서울 강남구 강남대로 지하 476",
                                                     "favoriteId": null
                                                 },
                                                 "end": {
@@ -64,7 +64,7 @@ public interface NavigationControllerSupporter {
                                                     "nickname": "회사",
                                                     "latitude": 37.479103,
                                                     "longitude": 127.037476,
-                                                    "roadAddress": "서울 서초구 강남대로 213",
+                                                    "address": "서울 서초구 강남대로 213",
                                                     "favoriteId": 3
                                                 }
                                             }
@@ -80,7 +80,7 @@ public interface NavigationControllerSupporter {
                                                     "nickname": "신논현역",
                                                     "latitude": 37.504585,
                                                     "longitude": 127.024798,
-                                                    "roadAddress": "서울 강남구 강남대로 지하 476",
+                                                    "address": "서울 강남구 강남대로 지하 476",
                                                     "favoriteId": null
                                                 },
                                                 "end": {
@@ -88,7 +88,7 @@ public interface NavigationControllerSupporter {
                                                     "nickname": "말죽거리공원사거리",
                                                     "latitude": 37.479103,
                                                     "longitude": 127.037476,
-                                                    "roadAddress": "서울 서초구 강남대로 213",
+                                                    "address": "서울 서초구 강남대로 213",
                                                     "favoriteId": null
                                                 }
                                             }
@@ -122,10 +122,10 @@ public interface NavigationControllerSupporter {
                                                                     "overpassCount": 1,
                                                                     "underpassCount": 0,
                                                                     "startingName": "신논현역",
-                                                                    "startingRoadAddress": "서울 강남구 강남대로 지하 476",
+                                                                    "startingAddress": "서울 강남구 강남대로 지하 476",
                                                                     "startingCoordinate": [37.504585, 127.024798],
                                                                     "destinationName": "말죽거리공원사거리",
-                                                                    "destinationRoadAddress": "서울 서초구 강남대로 213",
+                                                                    "destinationAddress": "서울 서초구 강남대로 213",
                                                                     "destinationCoordinate": [37.479103, 127.037476]
                                                                 }
                                                             }
@@ -146,10 +146,10 @@ public interface NavigationControllerSupporter {
                                                                     "totalFare": 1000,
                                                                     "taxiFare": 22200,
                                                                     "startingName": "신논현역",
-                                                                    "startingRoadAddress": "서울 강남구 강남대로 지하 476",
+                                                                    "startingAddress": "서울 강남구 강남대로 지하 476",
                                                                     "startingCoordinate": [37.504585, 127.024798],
                                                                     "destinationName": "말죽거리공원사거리",
-                                                                    "destinationRoadAddress": "서울 서초구 강남대로 213",
+                                                                    "destinationAddress": "서울 서초구 강남대로 213",
                                                                     "destinationCoordinate": [37.479103, 127.037476]
                                                                 }
                                                             }
@@ -302,7 +302,7 @@ public interface NavigationControllerSupporter {
                                             "nickname": "신논현역",
                                             "latitude": 37.504585,
                                             "longitude": 127.024798,
-                                            "roadAddress": "서울 강남구 강남대로 지하 476",
+                                            "address": "서울 강남구 강남대로 지하 476",
                                             "favoriteId": null
                                         },
                                         "end": {
@@ -310,7 +310,7 @@ public interface NavigationControllerSupporter {
                                             "nickname": "말죽거리공원사거리",
                                             "latitude": 37.479103,
                                             "longitude": 127.037476,
-                                            "roadAddress": "서울 서초구 강남대로 213",
+                                            "address": "서울 서초구 강남대로 213",
                                             "favoriteId": null
                                         }
                                     }
@@ -374,10 +374,10 @@ public interface NavigationControllerSupporter {
                                                                     }
                                                                 ],
                                                                 "startingName": "신논현역",
-                                                                "startingRoadAddress": "서울 강남구 강남대로 지하 476",
+                                                                "startingAddress": "서울 강남구 강남대로 지하 476",
                                                                 "startingCoordinate": [37.504585, 127.024798],
                                                                 "destinationName": "말죽거리공원사거리",
-                                                                "destinationRoadAddress": "서울 서초구 강남대로 213",
+                                                                "destinationAddress": "서울 서초구 강남대로 213",
                                                                 "destinationCoordinate": [37.479103, 127.037476]
                                                             }
                                                         ]
@@ -706,7 +706,7 @@ public interface NavigationControllerSupporter {
                                                                         "nickname": "신논현역",
                                                                         "latitude": 37.504585,
                                                                         "longitude": 127.024798,
-                                                                        "roadAddress": "서울 강남구 강남대로 지하 476",
+                                                                        "address": "서울 강남구 강남대로 지하 476",
                                                                         "favoriteId": null
                                                                     },
                                                                     "end": {
@@ -714,7 +714,7 @@ public interface NavigationControllerSupporter {
                                                                         "nickname": "말죽거리공원사거리",
                                                                         "latitude": 37.479103,
                                                                         "longitude": 127.037476,
-                                                                        "roadAddress": "서울 서초구 강남대로 213",
+                                                                        "address": "서울 서초구 강남대로 213",
                                                                         "favoriteId": null
                                                                     },
                                                                     "remainingDistanceM": 2450,
@@ -741,10 +741,10 @@ public interface NavigationControllerSupporter {
                                                                                 }
                                                                             ],
                                                                             "startingName": "신논현역",
-                                                                            "startingRoadAddress": "서울 강남구 강남대로 지하 476",
+                                                                            "startingAddress": "서울 강남구 강남대로 지하 476",
                                                                             "startingCoordinate": [37.504585, 127.024798],
                                                                             "destinationName": "말죽거리공원사거리",
-                                                                            "destinationRoadAddress": "서울 서초구 강남대로 213",
+                                                                            "destinationAddress": "서울 서초구 강남대로 213",
                                                                             "destinationCoordinate": [37.479103, 127.037476]
                                                                         },
                                                                         "legs": [
@@ -822,7 +822,7 @@ public interface NavigationControllerSupporter {
                                                                         "nickname": "신논현역",
                                                                         "latitude": 37.504585,
                                                                         "longitude": 127.024798,
-                                                                        "roadAddress": "서울 강남구 강남대로 지하 476",
+                                                                        "address": "서울 강남구 강남대로 지하 476",
                                                                         "favoriteId": null
                                                                     },
                                                                     "end": {
@@ -830,7 +830,7 @@ public interface NavigationControllerSupporter {
                                                                         "nickname": "말죽거리공원사거리",
                                                                         "latitude": 37.479103,
                                                                         "longitude": 127.037476,
-                                                                        "roadAddress": "서울 서초구 강남대로 213",
+                                                                        "address": "서울 서초구 강남대로 213",
                                                                         "favoriteId": null
                                                                     },
                                                                     "remainingDistanceM": 2450,
@@ -845,10 +845,10 @@ public interface NavigationControllerSupporter {
                                                                             "overpassCount": 0,
                                                                             "underpassCount": 0,
                                                                             "startingName": "신논현역",
-                                                                            "startingRoadAddress": "서울 강남구 강남대로 지하 476",
+                                                                            "startingAddress": "서울 강남구 강남대로 지하 476",
                                                                             "startingCoordinate": [37.504585, 127.024798],
                                                                             "destinationName": "말죽거리공원사거리",
-                                                                            "destinationRoadAddress": "서울 서초구 강남대로 213",
+                                                                            "destinationAddress": "서울 서초구 강남대로 213",
                                                                             "destinationCoordinate": [37.479103, 127.037476]
                                                                         },
                                                                         "requestedStart": [37.504600, 127.024750],

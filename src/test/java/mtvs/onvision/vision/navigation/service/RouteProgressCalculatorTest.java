@@ -16,10 +16,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * 남은 거리 계산.
- *
+ * <p>
  * 좌표는 서울 근처의 실제 위경도를 쓴다. 위도 1도 ≈ 110.5km, 경도 1도 ≈ 88km(위도 37도 기준)라
  * 위경도 증분을 미터로 환산하며 기대값을 잡았다.
- *
+ * <p>
  * 경로는 위도만 증가하는 남북 직선이다. 동서 성분이 섞이면 기대값을 손으로 계산할 수 없다.
  */
 @DisplayName("RouteProgressCalculator의")

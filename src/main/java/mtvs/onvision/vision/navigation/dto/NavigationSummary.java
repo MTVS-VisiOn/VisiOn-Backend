@@ -16,10 +16,10 @@ public sealed interface NavigationSummary permits WalkSummaryResponse, CarSummar
     Integer totalDistance();
     Integer totalTime();
     String startingName();
-    String startingRoadAddress();
+    String startingAddress();
     List<Double> startingCoordinate();
     String destinationName();
-    String destinationRoadAddress();
+    String destinationAddress();
     List<Double> destinationCoordinate();
 
 }
