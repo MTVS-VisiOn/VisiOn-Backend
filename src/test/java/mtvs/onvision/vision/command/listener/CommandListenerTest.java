@@ -1,5 +1,6 @@
 package mtvs.onvision.vision.command.listener;
 
+import mtvs.onvision.vision.alert.domain.NotifyStatus;
 import mtvs.onvision.vision.common.service.FcmService;
 import mtvs.onvision.vision.common.constant.DataMessageType;
 import mtvs.onvision.vision.command.event.GuardianInstructed;
@@ -15,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Instant;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -95,6 +97,41 @@ class CommandListenerTest {
                 //then
                 verify(fcmService).sendToDevice(anyLong(), anyString(), any(DataMessageType.class), any(Instant.class), eq("fid-1"));
                 verify(fcmService).sendToDevice(anyLong(), anyString(), any(DataMessageType.class), any(Instant.class), eq("fid-2"));
+            }
+        }
+
+        @Nested
+        @DisplayName("Context: 일부 기기 전송이 실패하면")
+        class Context_with_partial_failure {
+
+            @Test
+            @DisplayName("(재전송하지 않는다)It : 나머지 기기 전송을 계속한다")
+            void it_keeps_sending_to_the_rest() {
+                //given : 지시는 다시 보내지 않으므로 실패한 기기를 붙잡고 멈추면 안 된다
+                given(userService.getFids(wardId)).willReturn(List.of("fid-dead", "fid-alive"));
+                given(fcmService.sendToDevice(anyLong(), anyString(), any(DataMessageType.class), any(Instant.class), eq("fid-dead")))
+                        .willReturn(NotifyStatus.UNREGISTERED);
+                given(fcmService.sendToDevice(anyLong(), anyString(), any(DataMessageType.class), any(Instant.class), eq("fid-alive")))
+                        .willReturn(NotifyStatus.SENT);
+
+                //when
+                commandListener.handleGuardianInstructedEvent(event);
+
+                //then
+                verify(fcmService).sendToDevice(anyLong(), anyString(), any(DataMessageType.class), any(Instant.class), eq("fid-alive"));
+            }
+
+            @Test
+            @DisplayName("(예외로 만들지 않는다)It : 조용히 끝낸다")
+            void it_does_not_throw() {
+                //given : 실패는 로그로만 남는다. 여기서 던지면 @Async 스레드에서 죽는다
+                given(userService.getFids(wardId)).willReturn(List.of("fid-dead"));
+                given(fcmService.sendToDevice(anyLong(), anyString(), any(DataMessageType.class), any(Instant.class), anyString()))
+                        .willReturn(NotifyStatus.FAILED);
+
+                //when & then
+                assertThatCode(() -> commandListener.handleGuardianInstructedEvent(event))
+                        .doesNotThrowAnyException();
             }
         }
 
