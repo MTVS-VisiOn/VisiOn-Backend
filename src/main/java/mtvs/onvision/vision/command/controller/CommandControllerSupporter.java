@@ -30,6 +30,36 @@ public interface CommandControllerSupporter {
                     나중에 배달되면 위험한 데이터라 재전송하지 않는다.
 
                     앱은 수신 즉시 음성으로 읽는다. `content`는 그대로 발화되므로 빈 값을 보낼 수 없다.
+
+                    ### 피보호자 기기로 나가는 FCM data 계약
+
+                    알림(notification)이 없는 **data-only** 메시지다. FCM 제약상 **값은 모두 문자열**이다.
+
+                    ```json
+                    {
+                      "type": "GUARDIAN_INSTRUCTION",
+                      "commandId": "123",
+                      "content": "잠시 멈추세요.",
+                      "occurredAt": "2026-08-27T12:30:00Z",
+                      "occurredAtEpochMillis": "1787805000000",
+                      "expiresAtEpochMillis": "1787805030000"
+                    }
+                    ```
+
+                    | 필드 | 설명 |
+                    |---|---|
+                    | `type` | 항상 `GUARDIAN_INSTRUCTION` |
+                    | `commandId` | 지시 id. 앱·Unity의 중복 재생 방지 키다 |
+                    | `content` | 표시·발화할 문구 |
+                    | `occurredAt` | 발생 시각. **UTC ISO-8601**(`Z`)이다. KST가 아니다 |
+                    | `occurredAtEpochMillis` | 발생 시각 epoch millis |
+                    | `expiresAtEpochMillis` | 발생 시각 + 30초. 앱과 Unity가 이 값으로 폐기를 판단한다 |
+
+                    **FCM ttl도 같은 30초다.** 알림 API의 ttl(24시간)과 다르다 — 지시는 늦게 도착하면
+                    위험하므로 기기가 꺼져 있었다면 FCM 단계에서 버려진다.
+
+                    서버는 **영상 연결 여부를 검사하지 않는다.** 스트리밍 중이 아닐 때 재생하지 않는 것은
+                    보호자 앱과 Unity 쪽 책임이다. 이 API를 직접 호출해도 저장과 발송은 그대로 일어난다.
                     """,
             extensions = @Extension(properties = @ExtensionProperty(name = "x-order", value = "1"))
     )

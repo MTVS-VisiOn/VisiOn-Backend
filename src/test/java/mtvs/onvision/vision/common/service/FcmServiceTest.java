@@ -6,6 +6,7 @@ import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.MessagingErrorCode;
 import mtvs.onvision.vision.alert.domain.AlertType;
 import mtvs.onvision.vision.alert.domain.NotifyStatus;
+import mtvs.onvision.vision.common.constant.DataMessageType;
 import mtvs.onvision.vision.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -51,6 +52,7 @@ class FcmServiceTest {
         ReflectionTestUtils.setField(fcmService, "maxAttempts", maxAttempts);
         ReflectionTestUtils.setField(fcmService, "pushCommandTtl", Duration.ofHours(24));
         ReflectionTestUtils.setField(fcmService, "signalPushTtl", Duration.ofSeconds(60));
+        ReflectionTestUtils.setField(fcmService, "instructionTtl", Duration.ofSeconds(30));
     }
 
     /** 생성자가 막혀 있어 직접 만들 수 없다. Mockito가 생성자를 우회해 만든다 */
@@ -267,6 +269,59 @@ class FcmServiceTest {
                 //then
                 assertThat(status).isEqualTo(NotifyStatus.SENT);
                 verify(firebaseMessaging, times(2)).send(any(Message.class));
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Describe: instructionData 메서드는")
+    class Describe_with_instructionData {
+
+        private Map<String, String> data() {
+            return fcmService.instructionData(99L, DataMessageType.GUARDIAN_INSTRUCTION, "잠시 멈추세요.", occurredAt);
+        }
+
+        @Nested
+        @DisplayName("Context: 지시를 실어 보낼 때")
+        class Context_with_instruction {
+
+            @Test
+            @DisplayName("It : 앱이 약속한 키를 빠짐없이 넣는다")
+            void it_has_every_agreed_key() {
+                //then : 하나라도 없으면 앱이 메시지 전체를 무시한다
+                assertThat(data()).containsOnlyKeys(
+                        "type", "commandId", "content",
+                        "occurredAt", "occurredAtEpochMillis", "expiresAtEpochMillis");
+            }
+
+            @Test
+            @DisplayName("(alertId가 아니다)It : 지시 id를 commandId로 넣는다")
+            void it_names_the_id_commandId() {
+                //then
+                assertThat(data()).containsEntry("commandId", "99");
+            }
+
+            @Test
+            @DisplayName("It : occurredAt을 UTC ISO-8601로 넣는다")
+            void it_formats_occurredAt_as_utc() {
+                //then : KST 로컬시간(2026-08-06T15:12)으로 나가면 앱이 9시간 어긋나게 읽는다
+                assertThat(data()).containsEntry("occurredAt", "2026-08-06T06:12:00Z");
+            }
+
+            @Test
+            @DisplayName("It : 만료 시각을 발생 시각 + 지시 TTL로 계산한다")
+            void it_expires_after_ttl() {
+                //then : FCM ttl과 같은 instructionTtl에서 나온다. 따로 두면 어긋난다
+                assertThat(data())
+                        .containsEntry("occurredAtEpochMillis", String.valueOf(occurredAt.toEpochMilli()))
+                        .containsEntry("expiresAtEpochMillis", String.valueOf(occurredAt.toEpochMilli() + 30_000L));
+            }
+
+            @Test
+            @DisplayName("(FCM data 제약)It : 값을 전부 문자열로 넣는다")
+            void it_keeps_every_value_a_string() {
+                //then : 숫자로 넣으면 FCM이 거부하고 앱도 파싱하지 못한다
+                assertThat(data().values()).allSatisfy(value -> assertThat(value).isInstanceOf(String.class));
             }
         }
     }
