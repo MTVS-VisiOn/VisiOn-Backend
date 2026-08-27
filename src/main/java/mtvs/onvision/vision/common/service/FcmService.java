@@ -31,6 +31,8 @@ public class FcmService {
     private Duration pushCommandTtl;
     @Value("${alert.push.signal-ttl}")
     private Duration signalPushTtl;
+    @Value("${alert.push.instruction-ttl}")
+    private Duration instructionTtl;
 
     private static final long BACKOFF_MILLIS = 200L;
 
@@ -63,10 +65,10 @@ public class FcmService {
         return send(fid, message);
     }
 
-    //앱으로 보내는 지시사항
-    public void sendToDevice(Long commandId, String content, DataMessageType type, Instant occurredAt, String fid) {
+    /** 앱으로 보내는 지시사항. 결과 로그는 commandId·wardId를 아는 리스너 쪽에서 남긴다 */
+    public NotifyStatus sendToDevice(Long commandId, String content, DataMessageType type, Instant occurredAt, String fid) {
         Message message = buildMessage(commandId, type, content, occurredAt, fid);
-        send(fid, message);
+        return send(fid, message);
     }
 
     /**
@@ -139,17 +141,30 @@ public class FcmService {
     private Message buildMessage(Long commandId, DataMessageType type, String content, Instant occurredAt, String fid) {
         return Message.builder()
                 .setToken(fid)
-                .putData("alertId", commandId.toString())
-                .putData("type", type.name())
-                .putData("content", content)
-                .putData("occurredAt", occurredAt.atZone(SEOUL).toLocalDateTime().toString())
+                .putAllData(instructionData(commandId, type, content, occurredAt))
                 .setAndroidConfig(AndroidConfig.builder()
                         .setPriority(AndroidConfig.Priority.HIGH)
-                        // 기기가 오프라인인 건 장애가 아니다. 켜지면 그때라도 배달되게 둔다.
-                        // 서버 재시도 만료(alert.retry.expire-minutes)와는 다른 층이다
-                        .setTtl(pushCommandTtl.toMillis())
+                        // 알림(ttl=24h)과 달리 지시는 늦게 도착하면 위험하다.
+                        // 앱이 폐기 판단에 쓰는 expiresAtEpochMillis와 같은 값에서 나와야 어긋나지 않는다
+                        .setTtl(instructionTtl.toMillis())
                         .build())
                 .build();
+    }
+
+    /**
+     * 지시 FCM의 data 본문. 값은 전부 문자열이다 — 숫자로 넣으면 앱이 읽지 못한다.
+     * <p>
+     * Firebase {@code Message}는 만든 내용을 되읽을 수 없어 package-private으로 열어 직접 검증한다.
+     */
+    Map<String, String> instructionData(Long commandId, DataMessageType type, String content, Instant occurredAt) {
+        return Map.of(
+                "commandId", commandId.toString(),
+                "type", type.name(),
+                "content", content,
+                "occurredAt", DateTimeFormatter.ISO_INSTANT.format(occurredAt),
+                "occurredAtEpochMillis", String.valueOf(occurredAt.toEpochMilli()),
+                "expiresAtEpochMillis", String.valueOf(occurredAt.plus(instructionTtl).toEpochMilli())
+        );
     }
 
     /**

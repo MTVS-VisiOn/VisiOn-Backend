@@ -69,6 +69,7 @@ alert:
     # 미설정 시 기본이 4주라 길고, 하루 넘게 꺼져 있었으면 알림 목록으로 보면 된다
     ttl: 24h
     signal-ttl: 60s
+    instruction-ttl: 30s
 
 
 tmap:
