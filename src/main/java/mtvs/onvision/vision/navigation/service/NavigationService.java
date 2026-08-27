@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
+import mtvs.onvision.vision.common.config.properties.NavigationStartProperties;
 import mtvs.onvision.vision.common.util.GeoUtils;
 import mtvs.onvision.vision.location.domain.MovementStatus;
 import mtvs.onvision.vision.location.dto.LocationReport;
@@ -50,16 +51,12 @@ public class NavigationService {
 
     private static final Pattern DISTANCE_TAIL = Pattern.compile("\\d+m 이동$");
 
-    /** 경로 출발점으로 쓸 수 있는 반경 오차 상한(m). 실측 실외 15건이 전부 12m 이하, 픽스 없음이 55~117m다 */
-    private static final float START_ACCURACY_MAX_M = 30f;
-    /** 요청에 실려 온 좌표의 수명(초). 클라이언트가 요청 직전에 측정한 값이라 짧게 잡는다 */
-    private static final long REQUEST_MAX_AGE_SEC = 20;
-    /** 저장 좌표가 정지 상태일 때의 수명(초). 정지 중 보고 간격이 58~62초라 그 1.5배로 둔다 */
-    private static final long CACHE_MAX_AGE_STATIONARY_SEC = 90;
-    /** 저장 좌표가 이동 중일 때의 수명(초). 보행 중 보고 간격은 3~5초다 */
-    private static final long CACHE_MAX_AGE_MOVING_SEC = 30;
-    /** 폰 시계가 서버보다 앞설 때 오차로 봐주는 상한(초). 실측 스큐는 ±1.2초다 */
-    private static final long CLOCK_SKEW_TOLERANCE_SEC = 5;
+    /**
+     * 출발 좌표 신뢰도 문턱. 상수가 아니라 설정값이다 — 실기기 환경(실내·도심 빌딩숲)에 따라
+     * 현장에서 몇 번 돌려 보며 정해야 하는 값이라 재빌드 없이 env로 바꿀 수 있어야 한다.
+     * 값의 근거는 {@link NavigationStartProperties} 참조.
+     */
+    private final NavigationStartProperties startPolicy;
     private final UserService userService;
     private final RealtimeLocationRepository realtimeLocationRepository;
     private final RouteProgressCalculator routeProgressCalculator;
@@ -437,15 +434,18 @@ public class NavigationService {
      * 2026-08-26 실측에서 accuracy 100m짜리 재전송 좌표로 경로가 만들어져 실제 위치에서
      * 218m 떨어진 곳에서 안내가 시작됐다.
      *
-     * <p>저장 좌표의 수명을 이동 상태로 나눈 이유 — 고정값으로는 못 맞춘다. 90초는 보행 중
-     * 90m 오차이고, 30초는 정지 중 상시 만료다(실측 보고 간격 58~62초). 판정이 틀릴 때는
-     * 정지 확정이 늦는 쪽이라 오차 방향이 안전하다.
+     * <p>저장 좌표의 수명을 이동 상태로 나눈 이유 — 고정값으로는 못 맞춘다. 이동 중 수명은
+     * 그 시간만큼이 그대로 드리프트가 되고, 정지 중 수명은 짧으면 상시 만료라 폴백이 아무것도
+     * 못 건진다(실측 보고 공백 81~180초). 판정이 틀릴 때는 정지 확정이 늦는 쪽이라 오차 방향이 안전하다.
+     *
+     * <p>문턱 값 자체는 {@link NavigationStartProperties}로 뺐다. 실기기 환경마다 달라서
+     * 재빌드 없이 조정할 수 있어야 한다.
      */
     private StartOrigin resolveStart(NavigationPreRequest request, Long wardId) {
         Instant now = Instant.now();
 
         Long age = ageSeconds(request.startRecordedAt(), now);
-        if (trustworthy(request.startAccuracy(), age, REQUEST_MAX_AGE_SEC)) {
+        if (trustworthy(request.startAccuracy(), age, startPolicy.getRequestMaxAge().getSeconds())) {
             return new StartOrigin(List.of(request.start().latitude(), request.start().longitude()),
                     StartSource.REQUEST, request.startAccuracy(), request.startRecordedAt());
         }
@@ -455,8 +455,7 @@ public class NavigationService {
         LocationReport last = lastLocationSafely(wardId);
         if (last != null && last.latitude() != null && last.longitude() != null) {
             Long lastAge = ageSeconds(last.recordedAt(), now);
-            long limit = last.status() == MovementStatus.STATIONARY
-                    ? CACHE_MAX_AGE_STATIONARY_SEC : CACHE_MAX_AGE_MOVING_SEC;
+            long limit = cacheMaxAgeSecondsOf(last.status());
             if (trustworthy(last.accuracy(), lastAge, limit)) {
                 log.info("출발 좌표 — 저장 위치로 폴백: wardId={} accuracy={} ageSec={} status={}",
                         wardId, last.accuracy(), lastAge, last.status());
@@ -470,13 +469,23 @@ public class NavigationService {
     }
 
     /**
+     * 저장 좌표의 수명(초). 이동 상태로 나눈 이유 — 고정값으로는 못 맞춘다.
+     * 정지가 맞다면 나이가 오차를 만들지 않아 길게 줄 수 있고, 이동 중이면 그 시간만큼이 그대로 드리프트다.
+     */
+    private long cacheMaxAgeSecondsOf(MovementStatus status) {
+        return status == MovementStatus.STATIONARY
+                ? startPolicy.getCacheMaxAgeStationary().getSeconds()
+                : startPolicy.getCacheMaxAgeMoving().getSeconds();
+    }
+
+    /**
      * 좌표를 경로 출발점으로 쓸 수 있는지. 정확도와 나이를 모두 넘겨야 한다.
      *
      * <p>{@code accuracy}가 없거나 0 이하이면 「오차 0」이 아니라 「정확도 없음」이므로 불신한다.
-     * 나이를 모르면({@code age == null}) 측정 시각이 없거나 시계가 5초 넘게 미래인 경우다.
+     * 나이를 모르면({@code age == null}) 측정 시각이 없거나 시계가 허용치를 넘게 미래인 경우다.
      */
     private boolean trustworthy(Float accuracy, Long ageSec, long limitSec) {
-        if (accuracy == null || accuracy <= 0f || accuracy > START_ACCURACY_MAX_M) return false;
+        if (accuracy == null || accuracy <= 0f || accuracy > startPolicy.getAccuracyMaxM()) return false;
         return ageSec != null && ageSec <= limitSec;
     }
 
@@ -484,14 +493,14 @@ public class NavigationService {
      * 측정 시각부터 지금까지의 초. 못 믿을 값이면 {@code null}.
      *
      * <p>폰 시계가 서버보다 앞선 보고가 실측된다(2026-08-26 관측 +1.1초). 그 정도는 시계 오차로
-     * 보고 0초로 클램프하되, {@link #CLOCK_SKEW_TOLERANCE_SEC}를 넘는 미래 시각은 불신한다.
+     * 보고 0초로 클램프하되, {@code clockSkewTolerance}를 넘는 미래 시각은 불신한다.
      * 무제한으로 클램프하면 시계가 크게 틀어진 단말의 좌표가 영원히 「방금 측정됨」이 된다.
      */
     private Long ageSeconds(Instant recordedAt, Instant now) {
         if (recordedAt == null) return null;
         long age = Duration.between(recordedAt, now).getSeconds();
         if (age >= 0) return age;
-        return -age <= CLOCK_SKEW_TOLERANCE_SEC ? 0L : null;
+        return -age <= startPolicy.getClockSkewTolerance().getSeconds() ? 0L : null;
     }
 
     /**
@@ -504,8 +513,7 @@ public class NavigationService {
         LocationReport last = lastLocationOf(wardId);
         if (last == null) return null;
         Long age = ageSeconds(last.recordedAt(), Instant.now());
-        long limit = last.status() == MovementStatus.STATIONARY
-                ? CACHE_MAX_AGE_STATIONARY_SEC : CACHE_MAX_AGE_MOVING_SEC;
+        long limit = cacheMaxAgeSecondsOf(last.status());
         if (trustworthy(last.accuracy(), age, limit)) return last;
         log.debug("남은 거리 계산 생략 — wardId={} accuracy={} ageSec={} status={}",
                 wardId, last.accuracy(), age, last.status());

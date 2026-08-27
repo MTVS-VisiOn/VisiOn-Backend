@@ -3,6 +3,7 @@ package mtvs.onvision.vision.navigation.service;
 import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.common.exception.BusinessException;
 import mtvs.onvision.vision.common.exception.ErrorCode;
+import mtvs.onvision.vision.common.config.properties.NavigationStartProperties;
 import mtvs.onvision.vision.location.domain.MovementStatus;
 import mtvs.onvision.vision.location.dto.LocationReport;
 import mtvs.onvision.vision.location.repository.RealtimeLocationRepository;
@@ -29,6 +30,7 @@ import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -73,6 +75,19 @@ class NavigationServiceTest {
 
     @Mock
     private RouteProgressCalculator routeProgressCalculator;
+
+    /**
+     * 진짜 값을 쓴다. 목으로 대체하면 문턱이 전부 0이 돼 어떤 좌표도 통과하지 못하고
+     * 출발 좌표 관련 테스트가 통째로 409로 떨어진다.
+     * 값은 {@code application.yml}의 기본값과 같게 둔다.
+     */
+    @Spy
+    private NavigationStartProperties startPolicy = new NavigationStartProperties(
+            30f,
+            Duration.ofSeconds(30),
+            Duration.ofSeconds(180),
+            Duration.ofSeconds(60),
+            Duration.ofSeconds(5));
 
     /**
      * 진짜 매퍼를 쓴다. Redis의 report를 다시 읽는 게 이 도메인에서 가장 조용히 깨지는 자리라
@@ -190,9 +205,9 @@ class NavigationServiceTest {
             }
 
             @Test
-            @DisplayName("It : 측정 시각이 20초를 넘으면 신뢰하지 않는다")
+            @DisplayName("It : 측정 시각이 요청 좌표 수명을 넘으면 신뢰하지 않는다")
             void it_rejects_stale_request_coordinate() {
-                //given — 정확도는 좋지만 오래됐다
+                //given — 정확도는 좋지만 오래됐다. 60초는 어떤 기본값(현재 30초)보다도 길다
                 NavigationPreRequest request = requestWith(5f, Instant.now().minusSeconds(60));
                 given(realtimeLocationRepository.getLastLocation(wardId)).willReturn(Optional.empty());
 

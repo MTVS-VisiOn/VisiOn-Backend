@@ -61,6 +61,13 @@ alert:
     ttl: 24h
     signal-ttl: 60s
     instruction-ttl: 30s
+navigation:
+  start:
+    accuracy-max-m: 30
+    request-max-age: 30s
+    cache-max-age-stationary: 180s
+    cache-max-age-moving: 60s
+    clock-skew-tolerance: 5s
 tmap:
   base-url: https://apis.openapi.sk.com
   app-key: test

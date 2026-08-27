@@ -76,6 +76,16 @@ tmap:
   base-url: https://apis.openapi.sk.com
   app-key: ${TMAP_APP_KEY}
 
+# 경로 출발 좌표 신뢰도 문턱. 실기기 환경(실내·도심 빌딩숲)에 맞춰 재빌드 없이 env로 조정한다.
+# 값의 근거와 올려도 되는 상한은 NavigationStartProperties javadoc 참조
+navigation:
+  start:
+    accuracy-max-m: ${NAV_START_ACCURACY_MAX_M:30}
+    request-max-age: ${NAV_START_REQUEST_MAX_AGE:30s}
+    cache-max-age-stationary: ${NAV_START_CACHE_MAX_AGE_STATIONARY:180s}
+    cache-max-age-moving: ${NAV_START_CACHE_MAX_AGE_MOVING:60s}
+    clock-skew-tolerance: ${NAV_START_CLOCK_SKEW_TOLERANCE:5s}
+
 ice:
   stun-urls:
     - stun:stun.l.google.com:19302
