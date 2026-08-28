@@ -1121,6 +1121,15 @@ public interface NavigationControllerSupporter {
                     `/processing`과 달리 턴바이턴 안내 정보를 빼고 **지도에 필요한 값만** 내보낸다.
                     `path`는 구간별 좌표를 하나로 이어붙인 것이며 `{latitude, longitude}` 객체 배열이다.
 
+                    **접두사 없는 `name`·`address`·`latitude`·`longitude`는 목적지다.**
+                    출발지는 `departureName`·`departureAddress`·`departureLatitude`·`departureLongitude`로 따로 나간다.
+
+                    **출발 좌표는 `path`의 첫 점과 항상 같다.** 경로가 실제로 시작한 지점이라서다 —
+                    서버는 요청에 실려 온 출발 좌표를 그대로 쓰지 않고, 못 믿으면 저장된 최신 위치로 폴백한다.
+                    반면 `departureName`·`departureAddress`는 사용자가 고른 출발지의 이름이라 그 좌표의 주소가 아니다.
+
+                    목적지 좌표는 티맵에 보낸 값(보행자 입구점일 수 있다)과 다를 수 있다.
+
                     **진행 중인 경로가 없으면 404가 아니라 `data: null`이다.** 목적지 미설정은 오류가 아니다.
 
                     `distanceM`·`etaMin`은 **경로를 저장한 시점의 전체 값**이다. 이동한 만큼 줄어들지 않는다.
@@ -1165,6 +1174,10 @@ public interface NavigationControllerSupporter {
                                                                     "address": "서울 서초구 강남대로 213",
                                                                     "latitude": 37.479103,
                                                                     "longitude": 127.037476,
+                                                                    "departureName": "회사",
+                                                                    "departureAddress": "서울 강남구 강남대로 지하 476",
+                                                                    "departureLatitude": 37.504585,
+                                                                    "departureLongitude": 127.024798,
                                                                     "distanceM": 24269,
                                                                     "remainingDistanceM": 2450,
                                                                     "etaMin": 360,
@@ -1190,6 +1203,10 @@ public interface NavigationControllerSupporter {
                                                                     "address": "서울 서초구 강남대로 213",
                                                                     "latitude": 37.479103,
                                                                     "longitude": 127.037476,
+                                                                    "departureName": "회사",
+                                                                    "departureAddress": "서울 강남구 강남대로 지하 476",
+                                                                    "departureLatitude": 37.504585,
+                                                                    "departureLongitude": 127.024798,
                                                                     "distanceM": 24269,
                                                                     "remainingDistanceM": null,
                                                                     "etaMin": 360,

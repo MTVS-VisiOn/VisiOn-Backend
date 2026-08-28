@@ -463,6 +463,7 @@ class NavigationControllerTest {
         private MapResponse mapResponse() {
             return new MapResponse(
                     "말죽거리공원사거리", "서울 서초구 강남대로 213", 37.479103, 127.037476,
+                    "회사", "서울 강남구 강남대로 지하 476", 37.504585, 127.024798,
                     24269, 2450, 360, Instant.parse("2026-08-03T07:08:00Z"), TransportMode.WALK,
                     List.of(Map.of("latitude", 37.504585, "longitude", 127.024798),
                             Map.of("latitude", 37.503900, "longitude", 127.025200)));
@@ -484,6 +485,11 @@ class NavigationControllerTest {
                         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                         .andExpect(jsonPath("$.code").value(SuccessCode.ROUTE_READ.name()))
                         .andExpect(jsonPath("$.data.name").value("말죽거리공원사거리"))
+                        // 목적지만 나가고 출발지가 비어 앱이 "출발 위치 정보 없음"을 띄웠다(2026-08-27)
+                        .andExpect(jsonPath("$.data.departureName").value("회사"))
+                        .andExpect(jsonPath("$.data.departureAddress").value("서울 강남구 강남대로 지하 476"))
+                        .andExpect(jsonPath("$.data.departureLatitude").value(37.504585))
+                        .andExpect(jsonPath("$.data.departureLongitude").value(127.024798))
                         .andExpect(jsonPath("$.data.distanceM").value(24269))
                         .andExpect(jsonPath("$.data.remainingDistanceM").value(2450))
                         .andExpect(jsonPath("$.data.etaMin").value(360))
@@ -498,6 +504,7 @@ class NavigationControllerTest {
                 // 이 프로젝트는 NON_NULL을 안 걸어서 null이 그대로 나가야 한다(handoff §0 null 정책)
                 MapResponse unknown = new MapResponse(
                         "말죽거리공원사거리", "서울 서초구 강남대로 213", 37.479103, 127.037476,
+                        "회사", "서울 강남구 강남대로 지하 476", 37.504585, 127.024798,
                         24269, null, 360, Instant.parse("2026-08-03T07:08:00Z"), TransportMode.WALK,
                         List.of());
                 given(navigationService.getMapRoute(any())).willReturn(unknown);

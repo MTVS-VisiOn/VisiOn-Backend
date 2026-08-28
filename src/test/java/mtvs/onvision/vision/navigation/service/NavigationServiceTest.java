@@ -881,6 +881,33 @@ class NavigationServiceTest {
             }
 
             @Test
+            @DisplayName("It : 출발지 정보도 함께 내보낸다")
+            void it_returns_departure() {
+                //when : 목적지만 실어 보내 앱이 "출발 위치 정보 없음"을 띄웠다(2026-08-27)
+                MapResponse response = call();
+
+                //then
+                assertThat(response.departureName()).isEqualTo("신논현역");
+                assertThat(response.departureAddress()).isEqualTo("서울 강남구 강남대로 지하 476");
+            }
+
+            @Test
+            @DisplayName("(요약이 아니라 경로선)It : 출발 좌표를 path의 첫 점으로 내보낸다")
+            void it_takes_departure_from_path() {
+                //given : 요약의 출발 좌표(37.504585, 127.024798)는 클라이언트가 요청에 실어 보낸 값이다.
+                // resolveStart가 저장 좌표로 폴백하면 경로가 실제로 시작한 지점과 달라진다(2026-08-27 실측 58m)
+                //when
+                MapResponse response = call();
+
+                //then
+                assertThat(response.departureLatitude()).isEqualTo(37.504562);
+                assertThat(response.departureLongitude()).isEqualTo(127.024810);
+                assertThat(response.path().getFirst())
+                        .containsEntry("latitude", 37.504562)
+                        .containsEntry("longitude", 127.024810);
+            }
+
+            @Test
             @DisplayName("(초가 아니라 분)It : totalTime을 60으로 나눠 etaMin으로 내보낸다")
             void it_converts_seconds_to_minutes() {
                 //when : TMap totalTime은 초 단위다. 그대로 내보내면 21600분이 된다
