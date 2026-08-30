@@ -5,13 +5,12 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import mtvs.onvision.vision.auth.dto.CurrentUser;
 import mtvs.onvision.vision.auth.dto.TokenBody;
 import mtvs.onvision.vision.auth.service.JwtTokenProvider;
-import mtvs.onvision.vision.user.service.UserService;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -20,7 +19,6 @@ import java.io.IOException;
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
-	private final UserService userService;
 	private final JwtTokenProvider tokenProvider;
 
 	@Override
@@ -29,7 +27,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
 		if (token != null && tokenProvider.validate(token)) {
 			TokenBody tokenBody = tokenProvider.parseJwt(token);
-			UserDetails userDetails = userService.loadCurrentUser(tokenBody);
+			// 토큰이 userId·email·role·type을 다 실고 있어 요청마다 users 를 다시 읽지 않는다
+			CurrentUser userDetails = new CurrentUser(tokenBody.userId(), tokenBody.email(), tokenBody.role(), tokenBody.type());
 			Authentication authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
 			SecurityContextHolder.getContext().setAuthentication(authentication);
 
