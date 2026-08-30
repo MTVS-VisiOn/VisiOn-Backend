@@ -690,9 +690,9 @@ class NavigationServiceTest {
             return fixtureMapper.writeValueAsString(new NavigationRouteReport(
                     walkSummary(),
                     List.of(
-                            new RouteStep(0, 37.504585, 127.024798, "55m 이동",
+                            new RouteStep(0, 37.504562, 127.024810, "55m 이동",
                                     null, "출발지", null, 55, 40, 0,
-                                    List.of(List.of(37.504585, 127.024798), List.of(37.504562, 127.024810))),
+                                    List.of(List.of(37.504562, 127.024810), List.of(37.504300, 127.024900))),
                             new RouteStep(1, 37.504100, 127.025000, "직진",
                                     null, "일반 안내점", null, 60, 45, 55,
                                     List.of(List.of(37.504100, 127.025000), List.of(37.503900, 127.025200))))));
@@ -927,8 +927,8 @@ class NavigationServiceTest {
                 //then
                 assertThat(response.path()).hasSize(4);
                 assertThat(response.path().getFirst())
-                        .containsEntry("latitude", 37.504585)
-                        .containsEntry("longitude", 127.024798);
+                        .containsEntry("latitude", 37.504562)
+                        .containsEntry("longitude", 127.024810);
                 assertThat(response.path().getLast())
                         .containsEntry("latitude", 37.503900)
                         .containsEntry("longitude", 127.025200);
